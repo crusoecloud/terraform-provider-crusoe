@@ -9,11 +9,11 @@ import (
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
-type diskDataSource struct {
+type disksDataSource struct {
 	client *swagger.APIClient
 }
 
-type diskDataSourceModel struct {
+type disksDataSourceModel struct {
 	Disks []diskModel `tfsdk:"disks"`
 }
 
@@ -25,22 +25,21 @@ type diskModel struct {
 	Size string `tfsdk:"size"`
 }
 
-// TODO: let's also implement a DiskDataSource for fetching one disk with filtering
-func NewDiskDataSource() datasource.DataSource {
-	return &diskDataSource{}
+// TODO: let's also implement a singular DiskDataSource for fetching one disk with filtering
+func NewDisksDataSource() datasource.DataSource {
+	return &disksDataSource{}
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (ds diskDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (ds disksDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_storage_disks"
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (ds diskDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (ds disksDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
 		"disks": schema.ListNestedAttribute{
 			Computed:    true,
-			Description: "TODO",
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"id": schema.StringAttribute{
@@ -62,7 +61,7 @@ func (ds diskDataSource) Schema(ctx context.Context, request datasource.SchemaRe
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (ds diskDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (ds disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	dataResp, httpResp, err := ds.client.DisksApi.GetDisks(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Disks", "Could not fetch Disk data at this time.")
@@ -70,7 +69,7 @@ func (ds diskDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	var state diskDataSourceModel
+	var state disksDataSourceModel
 	for i := range dataResp.Disks {
 		state.Disks = append(state.Disks, diskModel{
 			ID:   dataResp.Disks[i].Id,

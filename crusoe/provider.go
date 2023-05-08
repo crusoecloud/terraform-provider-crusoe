@@ -58,7 +58,7 @@ func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		vm.NewVMDataSource,
-		disk.NewDiskDataSource,
+		disk.NewDisksDataSource,
 	}
 }
 

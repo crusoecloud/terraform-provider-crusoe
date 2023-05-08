@@ -7,7 +7,7 @@ terraform {
 }
 
 provider "crusoe" {
-  // create a new access keypair as https://console.crusoecloud.com/security/tokens
+  // create a new access keypair at https://console.crusoecloud.com/security/tokens
   access_key = "MY_KEY"
   secret_key = "MY_SECRET"
 }
@@ -18,7 +18,7 @@ locals {
 
 // new VM
 resource "crusoe_compute_instance" "test_vm" {
-  name = "my-cool-vm"
+  name = "my-new-vm"
   type = "a40.1x"
 
   ssh_key = local.my_ssh_key
