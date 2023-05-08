@@ -12,19 +12,17 @@ import (
 )
 
 // vmDataSource is a Terraform datasource that can be used to fetch a single VM instance.
-// TODO: consider making another one of these for getting multiple instances, if it seems useful
+// TODO: consider making another one of these for getting multiple instances
 type vmDataSource struct {
 	client *swagger.APIClient
 }
 
 type vmDataSourceFilter struct {
-	ID    *string               `tfsdk:"id"`
-	Name  *string               `tfsdk:"name"`
-	Type  *string               `tfsdk:"type"`
-	Disks []vmDiskResourceModel `tfsdk:"disks"`
-
+	ID                *string                   `tfsdk:"id"`
+	Name              *string                   `tfsdk:"name"`
+	Type              *string                   `tfsdk:"type"`
+	Disks             []vmDiskResourceModel     `tfsdk:"disks"`
 	NetworkInterfaces []vmNetworkInterfaceModel `tfsdk:"network_interfaces"`
-	// TODO: add remaining fields
 }
 
 type vmNetworkInterfaceModel struct {

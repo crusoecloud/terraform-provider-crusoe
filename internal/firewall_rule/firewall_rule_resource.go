@@ -1,6 +1,3 @@
-// TODO: finish adding validators
-// TODO: document options? need to figure out documentation generator
-
 package firewall_rule
 
 import (

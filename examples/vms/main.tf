@@ -7,12 +7,13 @@ terraform {
 }
 
 provider "crusoe" {
+  // create a new access keypair as https://console.crusoecloud.com/security/tokens
   access_key = "MY_KEY"
   secret_key = "MY_SECRET"
 }
 
 locals {
-  my_ssh_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFxu4fSr7AILGLlkr5xyJ+x7G5an0mO4WDTuuL2MDXym agutierrez@crusoeenergy.com"
+  my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
 // new VM
@@ -36,8 +37,9 @@ resource "crusoe_storage_disk" "data_disk" {
 }
 
 // firewall rule
+// warning: this allows all ingress over TCP to our test VM
 resource "crusoe_vpc_firewall_rule" "fw_rule2" {
-  network = crusoe_compute_instance.test_vm.network_interfaces[0].network //"2132b387-1692-4c52-8a51-c380b6889b87"
+  network = crusoe_compute_instance.test_vm.network_interfaces[0].network
   name = "testrule-terra"
   action = "allow"
   direction = "ingress"

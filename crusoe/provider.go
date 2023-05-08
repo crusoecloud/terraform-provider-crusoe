@@ -16,11 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func New() provider.Provider {
-	return &crusoeProvider{}
-}
-
-var defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"
+const defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"
 
 type crusoeProvider struct{}
 
@@ -28,6 +24,10 @@ type crusoeProviderModel struct {
 	Host      types.String `tfsdk:"host"`
 	AccessKey types.String `tfsdk:"access_key"`
 	SecretKey types.String `tfsdk:"secret_key"`
+}
+
+func New() provider.Provider {
+	return &crusoeProvider{}
 }
 
 // Metadata returns the provider type name.

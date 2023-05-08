@@ -16,8 +16,8 @@ import (
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
-var defaultDiskLocation = "mtkn-cdp-prod" // CDP Production
-var defaultDiskType = "persistent-ssd"
+const defaultDiskLocation = "mtkn-cdp-prod" // CDP Production
+const defaultDiskType = "persistent-ssd"
 
 type diskResource struct {
 	client *swagger.APIClient
@@ -75,7 +75,6 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				// support falling back to a default value by setting both true
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.String{

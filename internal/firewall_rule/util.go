@@ -7,7 +7,6 @@ import (
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
-
 var whitespaceRegex = regexp.MustCompile(`\s`)
 
 // cidrListToString converts a list of CIDRs to a comma separated string.
