@@ -13,6 +13,9 @@ import (
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
+// TODO: pull from config set during build
+const version = "v1.0.0"
+
 type opStatus string
 
 type opResultError struct {
@@ -41,7 +44,7 @@ var (
 // NewAPIClient initializes a new Crusoe API client with the given configuration.
 func NewAPIClient(host, key, secret string) *swagger.APIClient {
 	cfg := swagger.NewConfiguration()
-	cfg.UserAgent = "CrusoeTerraform/0.0.1" // TODO: include version
+	cfg.UserAgent = fmt.Sprintf("CrusoeTerraform/%s", version)
 	cfg.BasePath = host
 	if cfg.HTTPClient == nil {
 		cfg.HTTPClient = http.DefaultClient

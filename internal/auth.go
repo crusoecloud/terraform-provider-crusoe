@@ -45,7 +45,7 @@ func (t AuthenticatingTransport) RoundTrip(r *http.Request) (*http.Response, err
 const (
 	timestampHeader = "X-Crusoe-Timestamp"
 	authHeader      = "Authorization"
-	version         = "1.0"
+	authVersion     = "1.0"
 )
 
 // Verifies if the token signature is valid for a given request.
@@ -62,7 +62,7 @@ func addSignature(req *http.Request, encodedKeyID, encodedKey string) error {
 	}
 
 	req.Header.Set(authHeader,
-		"Bearer "+fmt.Sprintf("%s:%s:%s", version, encodedKeyID, base64.RawURLEncoding.EncodeToString(signature)))
+		"Bearer "+fmt.Sprintf("%s:%s:%s", authVersion, encodedKeyID, base64.RawURLEncoding.EncodeToString(signature)))
 
 	return nil
 }
