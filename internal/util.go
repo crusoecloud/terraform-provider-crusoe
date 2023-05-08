@@ -111,7 +111,7 @@ func AwaitOperation(ctx context.Context, op *swagger.Operation,
 }
 
 // AwaitOperationAndResolve awaits an async API operation and attempts to parse the response as an instance of T,
-// assuming the operation was successful.
+// if the operation was successful.
 func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation,
 	getFunc func(context.Context, string) (swagger.OperationsGetResponse, *http.Response, error)) (*T, *swagger.Operation, error) {
 	op, err := AwaitOperation(ctx, op, getFunc)
