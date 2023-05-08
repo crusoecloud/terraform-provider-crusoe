@@ -1,0 +1,71 @@
+# see https://golangci-lint.run/usage/configuration/
+linters-settings:
+  errcheck:
+    # report about not checking of errors in type assertions: `a := b.(MyStruct)`;
+    # default is false: such cases aren't reported by default.
+    check-type-assertions: true
+
+    # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
+    # default is false: such cases aren't reported by default.
+    check-blank: true
+  govet:
+    check-shadowing: true
+  goimports:
+    local-prefixes: gitlab.com/crusoeenergy
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - commentedOutCode
+  whitespace:
+    multi-if: true # Enforces newlines (or comments) after every multi-line if statement
+  gosec:
+    global:
+      audit: enabled # Run extra checks that might be "nosy"
+  gomoddirectives:
+    replace-allow-list:
+      - gitlab.com/crusoeenergy/island/external/client-go
+
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - deadcode
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - gocritic
+    - gosimple
+    - govet
+    - gomnd
+    - gosec
+    - goimports
+    - makezero
+    - misspell
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - structcheck
+
+issues:
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude lll issues for long lines with go:generate
+    - linters:
+        - lll
+      source: "^//go:generate "
+
+run:
+  # include test  files or not
+  tests: true
+
+# golangci.com configuration
+# https://github.com/golangci/golangci/wiki/Configuration
+service:
+  golangci-lint-version: 1.52.x # use a fixed version for consistent results
