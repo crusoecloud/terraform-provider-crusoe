@@ -7,8 +7,6 @@ terraform {
 }
 
 provider "crusoe" {
-  # staging env
-  host = "https://api.crusoecloud.site/v1alpha4"
   access_key = "MY_KEY"
   secret_key = "MY_SECRET"
 }
