@@ -15,7 +15,7 @@ import (
 	validators "terraform-provider-crusoe/internal/validators"
 )
 
-const defaultDiskLocation = "mtkn-cdp-prod" // CDP Production
+const defaultDiskLocation = "mtkn-cdp-prod"
 const defaultDiskType = "persistent-ssd"
 
 type diskResource struct {
