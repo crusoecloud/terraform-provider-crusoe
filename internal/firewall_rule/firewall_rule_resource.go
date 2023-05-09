@@ -4,14 +4,15 @@ import (
 	"context"
 	"strings"
 
+	"terraform-provider-crusoe/internal"
+	validators "terraform-provider-crusoe/internal/validators"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"terraform-provider-crusoe/internal"
-	validators "terraform-provider-crusoe/internal/validators"
 
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
@@ -44,8 +45,7 @@ func (r *firewallRuleResource) Configure(ctx context.Context, req resource.Confi
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", "Could not initialize the Crusoe provider."+
-			" Please check your Crusoe configuration and try again, and if the problem persists, contact support.")
+		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
 
 		return
 	}
@@ -200,9 +200,9 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// This should be unreachable, since all properties should be marked as needing replacement on update.
 	resp.Diagnostics.AddWarning("Updates not supported",
-		"Updating firewall rules is not currently supported. If you're seeing this message, please reach out to"+
-			"Crusoe support and let us know. In the meantime, you should be able to update your rule by deleting it"+
-			"and then creating a new one.")
+		"Updating firewall rules is not currently supported. If you're seeing this message, please reach out to support@crusoecloud.com"+
+			" and let us know. In the meantime, you should be able to update your rule by deleting it"+
+			" and then creating a new one.")
 }
 
 //nolint:gocritic // Implements Terraform defined interface

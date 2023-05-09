@@ -23,6 +23,7 @@ func cidrListToString(ruleObjects []swagger.FirewallRuleObject) string {
 	return out
 }
 
+// toFirewallRuleObject wraps an IP or CIDR string into a FirewallRuleObject.
 func toFirewallRuleObject(ipOrCIDR string) swagger.FirewallRuleObject {
 	return swagger.FirewallRuleObject{Cidr: ipOrCIDR}
 }

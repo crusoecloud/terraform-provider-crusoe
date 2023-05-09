@@ -2,9 +2,39 @@
 
 This repo defines the official Terraform Provider for use with [Crusoe Cloud](https://crusoecloud.com/), the world's first carbon-reducing, low-cost GPU cloud platform.
 
+To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.ai/security/tokens and add the following to the beginning of your `.tf` file:
+
+```
+terraform {
+  required_providers {
+    crusoe = {
+      source = "registry.terraform.io/crusoecloud/crusoe"
+    }
+  }
+}
+
+provider "crusoe" {
+  access_key = "<my_key>"
+  secret_key = "<my_secret>"
+}
+
+locals {
+  ssh_key = file("~/.ssh/id_ed25519.pub")
+}
+```
+
 ## Examples
 
-TODO
+```terraform
+# Create 10, 8xA100-80GB VMs
+resource "crusoe_compute_instance" "nodes" {
+  name = "node-${count.index}"
+  type = "a100-80gb.8x"
+  ssh_key = local.ssh_key
+}
+```
+
+For more usage examples, including storage disks, startup scripts, and firewall rules, see the [examples folder](./examples/).
 
 ## Development
 
@@ -24,23 +54,4 @@ provider_installation {
 }
 ```
 
-Create a new access token pair if you haven't yet at https://console.crusoecloud.com/security/tokens. 
-These will go in the crusoe provider definition of your terraform files. Alternatively, you can define them as
-environment variables:
-
-```bash
-export CRUSOE_ACCESS_KEY='MY_API_KEY'
-export CRUSOE_SECRET_KEY='MY_SECRET_KEY'
-```
-
-Run `make install` to build a provider and install it into your go-path. From there, you should be able to run `terraform init && terraform apply` with the example. You'll be prompted for an API key and secret if you haven't specified them in your `.tf` file, but if you've set your env variables,
-
-### Build provider
-
-Run the following command to build the provider and move it to your go bin folder.
-
-```shell
-make install
-```
-
-Test the provider by running `terraform plan && terraform apply` in a directory with a `.tf` file, such as `examples/vms`.
+Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples.

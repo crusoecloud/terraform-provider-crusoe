@@ -5,6 +5,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"terraform-provider-crusoe/internal"
+
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
@@ -38,8 +40,7 @@ func (ds *disksDataSource) Configure(_ context.Context, req datasource.Configure
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", "Could not initialize the Crusoe provider."+
-			" Please check your Crusoe configuration and try again, and if the problem persists, contact support.")
+		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
 
 		return
 	}

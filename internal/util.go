@@ -12,8 +12,15 @@ import (
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
-// TODO: pull from config set during build
-const version = "v0.1.0"
+const (
+	// TODO: pull from config set during build
+	version = "v0.1.0"
+
+	pollInterval = 2 * time.Second
+
+	ErrorMsgProviderInitFailed = "Could not initialize the Crusoe provider." +
+		" Please check your Crusoe configuration and try again, and if the problem persists, contact support@crusoecloud.com."
+)
 
 type opStatus string
 
@@ -31,13 +38,11 @@ var (
 	errNoOperations     = errors.New("no operation with id found")
 	errUnableToGetOpRes = errors.New("failed to get result of operation")
 
-	errAmbiguousRole     = errors.New("user is associated with multiple roles - please contact support")
+	errAmbiguousRole     = errors.New("user is associated with multiple roles - please contact support@crusoecloud.com")
 	errNoRoleAssociation = errors.New("user is not associated with any role")
 
 	// fallback error presented to the user in unexpected situations
-	errUnexpected = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support.")
-
-	pollInterval = 2 * time.Second
+	errUnexpected = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
 )
 
 // NewAPIClient initializes a new Crusoe API client with the given configuration.

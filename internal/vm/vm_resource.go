@@ -3,6 +3,9 @@ package vm
 import (
 	"context"
 
+	"terraform-provider-crusoe/internal"
+	validators "terraform-provider-crusoe/internal/validators"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,8 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
-	"terraform-provider-crusoe/internal"
-	validators "terraform-provider-crusoe/internal/validators"
 )
 
 type vmResource struct {
@@ -63,8 +64,7 @@ func (r *vmResource) Configure(ctx context.Context, req resource.ConfigureReques
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", "Could not initialize the Crusoe provider."+
-			" Please check your Crusoe configuration and try again, and if the problem persists, contact support.")
+		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
 
 		return
 	}
