@@ -35,7 +35,7 @@ type vmResourceModel struct {
 	NetworkInterfaces types.List            `tfsdk:"network_interfaces"`
 }
 
-type vmNetworkResourceModel struct {
+type vmNetworkInterfaceResourceModel struct {
 	ID            types.String        `tfsdk:"id"`
 	Name          types.String        `tfsdk:"name"`
 	Network       types.String        `tfsdk:"network"`
@@ -219,9 +219,9 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	plan.ID = types.StringValue(instance.Id)
 
-	networkInterfaces := make([]vmNetworkResourceModel, 0, len(instance.NetworkInterfaces))
+	networkInterfaces := make([]vmNetworkInterfaceResourceModel, 0, len(instance.NetworkInterfaces))
 	for _, networkInterface := range instance.NetworkInterfaces {
-		networkInterfaces = append(networkInterfaces, vmNetworkResourceModel{
+		networkInterfaces = append(networkInterfaces, vmNetworkInterfaceResourceModel{
 			ID:            types.StringValue(networkInterface.Id),
 			Name:          types.StringValue(networkInterface.Name),
 			Network:       types.StringValue(networkInterface.Network),
@@ -280,23 +280,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		state.Disks = disks
 	}
 
-	// TODO: extract to util function?
-	networkInterfaces := make([]vmNetworkResourceModel, 0, len(instance.NetworkInterfaces))
-	for _, networkInterface := range instance.NetworkInterfaces {
-		networkInterfaces = append(networkInterfaces, vmNetworkResourceModel{
-			ID:            types.StringValue(networkInterface.Id),
-			Name:          types.StringValue(networkInterface.Name),
-			Network:       types.StringValue(networkInterface.Network),
-			Subnet:        types.StringValue(networkInterface.Subnet),
-			InterfaceType: types.StringValue(networkInterface.InterfaceType),
-			PrivateIpv4: vmIPv4ResourceModel{
-				Address: types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address),
-			},
-			PublicIpv4: vmIPv4ResourceModel{
-				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
-			},
-		})
-	}
+	networkInterfaces := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	tNetworkInterfaces, diags := types.ListValueFrom(ctx, types.ObjectType{
 		AttrTypes: vmNetworkTypeAttributes,
 	}, networkInterfaces)

@@ -3,11 +3,12 @@ package vm
 import (
 	"context"
 
+	"terraform-provider-crusoe/internal"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"terraform-provider-crusoe/internal"
 
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
@@ -19,14 +20,14 @@ type vmDataSource struct {
 }
 
 type vmDataSourceFilter struct {
-	ID                *string                   `tfsdk:"id"`
-	Name              *string                   `tfsdk:"name"`
-	Type              *string                   `tfsdk:"type"`
-	Disks             []vmDiskResourceModel     `tfsdk:"disks"`
-	NetworkInterfaces []vmNetworkInterfaceModel `tfsdk:"network_interfaces"`
+	ID                *string                       `tfsdk:"id"`
+	Name              *string                       `tfsdk:"name"`
+	Type              *string                       `tfsdk:"type"`
+	Disks             []vmDiskResourceModel         `tfsdk:"disks"`
+	NetworkInterfaces []vmNetworkInterfaceDataModel `tfsdk:"network_interfaces"`
 }
 
-type vmNetworkInterfaceModel struct {
+type vmNetworkInterfaceDataModel struct {
 	Id            string `tfsdk:"id"`
 	Name          string `tfsdk:"name"`
 	Network       string `tfsdk:"network"`
@@ -151,7 +152,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		state.ID = &vm.Id
 		state.Name = &vm.Name
 		state.Type = &vm.ProductName
-		state.NetworkInterfaces = vmNetworkInterfacesToTerraformModel(vm.NetworkInterfaces)
+		state.NetworkInterfaces = vmNetworkInterfacesToTerraformDataModel(vm.NetworkInterfaces)
 
 		diags = resp.State.Set(ctx, state)
 		resp.Diagnostics.Append(diags...)

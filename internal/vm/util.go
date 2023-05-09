@@ -81,12 +81,12 @@ func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swa
 	return nil, errors.New("failed to find VM with matching ID")
 }
 
-// vmNetworkInterfacesToTerraformModel creates a slice of Terraform compatible network
-// interfaces from Crusoe API network interfaces.
-func vmNetworkInterfacesToTerraformModel(networkInterfaces []swagger.NetworkInterface) []vmNetworkInterfaceModel {
-	interfaces := make([]vmNetworkInterfaceModel, 0, len(networkInterfaces))
+// vmNetworkInterfacesToTerraformDataModel creates a slice of Terraform-compatible network
+// interface datasource instances from Crusoe API network interfaces.
+func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.NetworkInterface) []vmNetworkInterfaceDataModel {
+	interfaces := make([]vmNetworkInterfaceDataModel, 0, len(networkInterfaces))
 	for _, networkInterface := range networkInterfaces {
-		interfaces = append(interfaces, vmNetworkInterfaceModel{
+		interfaces = append(interfaces, vmNetworkInterfaceDataModel{
 			Id:            networkInterface.Id,
 			Name:          networkInterface.Name,
 			Network:       networkInterface.Network,
@@ -97,6 +97,29 @@ func vmNetworkInterfacesToTerraformModel(networkInterfaces []swagger.NetworkInte
 			},
 			PublicIpv4: vmIPv4{
 				Address: networkInterface.Ips[0].PublicIpv4.Address,
+			},
+		})
+	}
+
+	return interfaces
+}
+
+// vmNetworkInterfacesToTerraformResourceModel creates a slice of Terraform-compatible network
+// interface resource instances from Crusoe API network interfaces.
+func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) []vmNetworkInterfaceResourceModel {
+	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
+	for _, networkInterface := range networkInterfaces {
+		interfaces = append(interfaces, vmNetworkInterfaceResourceModel{
+			ID:            types.StringValue(networkInterface.Id),
+			Name:          types.StringValue(networkInterface.Name),
+			Network:       types.StringValue(networkInterface.Network),
+			Subnet:        types.StringValue(networkInterface.Subnet),
+			InterfaceType: types.StringValue(networkInterface.InterfaceType),
+			PrivateIpv4: vmIPv4ResourceModel{
+				Address: types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address),
+			},
+			PublicIpv4: vmIPv4ResourceModel{
+				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
 			},
 		})
 	}
