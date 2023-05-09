@@ -3,10 +3,6 @@ package crusoe
 import (
 	"context"
 	"os"
-	"terraform-provider-crusoe/internal"
-	"terraform-provider-crusoe/internal/disk"
-	"terraform-provider-crusoe/internal/firewall_rule"
-	"terraform-provider-crusoe/internal/vm"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -14,6 +10,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"terraform-provider-crusoe/internal"
+	"terraform-provider-crusoe/internal/disk"
+	"terraform-provider-crusoe/internal/firewall_rule"
+	"terraform-provider-crusoe/internal/vm"
 )
 
 const defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"

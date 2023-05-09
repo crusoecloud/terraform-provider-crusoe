@@ -2,23 +2,21 @@ package vm
 
 import (
 	"context"
-	"terraform-provider-crusoe/internal"
-	validators "terraform-provider-crusoe/internal/validators"
-
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
-
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
+	"terraform-provider-crusoe/internal"
+	validators "terraform-provider-crusoe/internal/validators"
 )
 
 type vmResource struct {
@@ -67,6 +65,7 @@ func (r *vmResource) Configure(ctx context.Context, req resource.ConfigureReques
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", "Could not initialize the Crusoe provider."+
 			" Please check your Crusoe configuration and try again, and if the problem persists, contact support.")
+
 		return
 	}
 
@@ -185,6 +184,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	roleID, err := internal.GetRole(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
+
 		return
 	}
 
@@ -204,6 +204,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VM", err.Error())
+
 		return
 	}
 	defer httpResp.Body.Close()
@@ -212,6 +213,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		ctx, dataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VM", err.Error())
+
 		return
 	}
 
@@ -259,6 +261,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	instance, err := getVM(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
+
 		return
 	}
 
@@ -331,11 +334,13 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	instance, err := getVM(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
+
 		return
 	}
 
 	if instance.State != vmStateShutOff {
 		resp.Diagnostics.AddError("Instance is running", "VMs must be stopped before attaching or detaching disks. Please stop the VM and try again.")
+
 		return
 	}
 
@@ -347,6 +352,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}, state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk", err.Error())
+
 			return
 		}
 		defer httpResp.Body.Close()
@@ -369,6 +375,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		_, err = internal.AwaitOperation(ctx, detachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk", err.Error())
+
 			return
 		}
 	}
@@ -390,16 +397,19 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	instance, err := getVM(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
+
 		return
 	}
 	if instance.State != vmStateShutOff {
 		resp.Diagnostics.AddError("Instance is running", "Instances must be shut off before they can be deleted. This will be changed in a future release.")
+
 		return
 	}
 
 	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VM", err.Error())
+
 		return
 	}
 	defer delHttpResp.Body.Close()
@@ -407,6 +417,7 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	_, _, err = internal.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VM", err.Error())
+
 		return
 	}
 }

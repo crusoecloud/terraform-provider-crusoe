@@ -19,6 +19,7 @@ func cidrListToString(ruleObjects []swagger.FirewallRuleObject) string {
 			out += ","
 		}
 	}
+
 	return out
 }
 
@@ -29,5 +30,6 @@ func toFirewallRuleObject(ipOrCIDR string) swagger.FirewallRuleObject {
 // stringToSlice splits a delimited string list into a slice of strings.
 func stringToSlice(s, delimiter string) []string {
 	whitespaceRegex.ReplaceAllString(s, "")
+
 	return strings.Split(s, delimiter)
 }

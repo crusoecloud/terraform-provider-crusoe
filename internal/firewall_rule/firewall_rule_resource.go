@@ -4,17 +4,14 @@ import (
 	"context"
 	"strings"
 
-	"terraform-provider-crusoe/internal"
-	validators "terraform-provider-crusoe/internal/validators"
-
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"terraform-provider-crusoe/internal"
+	validators "terraform-provider-crusoe/internal/validators"
 
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
@@ -49,6 +46,7 @@ func (r *firewallRuleResource) Configure(ctx context.Context, req resource.Confi
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", "Could not initialize the Crusoe provider."+
 			" Please check your Crusoe configuration and try again, and if the problem persists, contact support.")
+
 		return
 	}
 
@@ -123,6 +121,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	roleID, err := internal.GetRole(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
+
 		return
 	}
 
@@ -140,6 +139,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule", err.Error())
+
 		return
 	}
 	defer httpResp.Body.Close()
@@ -149,6 +149,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule", err.Error())
+
 		return
 	}
 
@@ -170,6 +171,7 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get firewall rule", "Fetching Crusoe firewall rule info failed.")
+
 		return
 	}
 	defer httpResp.Body.Close()
@@ -215,6 +217,7 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.DeleteVPCFirewallRule(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule", err.Error())
+
 		return
 	}
 	defer httpResp.Body.Close()

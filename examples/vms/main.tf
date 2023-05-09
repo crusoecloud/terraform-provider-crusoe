@@ -12,6 +12,10 @@ provider "crusoe" {
   secret_key = "MY_SECRET"
 }
 
+data "crusoe_storage_disks" "d" {
+  
+}
+
 locals {
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }

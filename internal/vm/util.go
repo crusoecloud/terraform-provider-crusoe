@@ -6,7 +6,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
@@ -37,6 +36,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksR
 		for _, origDisk := range origDisks {
 			if newDisk.ID == origDisk.ID {
 				matched = true
+
 				break
 			}
 		}
@@ -50,6 +50,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksR
 		for _, newDisk := range newDisks {
 			if newDisk.ID == origDisk.ID {
 				matched = true
+
 				break
 			}
 		}

@@ -27,6 +27,7 @@ func (v StorageSizeValidator) ValidateString(ctx context.Context, req validator.
 	if !strings.HasSuffix(input, "gib") && !strings.HasSuffix(input, "tib") {
 		resp.Diagnostics.AddAttributeError(req.Path, "Unsupported Data Size",
 			"Storage size must be in GiB or TiB")
+
 		return
 	}
 

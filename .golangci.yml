@@ -33,12 +33,16 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+    - asciicheck
     - bodyclose
     - deadcode
+    - durationcheck
     - errcheck
     - errname
     - errorlint
     - exhaustive
+    - gci
+    - gofmt
     - gocritic
     - gosimple
     - govet
@@ -47,10 +51,12 @@ linters:
     - goimports
     - makezero
     - misspell
+    - nlreturn
     - ineffassign
     - staticcheck
     - typecheck
     - unused
+    - whitespace
     - structcheck
 
 issues:

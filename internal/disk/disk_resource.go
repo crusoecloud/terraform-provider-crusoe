@@ -2,8 +2,6 @@ package disk
 
 import (
 	"context"
-	"terraform-provider-crusoe/internal"
-	validators "terraform-provider-crusoe/internal/validators"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -12,8 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
+	"terraform-provider-crusoe/internal"
+	validators "terraform-provider-crusoe/internal/validators"
 )
 
 const defaultDiskLocation = "mtkn-cdp-prod" // CDP Production
@@ -45,6 +44,7 @@ func (r *diskResource) Configure(ctx context.Context, req resource.ConfigureRequ
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", "Could not initialize the Crusoe provider."+
 			" Please check your Crusoe configuration and try again, and if the problem persists, contact support.")
+
 		return
 	}
 
@@ -59,7 +59,6 @@ func (r *diskResource) Metadata(ctx context.Context, req resource.MetadataReques
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "TODO",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -116,6 +115,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	roleID, err := internal.GetRole(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
+
 		return
 	}
 
@@ -128,6 +128,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failure creating Disk", err.Error())
+
 		return
 	}
 	defer httpResp.Body.Close()
@@ -136,6 +137,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failure creating Disk", err.Error())
+
 		return
 	}
 
@@ -159,6 +161,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	dataResp, httpResp, err := r.client.DisksApi.GetDisks(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Disks", "Fetching Crusoe disks info failed.")
+
 		return
 	}
 	defer httpResp.Body.Close()
@@ -172,6 +175,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	if disk == nil {
 		resp.Diagnostics.AddError("Failed to find Disk", "A matching Crusoe Disk could not be found. Are you sure it exists?")
+
 		return
 	}
 
@@ -206,6 +210,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk", "Make sure the disk still exists, its VM is "+
 			"powered off, and you are enlarging the disk.")
+
 		return
 	}
 	defer httpResp.Body.Close()
@@ -213,6 +218,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	_, _, err = internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failure resizing Disk", err.Error())
+
 		return
 	}
 
@@ -232,6 +238,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	dataResp, httpResp, err := r.client.DisksApi.DeleteDisk(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk", err.Error())
+
 		return
 	}
 	defer httpResp.Body.Close()
@@ -239,6 +246,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk", err.Error())
+
 		return
 	}
 }

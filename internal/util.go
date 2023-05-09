@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
@@ -107,8 +106,10 @@ func AwaitOperation(ctx context.Context, op *swagger.Operation,
 		if err != nil {
 			return op, err
 		}
+
 		return op, opError
 	default:
+
 		return op, errUnexpected
 	}
 }

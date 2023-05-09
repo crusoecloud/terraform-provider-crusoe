@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
@@ -53,6 +52,7 @@ func (ds *vmDataSource) Configure(_ context.Context, req datasource.ConfigureReq
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", "Could not initialize the Crusoe provider."+
 			" Please check your Crusoe configuration and try again, and if the problem persists, contact support.")
+
 		return
 	}
 
@@ -143,6 +143,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		vm, err := getVM(ctx, ds.client, *config.ID)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get Instance", err.Error())
+
 			return
 		}
 
@@ -153,12 +154,14 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 
 		diags = resp.State.Set(ctx, state)
 		resp.Diagnostics.Append(diags...)
+
 		return
 	}
 
 	if config.Name != nil {
 		// TODO: support fetching instance by name instead of ID
 		resp.Diagnostics.AddError("Not Supported", "Fetching a compute instance by name will be supported in a future release.")
+
 		return
 	}
 
