@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -198,7 +199,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Disks:          diskIds,
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create VM", err.Error())
+		resp.Diagnostics.AddError("Failed to create instance",
+			fmt.Sprintf("There was an error starting a create instance operation: %s", err.Error()))
 
 		return
 	}
@@ -207,7 +209,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	instance, _, err := internal.AwaitOperationAndResolve[swagger.InstanceV1Alpha4](
 		ctx, dataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create VM", err.Error())
+		resp.Diagnostics.AddError("Failed to create instance",
+			fmt.Sprintf("There was an error creating a instance: %s", err.Error()))
 
 		return
 	}
@@ -318,7 +321,8 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	if instance.State != vmStateShutOff {
-		resp.Diagnostics.AddError("Instance is running", "VMs must be stopped before attaching or detaching disks. Please stop the VM and try again.")
+		resp.Diagnostics.AddError("Instance is running",
+			"VMs must be stopped before attaching or detaching disks. Please stop the VM and try again.")
 
 		return
 	}
@@ -330,7 +334,8 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			AttachDisks: addedDisks,
 		}, state.ID.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to attach disk", err.Error())
+			resp.Diagnostics.AddError("Failed to attach disk",
+				fmt.Sprintf("There was an error starting an attach disk operation: %s", err.Error()))
 
 			return
 		}
@@ -338,7 +343,8 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 
 		_, err = internal.AwaitOperation(ctx, attachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to attach disk", err.Error())
+			resp.Diagnostics.AddError("Failed to attach disk",
+				fmt.Sprintf("There was an error attaching a disk: %s", err.Error()))
 		}
 	}
 
@@ -347,13 +353,15 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			DetachDisks: removedDisks,
 		}, state.ID.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to detach disk", err.Error())
+			resp.Diagnostics.AddError("Failed to detach disk",
+				fmt.Sprintf("There was an error starting a detach disk operation: %s", err.Error()))
 		}
 		defer httpResp.Body.Close()
 
 		_, err = internal.AwaitOperation(ctx, detachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to detach disk", err.Error())
+			resp.Diagnostics.AddError("Failed to detach disk",
+				fmt.Sprintf("There was an error detaching a disk: %s", err.Error()))
 
 			return
 		}
@@ -380,14 +388,16 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 		return
 	}
 	if instance.State != vmStateShutOff {
-		resp.Diagnostics.AddError("Instance is running", "Instances must be shut off before they can be deleted. This will be changed in a future release.")
+		resp.Diagnostics.AddError("Instance is running",
+			"Instances must be shut off before they can be deleted. This will be changed in a future release.")
 
 		return
 	}
 
 	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete VM", err.Error())
+		resp.Diagnostics.AddError("Failed to delete instance",
+			fmt.Sprintf("There was an error starting a delete instance operation: %s", err.Error()))
 
 		return
 	}
@@ -395,7 +405,8 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 
 	_, _, err = internal.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete VM", err.Error())
+		resp.Diagnostics.AddError("Failed to delete instance",
+			fmt.Sprintf("There was an error deleting an instance: %s", err.Error()))
 
 		return
 	}

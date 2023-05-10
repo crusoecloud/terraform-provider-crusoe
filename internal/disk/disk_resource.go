@@ -2,6 +2,7 @@ package disk
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -127,7 +128,8 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Size:     plan.Size.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failure creating Disk", err.Error())
+		resp.Diagnostics.AddError("Failed to create disk",
+			fmt.Sprintf("There was an error starting a create disk operation: %s", err.Error()))
 
 		return
 	}
@@ -136,7 +138,8 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	disk, _, err :=
 		internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
-		resp.Diagnostics.AddError("Failure creating Disk", err.Error())
+		resp.Diagnostics.AddError("Failed to create disk",
+			fmt.Sprintf("There was an error creating a disk: %s", err.Error()))
 
 		return
 	}
@@ -160,7 +163,8 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	dataResp, httpResp, err := r.client.DisksApi.GetDisks(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get Disks", "Fetching Crusoe disks info failed.")
+		resp.Diagnostics.AddError("Failed to get disks",
+			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoeenergy.com", err.Error()))
 
 		return
 	}
@@ -174,7 +178,10 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	if disk == nil {
-		resp.Diagnostics.AddError("Failed to find Disk", "A matching Crusoe Disk could not be found. Are you sure it exists?")
+		// TODO: investigate whether there's a way to resolve these by updating the local TF state to reflect missing disk
+		resp.Diagnostics.AddError("Failed to find disk",
+			"A matching Crusoe Disk could not be found. Make sure the disk still exists, and"+
+				" contact support@crusoeenergy.com if the problem persists.")
 
 		return
 	}
@@ -208,8 +215,10 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		swagger.DisksPatchRequest{Size: plan.Size.ValueString()},
 	)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to resize disk", "Make sure the disk still exists, its VM is "+
-			"powered off, and you are enlarging the disk.")
+		resp.Diagnostics.AddError("Failed to resize disk",
+			fmt.Sprintf("There was an error starting a resize operation: %s.\n\n"+
+				"Make sure the disk still exists, you are englarging the disk,"+
+				" and if the disk is attached to a VM, the VM is powered off.", err.Error()))
 
 		return
 	}
@@ -217,7 +226,10 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	_, _, err = internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
-		resp.Diagnostics.AddError("Failure resizing Disk", err.Error())
+		resp.Diagnostics.AddError("Failed to resize disk",
+			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
+				"Make sure the disk still exists, you are englarging the disk,"+
+				" and if the disk is attached to a VM, the VM is powered off.", err.Error()))
 
 		return
 	}
@@ -237,7 +249,8 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	dataResp, httpResp, err := r.client.DisksApi.DeleteDisk(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete disk", err.Error())
+		resp.Diagnostics.AddError("Failed to delete disk",
+			fmt.Sprintf("There was an error starting a delete disk operation: %s", err.Error()))
 
 		return
 	}
@@ -245,7 +258,8 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete disk", err.Error())
+		resp.Diagnostics.AddError("Failed to delete disk",
+			fmt.Sprintf("There was a deleting a disk: %s", err.Error()))
 
 		return
 	}

@@ -2,6 +2,7 @@ package firewall_rule
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -137,7 +138,8 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		DestinationPorts: stringToSlice(plan.DestinationPorts.ValueString(), ","),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create firewall rule", err.Error())
+		resp.Diagnostics.AddError("Failed to create firewall rule",
+			fmt.Sprintf("There was an error starting a create firewall rule operation: %s", err.Error()))
 
 		return
 	}
@@ -147,7 +149,8 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		ctx, dataResp.Operation,
 		r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create firewall rule", err.Error())
+		resp.Diagnostics.AddError("Failed to create firewall rule",
+			fmt.Sprintf("There was an error creating a firewall rule: %s", err.Error()))
 
 		return
 	}
@@ -169,14 +172,25 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to get firewall rule", "Fetching Crusoe firewall rule info failed.")
+		resp.Diagnostics.AddError("Failed to get firewall rule",
+			"Fetching Crusoe firewall rule info failed.")
 
 		return
 	}
 	defer httpResp.Body.Close()
 
-	if (len(dataResp.FirewallRules)) == 0 {
-		resp.Diagnostics.AddError("Failed to find firewall rule", "No matching firewall rule round. Has the firewall rule been manually deleted?")
+	if len(dataResp.FirewallRules) == 0 {
+		resp.Diagnostics.AddError("Failed to find firewall rule",
+			"No matching firewall rule round. Has the firewall rule been manually deleted?")
+
+		return
+	}
+
+	if len(dataResp.FirewallRules) > 0 {
+		// should never happen
+		resp.Diagnostics.AddWarning("Found multiple matching firewall rules",
+			"An unexpected number of matching firewall rules was found. If you're seeing this error message, "+
+				"please report an issue to support@crusoeenergy.com")
 	}
 
 	rule := dataResp.FirewallRules[0]
@@ -197,11 +211,11 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// This should be unreachable, since all properties should be marked as needing replacement on update.
+	// This should be unreachable, since all properties are marked as needing replacement on update.
 	resp.Diagnostics.AddWarning("Updates not supported",
-		"Updating firewall rules is not currently supported. If you're seeing this message, please reach out to support@crusoecloud.com"+
-			" and let us know. In the meantime, you should be able to update your rule by deleting it"+
-			" and then creating a new one.")
+		"Updating firewall rules is not currently supported. If you're seeing this message, please reach out to"+
+			" support@crusoecloud.com and let us know. In the meantime, you should be able to update your rule by"+
+			" deleting it and then creating a new one.")
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -215,7 +229,8 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.DeleteVPCFirewallRule(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete firewall rule", err.Error())
+		resp.Diagnostics.AddError("Failed to delete firewall rule",
+			fmt.Sprintf("There was an error starting a delete firewall rule operation: %s", err.Error()))
 
 		return
 	}
@@ -223,6 +238,7 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete firewall rule", err.Error())
+		resp.Diagnostics.AddError("Failed to delete firewall rule",
+			fmt.Sprintf("There was an error deleting a firewall rule: %s", err.Error()))
 	}
 }
