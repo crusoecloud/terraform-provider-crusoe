@@ -171,17 +171,13 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, state.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get firewall rule",
-			"Fetching Crusoe firewall rule info failed.")
+	if err != nil || len(dataResp.FirewallRules) == 0 {
+		// fw rule has most likely been deleted out of band, so we update Terraform state to match
+		resp.State.RemoveResource(ctx)
 
-		return
-	}
-	defer httpResp.Body.Close()
-
-	if len(dataResp.FirewallRules) == 0 {
-		resp.Diagnostics.AddError("Failed to find firewall rule",
-			"No matching firewall rule round. Has the firewall rule been manually deleted?")
+		if err != nil {
+			httpResp.Body.Close()
+		}
 
 		return
 	}

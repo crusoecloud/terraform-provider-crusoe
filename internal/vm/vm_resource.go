@@ -257,8 +257,9 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	}
 
 	instance, err := getVM(ctx, r.client, state.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
+	if err != nil || instance == nil {
+		// instance has most likely been deleted out of band, so we update Terraform state to match
+		resp.State.RemoveResource(ctx)
 
 		return
 	}

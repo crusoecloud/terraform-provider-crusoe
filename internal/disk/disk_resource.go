@@ -179,10 +179,8 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	if disk == nil {
-		// TODO: investigate whether there's a way to resolve these by updating the local TF state to reflect missing disk
-		resp.Diagnostics.AddError("Failed to find disk",
-			"A matching Crusoe Disk could not be found. Make sure the disk still exists, and"+
-				" contact support@crusoeenergy.com if the problem persists.")
+		// disk has most likely been deleted out of band, so we update Terraform state to match
+		resp.State.RemoveResource(ctx)
 
 		return
 	}
