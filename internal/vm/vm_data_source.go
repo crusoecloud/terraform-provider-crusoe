@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 
-	"terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 )
 
 // vmDataSource is a Terraform datasource that can be used to fetch a single VM instance.

@@ -1,4 +1,4 @@
-module terraform-provider-crusoe
+module github.com/crusoecloud/terraform-provider-crusoe
 
 go 1.18
 

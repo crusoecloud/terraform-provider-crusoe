@@ -11,10 +11,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"terraform-provider-crusoe/internal"
-	"terraform-provider-crusoe/internal/disk"
-	"terraform-provider-crusoe/internal/firewall_rule"
-	"terraform-provider-crusoe/internal/vm"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 )
 
 const defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"

@@ -13,12 +13,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 
-	"terraform-provider-crusoe/internal"
-	validators "terraform-provider-crusoe/internal/validators"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
-const defaultDiskLocation = "mtkn-cdp-prod"
-const defaultDiskType = "persistent-ssd"
+const (
+	defaultDiskLocation = "mtkn-cdp-prod"
+	defaultDiskType     = "persistent-ssd"
+)
 
 type diskResource struct {
 	client *swagger.APIClient
@@ -135,8 +137,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	disk, _, err :=
-		internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error creating a disk: %s", err.Error()))

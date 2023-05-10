@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"terraform-provider-crusoe/crusoe"
+	"github.com/crusoecloud/terraform-provider-crusoe/crusoe"
 )
 
 func main() {

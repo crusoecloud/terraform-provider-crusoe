@@ -14,7 +14,7 @@ linters-settings:
     sections:
       - standard
       - default
-      - prefix(terraform-provider-crusoe)
+      - prefix(github.com/crusoecloud)
   gocritic:
     enabled-tags:
       - diagnostic
@@ -49,6 +49,7 @@ linters:
     - gochecknoinits
     - gocritic
     - gofmt
+    - gofumpt
     - gomnd
     - gosec
     - gosec
