@@ -41,23 +41,26 @@ linters:
     - errname
     - errorlint
     - exhaustive
+    - forcetypeassert
     - gci
-    - gofmt
+    - gochecknoinits
     - gocritic
-    - gosimple
-    - govet
+    - gofmt
+    - goimports
     - gomnd
     - gosec
-    - goimports
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
     - makezero
     - misspell
     - nlreturn
-    - ineffassign
     - staticcheck
+    - structcheck
     - typecheck
     - unused
     - whitespace
-    - structcheck
 
 issues:
   # Excluding configuration per-path, per-linter, per-text and per-source

@@ -3,14 +3,12 @@ package vm
 import (
 	"context"
 
-	"terraform-provider-crusoe/internal"
-
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
+	"terraform-provider-crusoe/internal"
 )
 
 // vmDataSource is a Terraform datasource that can be used to fetch a single VM instance.

@@ -7,7 +7,7 @@ import (
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 )
 
-var whitespaceRegex = regexp.MustCompile(`\s`)
+var whitespaceRegex = regexp.MustCompile(`\s*`)
 
 // cidrListToString converts a list of CIDRs to a comma separated string.
 func cidrListToString(ruleObjects []swagger.FirewallRuleObject) string {
@@ -30,7 +30,12 @@ func toFirewallRuleObject(ipOrCIDR string) swagger.FirewallRuleObject {
 
 // stringToSlice splits a delimited string list into a slice of strings.
 func stringToSlice(s, delimiter string) []string {
-	whitespaceRegex.ReplaceAllString(s, "")
+	s = whitespaceRegex.ReplaceAllString(s, "")
+	if s == "" {
+		return []string{}
+	}
 
-	return strings.Split(s, delimiter)
+	elems := strings.Split(s, delimiter)
+
+	return elems
 }

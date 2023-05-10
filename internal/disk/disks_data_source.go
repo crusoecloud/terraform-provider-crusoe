@@ -3,11 +3,12 @@ package disk
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"terraform-provider-crusoe/internal"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
+
 )
 
 type disksDataSource struct {
