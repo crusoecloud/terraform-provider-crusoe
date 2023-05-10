@@ -10,8 +10,11 @@ linters-settings:
     check-blank: true
   govet:
     check-shadowing: true
-  goimports:
-    local-prefixes: gitlab.com/crusoeenergy
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(terraform-provider-crusoe)
   gocritic:
     enabled-tags:
       - diagnostic
@@ -46,7 +49,6 @@ linters:
     - gochecknoinits
     - gocritic
     - gofmt
-    - goimports
     - gomnd
     - gosec
     - gosec
