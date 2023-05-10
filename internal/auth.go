@@ -154,7 +154,7 @@ func canonicalizeQuery(query string) (canonicalQuery string, err error) {
 	return encodeQuery(values), err
 }
 
-// Encodes a key-value map representing the query into a deterministic string.
+// encodeQuery encodes a key-value map representing the query into a deterministic string.
 // see https://cs.opensource.google/go/go/+/refs/tags/go1.17.6:src/net/url/url.go;l=974
 func encodeQuery(values map[string][]string) string {
 	if values == nil {
