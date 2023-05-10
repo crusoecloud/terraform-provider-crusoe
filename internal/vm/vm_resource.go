@@ -77,21 +77,17 @@ func (r *vmResource) Metadata(ctx context.Context, req resource.MetadataRequest,
 
 func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Crusoe MVs",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
-				Description:   "VM instance ID",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"name": schema.StringAttribute{
 				Required:      true,
-				Description:   "VM instance name",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
 				Required:      true,
-				Description:   "VM instance type",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators:    []validator.String{
 					// TODO: finish adding instances, maybe break this list out somewhere.
