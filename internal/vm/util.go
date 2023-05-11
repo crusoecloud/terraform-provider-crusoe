@@ -83,25 +83,35 @@ func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swa
 
 // vmNetworkInterfacesToTerraformDataModel creates a slice of Terraform-compatible network
 // interface datasource instances from Crusoe API network interfaces.
-func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.NetworkInterface) []vmNetworkInterfaceDataModel {
+//
+// In the case that a warning is returned because IP addresses are missing - which should never
+// be the case - we still return a partial response that should be usable.
+func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.NetworkInterface) ([]vmNetworkInterfaceDataModel, string) {
+	var warning string
 	interfaces := make([]vmNetworkInterfaceDataModel, 0, len(networkInterfaces))
 	for _, networkInterface := range networkInterfaces {
+		var publicIP string
+		var privateIP string
+		if len(networkInterface.Ips) != 0 {
+			warning = "At least one network interface is missing IP addresses. Please reach out support@crusoeenergy.com" +
+				" and let us know this."
+		} else {
+			publicIP = networkInterface.Ips[0].PrivateIpv4.Address
+			privateIP = networkInterface.Ips[0].PrivateIpv4.Address
+		}
+
 		interfaces = append(interfaces, vmNetworkInterfaceDataModel{
 			Id:            networkInterface.Id,
 			Name:          networkInterface.Name,
 			Network:       networkInterface.Network,
 			Subnet:        networkInterface.Subnet,
 			InterfaceType: networkInterface.InterfaceType,
-			PrivateIpv4: vmIPv4{
-				Address: networkInterface.Ips[0].PrivateIpv4.Address,
-			},
-			PublicIpv4: vmIPv4{
-				Address: networkInterface.Ips[0].PublicIpv4.Address,
-			},
+			PrivateIpv4:   vmIPv4{Address: privateIP},
+			PublicIpv4:    vmIPv4{Address: publicIP},
 		})
 	}
 
-	return interfaces
+	return interfaces, warning
 }
 
 // vmNetworkInterfacesToTerraformResourceModel creates a slice of Terraform-compatible network
