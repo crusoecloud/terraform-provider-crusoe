@@ -151,7 +151,12 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		state.ID = &vm.Id
 		state.Name = &vm.Name
 		state.Type = &vm.ProductName
-		state.NetworkInterfaces = vmNetworkInterfacesToTerraformDataModel(vm.NetworkInterfaces)
+
+		networkInterfaces, warning := vmNetworkInterfacesToTerraformDataModel(vm.NetworkInterfaces)
+		if warning != "" {
+			resp.Diagnostics.AddWarning("Network(s) missing data", warning)
+		}
+		state.NetworkInterfaces = networkInterfaces
 
 		diags = resp.State.Set(ctx, state)
 		resp.Diagnostics.Append(diags...)

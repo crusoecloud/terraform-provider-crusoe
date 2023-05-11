@@ -1,3 +1,4 @@
+
 # Terraform Provider Crusoe
 
 This repo defines the official Terraform Provider for use with [Crusoe Cloud](https://crusoecloud.com/), the world's first carbon-reducing, low-cost GPU cloud platform.
@@ -37,6 +38,9 @@ resource "crusoe_compute_instance" "nodes" {
 For more usage examples, including storage disks, startup scripts, and firewall rules, see the [examples folder](./examples/).
 
 ## Development
+
+To develop the Terraform provider, you'll need a recent version of [golang](https://go.dev/doc/install) installed.
+At the moment, the project is pinned to go1.18, but newer versions will likely work for development.  
 
 Add the following to your `~/.terraformrc`
 
