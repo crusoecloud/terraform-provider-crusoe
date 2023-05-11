@@ -13,7 +13,7 @@ import (
 )
 
 // vmDataSource is a Terraform datasource that can be used to fetch a single VM instance.
-// TODO: consider making another one of these for getting multiple instances
+// TODO: consider making another DataSource for getting multiple instances
 type vmDataSource struct {
 	client *swagger.APIClient
 }
@@ -160,7 +160,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	}
 
 	if config.Name != nil {
-		// TODO: support fetching instance by name instead of ID
+		// TODO: support fetching instance by name instead of ID once the API provides a utility for this
 		resp.Diagnostics.AddError("Not Supported", "Fetching a compute instance by name will be supported in a future release.")
 
 		return

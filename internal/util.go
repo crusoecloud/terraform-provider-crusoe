@@ -30,7 +30,6 @@ type opResultError struct {
 }
 
 var (
-	// TODO: is there a way we can avoid redefining these here?
 	OpSucceeded  opStatus = "SUCCEEDED"
 	OpInProgress opStatus = "IN_PROGRESS"
 	OpFailed     opStatus = "FAILED"

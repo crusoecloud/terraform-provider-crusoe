@@ -91,7 +91,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators:    []validator.String{
-					// TODO: finish adding instances, maybe break this list out somewhere.
+					// TODO: re-enable once instance types are stabilized
 					// validators.RegexValidator{RegexPattern: "^a40\\.(1|2|4|8)x|a100\\.(1|2|4|8)x|a100\\.(1|2|4|8)x|a100-80gb\\.(1|2|4|8)x$"},
 				},
 			},

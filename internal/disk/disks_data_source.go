@@ -18,7 +18,6 @@ type disksDataSourceModel struct {
 	Disks []diskModel `tfsdk:"disks"`
 }
 
-// TODO: add location
 type diskModel struct {
 	ID       string `tfsdk:"id"`
 	Name     string `tfsdk:"name"`
