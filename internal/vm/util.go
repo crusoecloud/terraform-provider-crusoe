@@ -86,9 +86,7 @@ func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swa
 //
 // In the case that a warning is returned because IP addresses are missing - which should never
 // be the case - we still return a partial response that should be usable.
-func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.NetworkInterface) ([]vmNetworkInterfaceDataModel, string) {
-	var warning string
-	interfaces := make([]vmNetworkInterfaceDataModel, 0, len(networkInterfaces))
+func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.NetworkInterface) (interfaces []vmNetworkInterfaceDataModel, warning string) {
 	for _, networkInterface := range networkInterfaces {
 		var publicIP string
 		var privateIP string
