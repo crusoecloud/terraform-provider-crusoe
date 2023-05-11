@@ -22,9 +22,9 @@ const defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"
 type crusoeProvider struct{}
 
 type crusoeProviderModel struct {
-	Host      types.String `tfsdk:"host"`
-	AccessKey types.String `tfsdk:"access_key"`
-	SecretKey types.String `tfsdk:"secret_key"`
+	ApiEndpoint types.String `tfsdk:"api_endpoint"`
+	AccessKey   types.String `tfsdk:"access_key"`
+	SecretKey   types.String `tfsdk:"secret_key"`
 }
 
 func New() provider.Provider {
@@ -40,7 +40,7 @@ func (p *crusoeProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"host": schema.StringAttribute{
+			"api_endpoint": schema.StringAttribute{
 				Optional: true,
 			},
 			"access_key": schema.StringAttribute{
@@ -83,9 +83,9 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	// Default to environment variables, but override with Terraform configuration values if set.
-	accessKey := os.Getenv("CRUSOE_ACCESS_KEY")
+	accessKey := os.Getenv("CRUSOE_ACCESS_KEY_ID")
 	secretKey := os.Getenv("CRUSOE_SECRET_KEY")
-	host := os.Getenv("CRUSOE_API_ENDPOINT")
+	apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT")
 
 	if config.AccessKey.ValueString() != "" {
 		accessKey = config.AccessKey.ValueString()
@@ -93,12 +93,12 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if config.SecretKey.ValueString() != "" {
 		secretKey = config.SecretKey.ValueString()
 	}
-	if config.Host.ValueString() != "" {
-		host = config.Host.ValueString()
+	if config.ApiEndpoint.ValueString() != "" {
+		apiEndpoint = config.ApiEndpoint.ValueString()
 	}
 
-	if host == "" {
-		host = defaultApiEndpoint
+	if apiEndpoint == "" {
+		apiEndpoint = defaultApiEndpoint
 	}
 
 	if accessKey == "" {
@@ -106,7 +106,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			path.Root("access_key"),
 			"Missing Crusoe API Key",
 			"The provider cannot create the Crusoe API client as there is a missing or empty value for the Crusoe API key. "+
-				"Set the access value in the configuration or use the CRUSOE_ACCESS_KEY environment variable. "+
+				"Set the access value in the configuration or use the CRUSOE_ACCESS_KEY_ID environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -126,7 +126,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	// Create an API client and make it available during DataSource and Resource type Configure methods.
-	client := internal.NewAPIClient(host, accessKey, secretKey)
+	client := internal.NewAPIClient(apiEndpoint, accessKey, secretKey)
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }
