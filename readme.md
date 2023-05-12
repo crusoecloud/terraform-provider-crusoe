@@ -29,6 +29,7 @@ locals {
 ```terraform
 # Create 10, 8xA100-80GB VMs
 resource "crusoe_compute_instance" "nodes" {
+  count = 10
   name = "node-${count.index}"
   type = "a100-80gb.8x"
   ssh_key = local.ssh_key
