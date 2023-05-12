@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 )
 
 const (

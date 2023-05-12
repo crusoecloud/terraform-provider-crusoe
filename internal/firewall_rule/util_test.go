@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 )
 
 func Test_cidrListToString(t *testing.T) {

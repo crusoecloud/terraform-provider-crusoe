@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )

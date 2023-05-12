@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -210,8 +210,8 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	dataResp, httpResp, err := r.client.DisksApi.ResizeDisk(ctx,
-		plan.ID.ValueString(),
 		swagger.DisksPatchRequest{Size: plan.Size.ValueString()},
+		plan.ID.ValueString(),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",

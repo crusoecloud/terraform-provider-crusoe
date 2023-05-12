@@ -31,7 +31,7 @@ linters-settings:
       audit: enabled # Run extra checks that might be "nosy"
   gomoddirectives:
     replace-allow-list:
-      - gitlab.com/crusoeenergy/island/external/client-go
+      - github.com/crusoecloud/client-go
 
 linters:
   disable-all: true

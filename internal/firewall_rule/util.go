@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	swagger "gitlab.com/crusoeenergy/island/external/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 )
 
 var whitespaceRegex = regexp.MustCompile(`\s*`)

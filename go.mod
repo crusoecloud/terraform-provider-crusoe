@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/antihax/optional v1.0.0
+	github.com/crusoecloud/client-go v0.1.16
 	github.com/hashicorp/terraform-plugin-framework v1.2.0
-	gitlab.com/crusoeenergy/island/external/client-go v0.1.12
 )
 
 require (
