@@ -2,7 +2,7 @@ package crusoe
 
 import (
 	"context"
-	"os"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -17,14 +17,10 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 )
 
-const defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"
-
 type crusoeProvider struct{}
 
 type crusoeProviderModel struct {
 	ApiEndpoint types.String `tfsdk:"api_endpoint"`
-	AccessKey   types.String `tfsdk:"access_key"`
-	SecretKey   types.String `tfsdk:"secret_key"`
 }
 
 func New() provider.Provider {
@@ -42,14 +38,6 @@ func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"api_endpoint": schema.StringAttribute{
 				Optional: true,
-			},
-			"access_key": schema.StringAttribute{
-				Required:  true,
-				Sensitive: true,
-			},
-			"secret_key": schema.StringAttribute{
-				Required:  true,
-				Sensitive: true,
 			},
 		},
 	}
@@ -74,7 +62,6 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 
 // Configure prepares a Crusoe API client for data sources and resources.
 func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	// Retrieve provider data from configuration
 	var config crusoeProviderModel
 	diags := req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
@@ -82,41 +69,31 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	// Default to environment variables, but override with Terraform configuration values if set.
-	accessKey := os.Getenv("CRUSOE_ACCESS_KEY_ID")
-	secretKey := os.Getenv("CRUSOE_SECRET_KEY")
-	apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT")
-
-	if config.AccessKey.ValueString() != "" {
-		accessKey = config.AccessKey.ValueString()
-	}
-	if config.SecretKey.ValueString() != "" {
-		secretKey = config.SecretKey.ValueString()
-	}
-	if config.ApiEndpoint.ValueString() != "" {
-		apiEndpoint = config.ApiEndpoint.ValueString()
+	clientConfig, err := internal.GetConfig()
+	if err != nil {
+		// only show a warning, since it's possible that we can't read their home dir (which is unexpected) but
+		// they have everything set via env variables, so we can still proceed.
+		resp.Diagnostics.AddWarning("Issue Reading Config",
+			fmt.Sprintf("There was an issue reading your Crusoe Config. Terraform may not have permission to"+
+				" read your home directory.\n\nWarning: %s", err.Error()))
 	}
 
-	if apiEndpoint == "" {
-		apiEndpoint = defaultApiEndpoint
-	}
-
-	if accessKey == "" {
+	if clientConfig.AccessKeyID == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("access_key"),
 			"Missing Crusoe API Key",
 			"The provider cannot create the Crusoe API client as there is a missing or empty value for the Crusoe API key. "+
-				"Set the access value in the configuration or use the CRUSOE_ACCESS_KEY_ID environment variable. "+
+				"Set the value in ~/.crusoe/config or use the CRUSOE_ACCESS_KEY_ID environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
 
-	if secretKey == "" {
+	if clientConfig.SecretKey == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("secret_key"),
 			"Missing Crusoe API Secret",
 			"The provider cannot create the Crusoe API client as there is a missing or empty value for the Crusoe API secret. "+
-				"Set the password value in the configuration or use the CRUSOE_SECRET_KEY environment variable. "+
+				"Set the value in ~/.crusoe/config or use the CRUSOE_SECRET_KEY environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -126,7 +103,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	// Create an API client and make it available during DataSource and Resource type Configure methods.
-	client := internal.NewAPIClient(apiEndpoint, accessKey, secretKey)
+	client := internal.NewAPIClient(clientConfig.ApiEndpoint, clientConfig.AccessKeyID, clientConfig.SecretKey)
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }
