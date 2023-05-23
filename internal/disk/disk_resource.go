@@ -153,7 +153,18 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	plan.ID = types.StringValue(disk.Id)
 	plan.Type = types.StringValue(disk.Type_)
 	plan.Location = types.StringValue(disk.Location)
-	plan.SerialNumber = types.StringValue(disk.SerialNumber)
+
+	// The Serial Number is not populated in the creation response, but we can reliably fetch it immediately after
+	// disk creation. TODO: this request can be dropped with if the creation response is updated to include serial number
+	disk2, err := getDisk(ctx, r.client, disk.Id)
+	if err != nil {
+		// log a warning and not an error, because creation still worked but the serial number won't be populated
+		// until the next time the resource is read.
+		resp.Diagnostics.AddWarning("Unable to get Serial Number",
+			"The serial number of one of your created disks was not populated; it should be populated during the next Terraform run.")
+	} else {
+		plan.SerialNumber = types.StringValue(disk2.SerialNumber)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
