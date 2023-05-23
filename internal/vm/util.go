@@ -79,7 +79,7 @@ func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swa
 		}
 	}
 
-	return nil, errors.New("failed to find VM with matching ID")
+	return nil, errors.New("failed to fetch VM with matching ID")
 }
 
 // vmNetworkInterfacesToTerraformDataModel creates a slice of Terraform-compatible network

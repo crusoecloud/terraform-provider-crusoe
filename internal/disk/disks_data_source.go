@@ -19,11 +19,12 @@ type disksDataSourceModel struct {
 }
 
 type diskModel struct {
-	ID       string `tfsdk:"id"`
-	Name     string `tfsdk:"name"`
-	Location string `tfsdk:"location"`
-	Type     string `tfsdk:"type"`
-	Size     string `tfsdk:"size"`
+	ID           string `tfsdk:"id"`
+	Name         string `tfsdk:"name"`
+	Location     string `tfsdk:"location"`
+	Type         string `tfsdk:"type"`
+	Size         string `tfsdk:"size"`
+	SerialNumber string `tfsdk:"serial_number"`
 }
 
 // TODO: let's also implement a singular DiskDataSource for fetching one disk with filtering
@@ -74,6 +75,9 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 					"size": schema.StringAttribute{
 						Required: true,
 					},
+					"serial_number": schema.StringAttribute{
+						Computed: true,
+					},
 				},
 			},
 		},
@@ -93,11 +97,12 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	var state disksDataSourceModel
 	for i := range dataResp.Disks {
 		state.Disks = append(state.Disks, diskModel{
-			ID:       dataResp.Disks[i].Id,
-			Name:     dataResp.Disks[i].Name,
-			Location: dataResp.Disks[i].Location,
-			Type:     dataResp.Disks[i].Type_,
-			Size:     dataResp.Disks[i].Size,
+			ID:           dataResp.Disks[i].Id,
+			Name:         dataResp.Disks[i].Name,
+			Location:     dataResp.Disks[i].Location,
+			Type:         dataResp.Disks[i].Type_,
+			Size:         dataResp.Disks[i].Size,
+			SerialNumber: dataResp.Disks[i].SerialNumber,
 		})
 	}
 

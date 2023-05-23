@@ -27,11 +27,12 @@ type diskResource struct {
 }
 
 type diskResourceModel struct {
-	ID       types.String `tfsdk:"id"`
-	Location types.String `tfsdk:"location"`
-	Name     types.String `tfsdk:"name"`
-	Type     types.String `tfsdk:"type"`
-	Size     types.String `tfsdk:"size"`
+	ID           types.String `tfsdk:"id"`
+	Location     types.String `tfsdk:"location"`
+	Name         types.String `tfsdk:"name"`
+	Type         types.String `tfsdk:"type"`
+	Size         types.String `tfsdk:"size"`
+	SerialNumber types.String `tfsdk:"serial_number"`
 }
 
 func NewDiskResource() resource.Resource {
@@ -87,6 +88,10 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"size": schema.StringAttribute{
 				Required:   true,
 				Validators: []validator.String{validators.StorageSizeValidator{}},
+			},
+			"serial_number": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 		},
 	}
@@ -149,6 +154,18 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	plan.Type = types.StringValue(disk.Type_)
 	plan.Location = types.StringValue(disk.Location)
 
+	// The Serial Number is not populated in the creation response, but we can reliably fetch it immediately after
+	// disk creation. TODO: this request can be dropped with if the creation response is updated to include serial number
+	disk2, err := getDisk(ctx, r.client, disk.Id)
+	if err != nil {
+		// log a warning and not an error, because creation still worked but the serial number won't be populated
+		// until the next time the resource is read.
+		resp.Diagnostics.AddWarning("Unable to get Serial Number",
+			"The serial number of one of your created disks was not populated; it should be populated during the next Terraform run.")
+	} else {
+		plan.SerialNumber = types.StringValue(disk2.SerialNumber)
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 }
@@ -188,6 +205,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	state.Name = types.StringValue(disk.Name)
 	state.Type = types.StringValue(disk.Type_)
 	state.Size = types.StringValue(disk.Size)
+	state.SerialNumber = types.StringValue(disk.SerialNumber)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
