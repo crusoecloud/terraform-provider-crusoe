@@ -3,7 +3,17 @@
 
 This repo defines the official Terraform Provider for use with [Crusoe Cloud](https://crusoecloud.com/), the world's first carbon-reducing, low-cost GPU cloud platform.
 
-To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.ai/security/tokens and add the following to the beginning of your `.tf` file:
+## Getting Started
+
+To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.ai/security/tokens and add the following to `~/.crusoe/config`:
+
+```toml
+[default]
+access_key_id="MY_ACCESS_KEY"
+secret_key="MY_SECRET_KEY"
+```
+
+Then, add the following to the start of your terraform file, for example `main.tf`:
 
 ```
 terraform {
@@ -14,17 +24,13 @@ terraform {
   }
 }
 
-provider "crusoe" {
-  access_key = "<my_key>"
-  secret_key = "<my_secret>"
-}
-
 locals {
+  # replace with path to your SSH key if different
   ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 ```
 
-## Examples
+You can then use Terraform to create instances, disks, and networking rules. To create 10 VMs with 8 80GB A100s, we would add the following block: 
 
 ```terraform
 # Create 10, 8xA100-80GB VMs

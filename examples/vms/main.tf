@@ -6,12 +6,6 @@ terraform {
   }
 }
 
-provider "crusoe" {
-  // create a new access keypair at https://console.crusoecloud.com/security/tokens
-  access_key = "MY_KEY"
-  secret_key = "MY_SECRET"
-}
-
 locals {
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }

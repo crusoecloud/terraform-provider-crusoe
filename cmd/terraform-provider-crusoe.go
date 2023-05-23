@@ -1,5 +1,4 @@
-// Meant for internal development - any changes meant for the released provider
-// should be made in main.go.
+// Meant for development - any changes targeting the released provider should be made in main.go.
 package main
 
 import (
@@ -12,7 +11,7 @@ import (
 
 func main() {
 	err := providerserver.Serve(context.Background(), crusoe.New, providerserver.ServeOpts{
-		// overriden during local development by an override that should be set in ~/.terraformrc
+		// overridden during local development by an override that should be set in ~/.terraformrc
 		Address: "registry.terraform.io/crusoecloud/crusoe",
 	})
 	if err != nil {
