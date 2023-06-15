@@ -125,6 +125,9 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	sourcePortsStr := strings.ReplaceAll(plan.SourcePorts.ValueString(), "*", "1-65535")
+	destPortsStr := strings.ReplaceAll(plan.DestinationPorts.ValueString(), "*", "1-65535")
+
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequest{
 		RoleId:           roleID,
 		VpcNetworkId:     plan.Network.ValueString(),
@@ -133,9 +136,9 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		Protocols:        stringToSlice(plan.Protocols.ValueString(), ","),
 		Direction:        plan.Direction.ValueString(),
 		Sources:          []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Source.ValueString())},
-		SourcePorts:      stringToSlice(plan.SourcePorts.ValueString(), ","),
+		SourcePorts:      stringToSlice(sourcePortsStr, ","),
 		Destinations:     []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Destination.ValueString())},
-		DestinationPorts: stringToSlice(plan.DestinationPorts.ValueString(), ","),
+		DestinationPorts: stringToSlice(destPortsStr, ","),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
