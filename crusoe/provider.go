@@ -3,6 +3,7 @@ package crusoe
 import (
 	"context"
 	"fmt"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -57,6 +58,7 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		vm.NewVMResource,
 		disk.NewDiskResource,
 		firewall_rule.NewFirewallRuleResource,
+		ib_partition.NewIBPartitionResource,
 	}
 }
 
