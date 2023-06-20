@@ -3,8 +3,7 @@ package crusoe
 import (
 	"context"
 	"fmt"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
+
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,6 +15,8 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 )
 

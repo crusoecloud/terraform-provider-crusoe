@@ -3,10 +3,12 @@ package ib_network
 import (
 	"context"
 	"fmt"
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 )
 
@@ -18,7 +20,7 @@ type ibNetworksDataSourceModel struct {
 	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
 }
 
-//type ibNetworksDataSourceModel struct {
+// type ibNetworksDataSourceModel struct {
 //	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
 //}
 

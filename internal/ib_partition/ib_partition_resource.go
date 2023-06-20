@@ -3,6 +3,7 @@ package ib_partition
 import (
 	"context"
 	"fmt"
+
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -149,7 +150,6 @@ func (r *ibPartitionResource) Update(ctx context.Context, req resource.UpdateReq
 		"Updating IB partitions in place is not currently supported. If you're seeing this message, please"+
 			" reach out to support@crusoecloud.com and let us know. In the meantime, you should be able to update your"+
 			" partition by deleting it and then creating a new one.")
-
 }
 
 //nolint:gocritic // Implements Terraform defined interface
