@@ -2,6 +2,7 @@ package ib_partition
 
 import (
 	"context"
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -81,61 +82,27 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	//diskLocation := plan.Location.ValueString()
-	//if diskLocation == "" {
-	//	diskLocation = defaultDiskLocation
-	//}
-	//
-	//diskType := plan.Type.ValueString()
-	//if diskType == "" {
-	//	diskType = defaultDiskType
-	//}
-	//
-	//roleID, err := internal.GetRole(ctx, r.client)
-	//if err != nil {
-	//	resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
-	//
-	//	return
-	//}
-	//
-	//dataResp, httpResp, err := r.client.DisksApi.CreateDisk(ctx, swagger.DisksPostRequest{
-	//	RoleId:   roleID,
-	//	Location: diskLocation,
-	//	Name:     plan.Name.ValueString(),
-	//	Type_:    diskType,
-	//	Size:     plan.Size.ValueString(),
-	//})
-	//if err != nil {
-	//	resp.Diagnostics.AddError("Failed to create disk",
-	//		fmt.Sprintf("There was an error starting a create disk operation: %s", err.Error()))
-	//
-	//	return
-	//}
-	//defer httpResp.Body.Close()
-	//
-	//disk, _, err := internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
-	//if err != nil {
-	//	resp.Diagnostics.AddError("Failed to create disk",
-	//		fmt.Sprintf("There was an error creating a disk: %s", err.Error()))
-	//
-	//	return
-	//}
-	//
-	//plan.ID = types.StringValue(disk.Id)
-	//plan.Type = types.StringValue(disk.Type_)
-	//plan.Location = types.StringValue(disk.Location)
-	//
-	//// The Serial Number is not populated in the creation response, but we can reliably fetch it immediately after
-	//// disk creation. TODO: this request can be dropped with if the creation response is updated to include serial number
-	//disk2, err := getDisk(ctx, r.client, disk.Id)
-	//if err != nil {
-	//	// log a warning and not an error, because creation still worked but the serial number won't be populated
-	//	// until the next time the resource is read.
-	//	resp.Diagnostics.AddWarning("Unable to get Serial Number",
-	//		"The serial number of one of your created disks was not populated; it should be populated during the next Terraform run.")
-	//} else {
-	//	plan.SerialNumber = types.StringValue(disk2.SerialNumber)
-	//}
+	roleID, err := internal.GetRole(ctx, r.client)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
+
+		return
+	}
+
+	dataResp, httpResp, err := r.client.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequest{
+		RoleId:      roleID,
+		Name:        plan.Name.ValueString(),
+		IbNetworkId: plan.IBNetworkID.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create partition",
+			fmt.Sprintf("There was an error creating an Infiniband partition: %s", err.Error()))
+
+		return
+	}
+	defer httpResp.Body.Close()
+
+	plan.ID = types.StringValue(dataResp.Id)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -150,33 +117,26 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	//dataResp, httpResp, err := r.client.DisksApi.GetDisks(ctx)
-	//if err != nil {
-	//	resp.Diagnostics.AddError("Failed to get disks",
-	//		fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoeenergy.com", err.Error()))
-	//
-	//	return
-	//}
-	//defer httpResp.Body.Close()
-	//
-	//var disk *swagger.Disk
-	//for i := range dataResp.Disks {
-	//	if dataResp.Disks[i].Id == state.ID.ValueString() {
-	//		disk = &dataResp.Disks[i]
-	//	}
-	//}
-	//
+	dataResp, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get IB partition",
+			fmt.Sprintf("Fetching Crusoe Infiniband partition failed: %s\n\nIf the problem persists, contact support@crusoeenergy.com", err.Error()))
+
+		return
+	}
+	defer httpResp.Body.Close()
+
+	// TODO: handle deleted out of band
 	//if disk == nil {
 	//	// disk has most likely been deleted out of band, so we update Terraform state to match
 	//	resp.State.RemoveResource(ctx)
 	//
 	//	return
 	//}
-	//
-	//state.Name = types.StringValue(disk.Name)
-	//state.Type = types.StringValue(disk.Type_)
-	//state.Size = types.StringValue(disk.Size)
-	//state.SerialNumber = types.StringValue(disk.SerialNumber)
+
+	state.ID = types.StringValue(dataResp.Id)
+	state.Name = types.StringValue(dataResp.Name)
+	state.IBNetworkID = types.StringValue(dataResp.IbNetworkId)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -194,27 +154,19 @@ func (r *ibPartitionResource) Update(ctx context.Context, req resource.UpdateReq
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state ibPartitionResource
+	var state ibPartitionResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	//dataResp, httpResp, err := r.client.DisksApi.DeleteDisk(ctx, state.ID.ValueString())
-	//if err != nil {
-	//	resp.Diagnostics.AddError("Failed to delete disk",
-	//		fmt.Sprintf("There was an error starting a delete disk operation: %s", err.Error()))
-	//
-	//	return
-	//}
-	//defer httpResp.Body.Close()
-	//
-	//_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
-	//if err != nil {
-	//	resp.Diagnostics.AddError("Failed to delete disk",
-	//		fmt.Sprintf("There was a deleting a disk: %s", err.Error()))
-	//
-	//	return
-	//}
+	httpResp, err := r.client.IBPartitionsApi.DeleteIBPartition(ctx, state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete partition",
+			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", err.Error()))
+
+		return
+	}
+	defer httpResp.Body.Close()
 }

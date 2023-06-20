@@ -3,6 +3,7 @@ package crusoe
 import (
 	"context"
 	"fmt"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -49,6 +50,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 	return []func() datasource.DataSource{
 		vm.NewVMDataSource,
 		disk.NewDisksDataSource,
+		ib_network.NewIBNetworkDataSource,
 	}
 }
 
