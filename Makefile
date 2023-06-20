@@ -1,3 +1,5 @@
+GOLANGCI_VERSION = v1.47.3
+
 default: install
 
 generate:
@@ -9,5 +11,8 @@ install:
 test:
 	go test -count=1 -parallel=4 ./...
 
-lint:
+precommit:
 	golangci-lint run --fix
+
+lint:
+	golangci-lint run

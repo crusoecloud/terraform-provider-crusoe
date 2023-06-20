@@ -15,6 +15,8 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 )
 
+const notFoundMessage = "404 Not Found"
+
 type ibPartitionResource struct {
 	client *swagger.APIClient
 }
@@ -118,8 +120,15 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	dataResp, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, state.ID.ValueString())
+	partition, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, state.ID.ValueString())
 	if err != nil {
+		if err.Error() == notFoundMessage {
+			// partition has most likely been deleted out of band, so we update Terraform state to match
+			resp.State.RemoveResource(ctx)
+
+			return
+		}
+
 		resp.Diagnostics.AddError("Failed to get IB partition",
 			fmt.Sprintf("Fetching Crusoe Infiniband partition failed: %s\n\nIf the problem persists, contact support@crusoeenergy.com", err.Error()))
 
@@ -127,17 +136,9 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 	defer httpResp.Body.Close()
 
-	// TODO: handle deleted out of band
-	//if disk == nil {
-	//	// disk has most likely been deleted out of band, so we update Terraform state to match
-	//	resp.State.RemoveResource(ctx)
-	//
-	//	return
-	//}
-
-	state.ID = types.StringValue(dataResp.Id)
-	state.Name = types.StringValue(dataResp.Name)
-	state.IBNetworkID = types.StringValue(dataResp.IbNetworkId)
+	state.ID = types.StringValue(partition.Id)
+	state.Name = types.StringValue(partition.Name)
+	state.IBNetworkID = types.StringValue(partition.IbNetworkId)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
@@ -19,10 +18,6 @@ type ibNetworksDataSource struct {
 type ibNetworksDataSourceModel struct {
 	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
 }
-
-// type ibNetworksDataSourceModel struct {
-//	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
-//}
 
 type ibNetworkModel struct {
 	ID       string `tfsdk:"id"`
