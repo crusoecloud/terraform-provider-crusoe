@@ -29,6 +29,7 @@ type vmResourceModel struct {
 	Name              types.String          `tfsdk:"name"`
 	Type              types.String          `tfsdk:"type"`
 	SSHKey            types.String          `tfsdk:"ssh_key"`
+	Location          types.String          `tfsdk:"location"`
 	StartupScript     types.String          `tfsdk:"startup_script"`
 	ShutdownScript    types.String          `tfsdk:"shutdown_script"`
 	Disks             []vmDiskResourceModel `tfsdk:"disks"`
@@ -99,6 +100,13 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators:    []validator.String{validators.SSHKeyValidator{}},
+			},
+			"location": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators: []validator.String{
+					validators.RegexValidator{RegexPattern: "^[a-z]+-[a-z]+[0-9]+-[a-z]$"},
+				},
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
@@ -193,6 +201,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		RoleId:         roleID,
 		Name:           plan.Name.ValueString(),
 		ProductName:    plan.Type.ValueString(),
+		Location:       plan.Location.ValueString(),
 		SshPublicKey:   plan.SSHKey.ValueString(),
 		StartupScript:  plan.StartupScript.ValueString(),
 		ShutdownScript: plan.ShutdownScript.ValueString(),
