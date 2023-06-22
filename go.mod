@@ -5,9 +5,10 @@ go 1.18
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/antihax/optional v1.0.0
-	github.com/crusoecloud/client-go v0.1.16
 	github.com/hashicorp/terraform-plugin-framework v1.2.0
 )
+
+require github.com/crusoecloud/client-go v0.1.19
 
 require (
 	github.com/fatih/color v1.13.0 // indirect
@@ -30,7 +31,7 @@ require (
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	golang.org/x/crypto v0.8.0
 	golang.org/x/net v0.9.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
+	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
