@@ -20,6 +20,8 @@ import (
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
+const defaultVMLocation = "us-northcentral1-a"
+
 type vmResource struct {
 	client *swagger.APIClient
 }
@@ -102,11 +104,9 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Validators:    []validator.String{validators.SSHKeyValidator{}},
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
+				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators: []validator.String{
-					validators.RegexValidator{RegexPattern: "^[a-z]+-[a-z]+[0-9]+-[a-z]$"},
-				},
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
@@ -197,11 +197,16 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		diskIds = append(diskIds, d.ID)
 	}
 
+	vmLocation := plan.Location.ValueString()
+	if vmLocation == "" {
+		vmLocation = defaultVMLocation
+	}
+
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha3{
 		RoleId:         roleID,
 		Name:           plan.Name.ValueString(),
 		ProductName:    plan.Type.ValueString(),
-		Location:       plan.Location.ValueString(),
+		Location:       vmLocation,
 		SshPublicKey:   plan.SSHKey.ValueString(),
 		StartupScript:  plan.StartupScript.ValueString(),
 		ShutdownScript: plan.ShutdownScript.ValueString(),

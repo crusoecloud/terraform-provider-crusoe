@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	defaultDiskLocation = "mtkn-cdp-prod"
+	defaultDiskLocation = "us-northcentral1-a"
 	defaultDiskType     = "persistent-ssd"
 )
 
