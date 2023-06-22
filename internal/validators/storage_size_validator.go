@@ -21,6 +21,10 @@ func (v StorageSizeValidator) MarkdownDescription(ctx context.Context) string {
 
 //nolint:gocritic // Implements Terraform defined interface
 func (v StorageSizeValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+
 	input := req.ConfigValue.ValueString()
 	input = strings.ToLower(input)
 
