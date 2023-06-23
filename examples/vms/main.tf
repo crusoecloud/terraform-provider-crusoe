@@ -19,8 +19,8 @@ resource "crusoe_compute_instance" "my_vm" {
   startup_script = file("startup.sh")
 
   disks = [
-    // uncomment to attach at startup
-    // crusoe_storage_disk.data_disk
+    // attached at startup
+     crusoe_storage_disk.data_disk
   ]
 }
 
