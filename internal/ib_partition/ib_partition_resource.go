@@ -1,3 +1,4 @@
+//nolint:gocritic // Implements Terraform defined interface
 package ib_partition
 
 import (
@@ -31,7 +32,6 @@ func NewIBPartitionResource() resource.Resource {
 	return &ibPartitionResource{}
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -47,12 +47,10 @@ func (r *ibPartitionResource) Configure(ctx context.Context, req resource.Config
 	r.client = client
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_ib_partition"
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
@@ -76,7 +74,6 @@ func (r *ibPartitionResource) ImportState(ctx context.Context, req resource.Impo
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan ibPartitionResourceModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -111,7 +108,6 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 	resp.Diagnostics.Append(diags...)
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state ibPartitionResourceModel
 	diags := req.State.Get(ctx, &state)
@@ -144,7 +140,6 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(diags...)
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// This should be unreachable, since all properties are marked as needing replacement on update.
 	resp.Diagnostics.AddWarning("In-place updates not supported",
@@ -153,7 +148,6 @@ func (r *ibPartitionResource) Update(ctx context.Context, req resource.UpdateReq
 			" partition by deleting it and then creating a new one.")
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state ibPartitionResourceModel
 	diags := req.State.Get(ctx, &state)

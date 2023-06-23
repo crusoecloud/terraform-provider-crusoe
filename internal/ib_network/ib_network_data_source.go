@@ -1,3 +1,4 @@
+//nolint:gocritic // Implements Terraform defined interface
 package ib_network
 
 import (
@@ -45,12 +46,10 @@ func (ds *ibNetworksDataSource) Configure(_ context.Context, req datasource.Conf
 	ds.client = client
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (ds *ibNetworksDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_ib_networks"
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
 		"ib_networks": schema.ListNestedAttribute{
@@ -72,7 +71,6 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 	}}
 }
 
-//nolint:gocritic // Implements Terraform defined interface
 func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	dataResp, httpResp, err := ds.client.IBNetworksApi.GetIBNetworks(ctx)
 	if err != nil {
