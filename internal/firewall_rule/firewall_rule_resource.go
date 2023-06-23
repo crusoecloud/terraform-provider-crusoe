@@ -211,10 +211,10 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// This should be unreachable, since all properties are marked as needing replacement on update.
-	resp.Diagnostics.AddWarning("Updates not supported",
-		"Updating firewall rules is not currently supported. If you're seeing this message, please reach out to"+
-			" support@crusoecloud.com and let us know. In the meantime, you should be able to update your rule by"+
-			" deleting it and then creating a new one.")
+	resp.Diagnostics.AddWarning("In-place updates not supported",
+		"Updating firewall rules in-place is not currently supported. If you're seeing this message, please reach"+
+			" out to support@crusoecloud.com and let us know. In the meantime, you should be able to update your"+
+			" rule by deleting it and then creating a new one.")
 }
 
 //nolint:gocritic // Implements Terraform defined interface

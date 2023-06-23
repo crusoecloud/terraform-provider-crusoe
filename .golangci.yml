@@ -80,4 +80,4 @@ run:
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
-  golangci-lint-version: 1.52.x # use a fixed version for consistent results
+  golangci-lint-version: 1.50.1 # use a fixed version for consistent results
