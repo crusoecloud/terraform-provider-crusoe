@@ -12,6 +12,7 @@ test:
 	go test -count=1 -parallel=4 ./...
 
 precommit: test
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_VERSION)
 	golangci-lint run --fix
 
 lint:

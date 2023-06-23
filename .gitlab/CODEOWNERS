@@ -1,0 +1,11 @@
+# By default, all Crusoe Cloud devs are codeowners of a file
+* @crusoeenergy/island
+
+.gitlab/CODEOWNERS  @lanwall12 @nitper @ksosnowski3
+
+# More restrictive ownership for adding dependencies and changing ci/builds
+Makefile            @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
+.golangci.yml       @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
+.goreleaser.yml     @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
+go.mod              @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
+go.sum              @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
