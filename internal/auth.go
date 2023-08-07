@@ -129,9 +129,7 @@ func canonicalizeQuery(query string) (canonicalQuery string, err error) {
 			continue
 		}
 		value := ""
-		if i := strings.Index(key, "="); i >= 0 {
-			key, value = key[:i], key[i+1:]
-		}
+		key, value, _ = strings.Cut(key, "=")
 		key, err1 := url.QueryUnescape(key)
 		if err1 != nil {
 			if err == nil {

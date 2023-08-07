@@ -14,6 +14,8 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 )
 
@@ -48,6 +50,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 	return []func() datasource.DataSource{
 		vm.NewVMDataSource,
 		disk.NewDisksDataSource,
+		ib_network.NewIBNetworkDataSource,
 	}
 }
 
@@ -57,6 +60,7 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		vm.NewVMResource,
 		disk.NewDiskResource,
 		firewall_rule.NewFirewallRuleResource,
+		ib_partition.NewIBPartitionResource,
 	}
 }
 

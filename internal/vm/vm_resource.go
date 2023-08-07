@@ -34,6 +34,7 @@ type vmResourceModel struct {
 	Location          types.String          `tfsdk:"location"`
 	StartupScript     types.String          `tfsdk:"startup_script"`
 	ShutdownScript    types.String          `tfsdk:"shutdown_script"`
+	IBPartitionID     types.String          `tfsdk:"ib_partition_id"`
 	Disks             []vmDiskResourceModel `tfsdk:"disks"`
 	NetworkInterfaces types.List            `tfsdk:"network_interfaces"`
 }
@@ -168,6 +169,11 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 					},
 				},
 			},
+			"ib_partition_id": schema.StringAttribute{
+				Optional:      true,
+				Description:   "Infiniband Partition ID",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
 		},
 	}
 }
@@ -210,6 +216,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		SshPublicKey:   plan.SSHKey.ValueString(),
 		StartupScript:  plan.StartupScript.ValueString(),
 		ShutdownScript: plan.ShutdownScript.ValueString(),
+		IbPartitionId:  plan.IBPartitionID.ValueString(),
 		Disks:          diskIds,
 	})
 	if err != nil {
