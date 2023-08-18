@@ -3,8 +3,6 @@ package vm
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -214,17 +212,12 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		vmLocation = defaultVMLocation
 	}
 
-	vmImage := plan.Image.ValueString()
-	if vmImage != "" && !strings.Contains(vmImage, ":") {
-		vmImage += ":latest" // default to latest tag if not supplied
-	}
-
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha3{
 		RoleId:         roleID,
 		Name:           plan.Name.ValueString(),
 		ProductName:    plan.Type.ValueString(),
 		Location:       vmLocation,
-		Image:          vmImage,
+		Image:          plan.Image.ValueString(),
 		SshPublicKey:   plan.SSHKey.ValueString(),
 		StartupScript:  plan.StartupScript.ValueString(),
 		ShutdownScript: plan.ShutdownScript.ValueString(),
