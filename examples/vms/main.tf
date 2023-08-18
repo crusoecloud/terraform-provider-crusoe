@@ -15,6 +15,9 @@ resource "crusoe_compute_instance" "my_vm" {
   name = "my-new-vm"
   type = "a40.1x"
 
+  # optionally specify a different base image
+  #image = "nvidia-docker"
+
   ssh_key        = local.my_ssh_key
   startup_script = file("startup.sh")
 

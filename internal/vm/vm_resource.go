@@ -32,6 +32,7 @@ type vmResourceModel struct {
 	Type              types.String          `tfsdk:"type"`
 	SSHKey            types.String          `tfsdk:"ssh_key"`
 	Location          types.String          `tfsdk:"location"`
+	Image             types.String          `tfsdk:"image"`
 	StartupScript     types.String          `tfsdk:"startup_script"`
 	ShutdownScript    types.String          `tfsdk:"shutdown_script"`
 	IBPartitionID     types.String          `tfsdk:"ib_partition_id"`
@@ -107,6 +108,10 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"location": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
+			"image": schema.StringAttribute{
+				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
@@ -213,6 +218,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Name:           plan.Name.ValueString(),
 		ProductName:    plan.Type.ValueString(),
 		Location:       vmLocation,
+		Image:          plan.Image.ValueString(),
 		SshPublicKey:   plan.SSHKey.ValueString(),
 		StartupScript:  plan.StartupScript.ValueString(),
 		ShutdownScript: plan.ShutdownScript.ValueString(),
