@@ -28,10 +28,12 @@ resource "crusoe_ib_partition" "my_partition" {
 
 # create two VMs, both in the same Infiniband partition
 resource "crusoe_compute_instance" "my_vm1" {
-  count = 2
+  count = 8
 
   name = "ib-vm-${count.index}"
-  type = "h100-80gb-hgx.8x" # IB enabled VM type
+  type = "a100-80gb-sxm-ib.8x" # IB enabled VM type
+  location = "us-east1-a" # IB currently only supported at us-east1-a
+  image = "ubuntu20.04-nvidia-sxm-docker:ib-nccl2.18.3" # IB image
   ib_partition_id = crusoe_ib_partition.my_partition.id
   ssh_key = local.my_ssh_key
 
