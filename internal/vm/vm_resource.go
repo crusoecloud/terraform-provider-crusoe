@@ -341,20 +341,6 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	instance, err := getVM(ctx, r.client, state.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
-
-		return
-	}
-
-	if instance.State != vmStateShutOff {
-		resp.Diagnostics.AddError("Instance is running",
-			"VMs must be stopped before attaching or detaching disks. Please stop the VM and try again.")
-
-		return
-	}
-
 	// attach/detach disks if requested
 	addedDisks, removedDisks := getDisksDiff(state.Disks, plan.Disks)
 	if len(addedDisks) > 0 {
