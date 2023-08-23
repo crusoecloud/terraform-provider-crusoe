@@ -276,7 +276,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
-			fmt.Sprintf("There was a deleting a disk: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting a disk: %s", err.Error()))
 
 		return
 	}
