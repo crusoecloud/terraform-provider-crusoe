@@ -23,6 +23,11 @@ func (v RegexValidator) MarkdownDescription(ctx context.Context) string {
 
 //nolint:gocritic // Implements Terraform defined interface
 func (v RegexValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	// skip validation if the value is still unknown, which is the case for vars before evaluation
+	if req.ConfigValue.IsUnknown() {
+		return
+	}
+
 	r := regexp.MustCompile(v.RegexPattern)
 
 	if !r.MatchString(req.ConfigValue.ValueString()) {
