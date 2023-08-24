@@ -20,6 +20,11 @@ func (v SSHKeyValidator) MarkdownDescription(ctx context.Context) string {
 
 //nolint:gocritic // Implements Terraform defined interface
 func (v SSHKeyValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	// skip validation if the value is still unknown, which is the case for vars before evaluation
+	if req.ConfigValue.IsUnknown() {
+		return
+	}
+
 	input := req.ConfigValue.ValueString()
 
 	_, _, _, _, err := ssh.ParseAuthorizedKey([]byte(input))
