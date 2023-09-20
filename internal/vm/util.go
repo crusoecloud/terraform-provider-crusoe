@@ -92,7 +92,7 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 		var publicIP string
 		var privateIP string
 		if len(networkInterface.Ips) == 0 {
-			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoeenergy.com" +
+			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoecloud.com" +
 				" and let us know."
 		} else {
 			publicIP = networkInterface.Ips[0].PublicIpv4.Address
@@ -121,7 +121,7 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 		var publicIP swagger.PublicIpv4Address
 		var privateIP swagger.PrivateIpv4Address
 		if len(networkInterface.Ips) == 0 {
-			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoeenergy.com" +
+			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoecloud.com" +
 				" and let us know."
 		} else {
 			publicIP = *networkInterface.Ips[0].PublicIpv4

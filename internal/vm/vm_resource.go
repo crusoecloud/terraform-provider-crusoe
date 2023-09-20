@@ -273,11 +273,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	plan.ID = types.StringValue(instance.Id)
 
-	networkInterfaces, warning := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	plan.NetworkInterfaces = networkInterfaces
-	if warning != "" {
-		resp.Diagnostics.AddWarning("Network(s) missing data", warning)
-	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -304,11 +301,8 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.ProductName)
 
-	networkInterfaces, warning := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
-	if warning != "" {
-		resp.Diagnostics.AddWarning("Network(s) missing data", warning)
-	}
 
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {

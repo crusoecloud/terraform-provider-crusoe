@@ -175,7 +175,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	dataResp, httpResp, err := r.client.DisksApi.GetDisks(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
-			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoeenergy.com", err.Error()))
+			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", err.Error()))
 
 		return
 	}
