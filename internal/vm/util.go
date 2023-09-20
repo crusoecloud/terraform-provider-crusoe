@@ -10,21 +10,26 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 )
 
-// reusable type attributes definition for a VM's network interface
-var vmNetworkTypeAttributes = map[string]attr.Type{
-	"id":             types.StringType,
-	"name":           types.StringType,
-	"network":        types.StringType,
-	"subnet":         types.StringType,
-	"interface_type": types.StringType,
-	"private_ipv4": types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"address": types.StringType,
+const StateRunning = "STATE_RUNNING"
+
+var vmNetworkInterfaceSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"id":             types.StringType,
+		"name":           types.StringType,
+		"network":        types.StringType,
+		"subnet":         types.StringType,
+		"interface_type": types.StringType,
+		"private_ipv4": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"address": types.StringType,
+			},
 		},
-	},
-	"public_ipv4": types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"address": types.StringType,
+		"public_ipv4": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"id":      types.StringType,
+				"address": types.StringType,
+				"type":    types.StringType,
+			},
 		},
 	},
 }
@@ -86,11 +91,11 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 	for _, networkInterface := range networkInterfaces {
 		var publicIP string
 		var privateIP string
-		if len(networkInterface.Ips) != 0 {
-			warning = "At least one network interface is missing IP addresses. Please reach out support@crusoeenergy.com" +
-				" and let us know this."
+		if len(networkInterface.Ips) == 0 {
+			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoecloud.com" +
+				" and let us know."
 		} else {
-			publicIP = networkInterface.Ips[0].PrivateIpv4.Address
+			publicIP = networkInterface.Ips[0].PublicIpv4.Address
 			privateIP = networkInterface.Ips[0].PrivateIpv4.Address
 		}
 
@@ -110,23 +115,38 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 
 // vmNetworkInterfacesToTerraformResourceModel creates a slice of Terraform-compatible network
 // interface resource instances from Crusoe API network interfaces.
-func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) []vmNetworkInterfaceResourceModel {
+func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) (networkInterfacesList types.List, warning string) {
 	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
 	for _, networkInterface := range networkInterfaces {
+		var publicIP swagger.PublicIpv4Address
+		var privateIP swagger.PrivateIpv4Address
+		if len(networkInterface.Ips) == 0 {
+			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoecloud.com" +
+				" and let us know."
+		} else {
+			publicIP = *networkInterface.Ips[0].PublicIpv4
+			privateIP = *networkInterface.Ips[0].PrivateIpv4
+		}
+
 		interfaces = append(interfaces, vmNetworkInterfaceResourceModel{
 			ID:            types.StringValue(networkInterface.Id),
 			Name:          types.StringValue(networkInterface.Name),
 			Network:       types.StringValue(networkInterface.Network),
 			Subnet:        types.StringValue(networkInterface.Subnet),
 			InterfaceType: types.StringValue(networkInterface.InterfaceType),
-			PrivateIpv4: vmIPv4ResourceModel{
-				Address: types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address),
-			},
-			PublicIpv4: vmIPv4ResourceModel{
-				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
+			PrivateIpv4: types.ObjectValueMust(
+				map[string]attr.Type{"address": types.StringType},
+				map[string]attr.Value{"address": types.StringValue(privateIP.Address)},
+			),
+			PublicIpv4: vmPublicIPv4ResourceModel{
+				ID:      types.StringValue(publicIP.Id),
+				Address: types.StringValue(publicIP.Address),
+				Type:    types.StringValue(publicIP.Type_),
 			},
 		})
 	}
 
-	return interfaces
+	values, _ := types.ListValueFrom(context.Background(), vmNetworkInterfaceSchema, interfaces)
+
+	return values, warning
 }

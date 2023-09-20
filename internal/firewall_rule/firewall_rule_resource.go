@@ -189,7 +189,7 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 		// should never happen
 		resp.Diagnostics.AddWarning("Found multiple matching firewall rules",
 			"An unexpected number of matching firewall rules was found. If you're seeing this error message, "+
-				"please report an issue to support@crusoeenergy.com")
+				"please report an issue to support@crusoecloud.com")
 	}
 
 	rule := dataResp.FirewallRules[0]

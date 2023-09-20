@@ -47,4 +47,5 @@ resource "crusoe_compute_instance" "my_vm1" {
 resource "crusoe_storage_disk" "data_disk" {
   name = "data-disk"
   size = "1TiB"
+  location = "us-east1-a"
 }
