@@ -86,7 +86,7 @@ func GetRole(ctx context.Context, api *swagger.APIClient) (string, error) {
 
 // AwaitOperation polls an async API operation until it resolves into a success or failure state.
 func AwaitOperation(ctx context.Context, op *swagger.Operation,
-	getFunc func(context.Context, string) (swagger.OperationsGetResponse, *http.Response, error)) (
+	getFunc func(context.Context, string) (swagger.ListOperationsResponseV1Alpha4, *http.Response, error)) (
 	*swagger.Operation, error,
 ) {
 	for op.State == string(OpInProgress) {
@@ -122,7 +122,7 @@ func AwaitOperation(ctx context.Context, op *swagger.Operation,
 // AwaitOperationAndResolve awaits an async API operation and attempts to parse the response as an instance of T,
 // if the operation was successful.
 func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation,
-	getFunc func(context.Context, string) (swagger.OperationsGetResponse, *http.Response, error),
+	getFunc func(context.Context, string) (swagger.ListOperationsResponseV1Alpha4, *http.Response, error),
 ) (*T, *swagger.Operation, error) {
 	op, err := AwaitOperation(ctx, op, getFunc)
 	if err != nil {

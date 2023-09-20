@@ -128,7 +128,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	sourcePortsStr := strings.ReplaceAll(plan.SourcePorts.ValueString(), "*", "1-65535")
 	destPortsStr := strings.ReplaceAll(plan.DestinationPorts.ValueString(), "*", "1-65535")
 
-	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequest{
+	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequestV1Alpha4{
 		RoleId:           roleID,
 		VpcNetworkId:     plan.Network.ValueString(),
 		Name:             plan.Name.ValueString(),

@@ -5,12 +5,8 @@ github.com/antihax/optional v1.0.0 h1:xK2lYat7ZLaVVcIuj82J8kIro4V6kDe0AUDFboUCwc
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/apparentlymart/go-textseg v1.0.0/go.mod h1:z96Txxhf3xSFMPmb5X/1W05FF/Nj9VFpLOpjS5yuumk=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/crusoecloud/client-go v0.1.19 h1:VuNFnHGlYm4w15BnC7bVy2J38LHC+prlJ52BO4C5dEU=
-github.com/crusoecloud/client-go v0.1.19/go.mod h1:k1FgpUllEJtE53osEwsF+JfbFKILn5t3UuBdHYBVpdY=
-github.com/crusoecloud/client-go v0.1.21-0.20230817174003-13b353653e84 h1:kMyuAJqRIr58ltfoq7iWwcR37esbL66oaAOzpkh69S0=
-github.com/crusoecloud/client-go v0.1.21-0.20230817174003-13b353653e84/go.mod h1:k1FgpUllEJtE53osEwsF+JfbFKILn5t3UuBdHYBVpdY=
-github.com/crusoecloud/client-go v0.1.21 h1:RycEXM9WqMwIfBnQNAtgqplof0/eQqZ0DTIgVvXfAik=
-github.com/crusoecloud/client-go v0.1.21/go.mod h1:k1FgpUllEJtE53osEwsF+JfbFKILn5t3UuBdHYBVpdY=
+github.com/crusoecloud/client-go v0.1.22 h1:SE077syXicRyq9/1B9V1+ocYJdGZZRr6pdkimKhUPQM=
+github.com/crusoecloud/client-go v0.1.22/go.mod h1:k1FgpUllEJtE53osEwsF+JfbFKILn5t3UuBdHYBVpdY=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

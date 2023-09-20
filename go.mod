@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/antihax/optional v1.0.0
-	github.com/crusoecloud/client-go v0.1.21
+	github.com/crusoecloud/client-go v0.1.22
 	github.com/hashicorp/terraform-plugin-framework v1.2.0
 )
 
