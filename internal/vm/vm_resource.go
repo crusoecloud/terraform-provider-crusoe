@@ -213,7 +213,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		vmLocation = defaultVMLocation
 	}
 
-	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha3{
+	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha4{
 		RoleId:         roleID,
 		Name:           plan.Name.ValueString(),
 		ProductName:    plan.Type.ValueString(),
@@ -344,7 +344,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// attach/detach disks if requested
 	addedDisks, removedDisks := getDisksDiff(state.Disks, plan.Disks)
 	if len(addedDisks) > 0 {
-		attachResp, httpResp, err := r.client.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequest{
+		attachResp, httpResp, err := r.client.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha4{
 			AttachDisks: addedDisks,
 		}, state.ID.ValueString())
 		if err != nil {
@@ -395,15 +395,9 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 		return
 	}
 
-	instance, err := getVM(ctx, r.client, state.ID.ValueString())
+	_, err := getVM(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
-
-		return
-	}
-	if instance.State != vmStateShutOff {
-		resp.Diagnostics.AddError("Instance is running",
-			"Instances must be shut off before they can be deleted. This will be changed in a future release.")
 
 		return
 	}

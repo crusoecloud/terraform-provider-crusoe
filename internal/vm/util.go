@@ -2,7 +2,7 @@ package vm
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -63,23 +63,18 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksR
 	return disksAdded, disksRemoved
 }
 
-const vmStateShutOff = "STATE_SHUTOFF"
-
-// TODO: update once we support an API endpoint to fetch a single VM by ID
 func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swagger.InstanceV1Alpha4, error) {
-	dataResp, httpResp, err := apiClient.VMsApi.GetInstances(ctx)
+	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, vmID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find VM: %w", err)
 	}
 	defer httpResp.Body.Close()
 
-	for i := range dataResp.Instances {
-		if dataResp.Instances[i].Id == vmID {
-			return &dataResp.Instances[i], nil
-		}
+	if dataResp.Instance != nil {
+		return dataResp.Instance, nil
 	}
 
-	return nil, errors.New("failed to fetch VM with matching ID")
+	return nil, fmt.Errorf("failed to find VM with matching ID: %w", err)
 }
 
 // vmNetworkInterfacesToTerraformDataModel creates a slice of Terraform-compatible network
