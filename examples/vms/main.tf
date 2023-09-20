@@ -14,6 +14,7 @@ locals {
 resource "crusoe_compute_instance" "my_vm" {
   name = "my-new-vm"
   type = "a40.1x"
+  location = "us-northcentral1-a"
 
   # optionally specify a different base image
   #image = "nvidia-docker"
@@ -31,13 +32,14 @@ resource "crusoe_compute_instance" "my_vm" {
 resource "crusoe_storage_disk" "data_disk" {
   name = "data-disk"
   size = "200GiB"
+  location = "us-northcentral1-a"
 }
 
 // firewall rule
 // note: this allows all ingress over TCP to our VM
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   network           = crusoe_compute_instance.my_vm.network_interfaces[0].network
-  name              = "testrule-terra"
+  name              = "example-terraform-rule"
   action            = "allow"
   direction         = "ingress"
   protocols         = "tcp"

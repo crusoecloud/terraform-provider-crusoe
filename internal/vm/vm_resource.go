@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -19,8 +18,6 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
-
-const defaultVMLocation = "us-northcentral1-a"
 
 type vmResource struct {
 	client *swagger.APIClient
@@ -41,17 +38,19 @@ type vmResourceModel struct {
 }
 
 type vmNetworkInterfaceResourceModel struct {
-	ID            types.String        `tfsdk:"id"`
-	Name          types.String        `tfsdk:"name"`
-	Network       types.String        `tfsdk:"network"`
-	Subnet        types.String        `tfsdk:"subnet"`
-	InterfaceType types.String        `tfsdk:"interface_type"`
-	PrivateIpv4   vmIPv4ResourceModel `tfsdk:"private_ipv4"`
-	PublicIpv4    vmIPv4ResourceModel `tfsdk:"public_ipv4"`
+	ID            types.String              `tfsdk:"id"`
+	Name          types.String              `tfsdk:"name"`
+	Network       types.String              `tfsdk:"network"`
+	Subnet        types.String              `tfsdk:"subnet"`
+	InterfaceType types.String              `tfsdk:"interface_type"`
+	PrivateIpv4   types.Object              `tfsdk:"private_ipv4"`
+	PublicIpv4    vmPublicIPv4ResourceModel `tfsdk:"public_ipv4"`
 }
 
-type vmIPv4ResourceModel struct {
+type vmPublicIPv4ResourceModel struct {
+	ID      types.String `tfsdk:"id"`
 	Address types.String `tfsdk:"address"`
+	Type    types.String `tfsdk:"type"`
 }
 
 type vmDiskResourceModel struct {
@@ -134,6 +133,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			},
 			"network_interfaces": schema.ListNestedAttribute{
 				Computed:      true,
+				Optional:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -158,18 +158,33 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 							Computed:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
-						"public_ipv4": schema.ObjectAttribute{
+						"public_ipv4": schema.SingleNestedAttribute{
 							Computed: true,
-							AttributeTypes: map[string]attr.Type{
-								"address": types.StringType,
+							Optional: true,
+							Attributes: map[string]schema.Attribute{
+								"id": schema.StringAttribute{
+									Computed:      true,
+									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+								},
+								"address": schema.StringAttribute{
+									Computed:      true,
+									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+								},
+								"type": schema.StringAttribute{
+									Computed: true,
+									Optional: true,
+								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
-						"private_ipv4": schema.ObjectAttribute{
+						"private_ipv4": schema.SingleNestedAttribute{
 							Computed: true,
-							AttributeTypes: map[string]attr.Type{
-								"address": types.StringType,
+							Attributes: map[string]schema.Attribute{
+								"address": schema.StringAttribute{
+									Computed: true,
+								},
 							},
+							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
@@ -208,22 +223,36 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		diskIds = append(diskIds, d.ID)
 	}
 
-	vmLocation := plan.Location.ValueString()
-	if vmLocation == "" {
-		vmLocation = defaultVMLocation
+	// public static IPs
+	var newNetworkInterfaces []swagger.NetworkInterface
+	if !plan.NetworkInterfaces.IsUnknown() && !plan.NetworkInterfaces.IsNull() {
+		tNetworkInterfaces := make([]vmNetworkInterfaceResourceModel, 0, len(plan.NetworkInterfaces.Elements()))
+		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
+		resp.Diagnostics.Append(diags...)
+
+		for _, networkInterface := range tNetworkInterfaces {
+			newNetworkInterfaces = []swagger.NetworkInterface{{
+				Ips: []swagger.IpAddresses{{
+					PublicIpv4: &swagger.PublicIpv4Address{
+						Type_: networkInterface.PublicIpv4.Type.ValueString(),
+					},
+				}},
+			}}
+		}
 	}
 
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha4{
-		RoleId:         roleID,
-		Name:           plan.Name.ValueString(),
-		ProductName:    plan.Type.ValueString(),
-		Location:       vmLocation,
-		Image:          plan.Image.ValueString(),
-		SshPublicKey:   plan.SSHKey.ValueString(),
-		StartupScript:  plan.StartupScript.ValueString(),
-		ShutdownScript: plan.ShutdownScript.ValueString(),
-		IbPartitionId:  plan.IBPartitionID.ValueString(),
-		Disks:          diskIds,
+		RoleId:            roleID,
+		Name:              plan.Name.ValueString(),
+		ProductName:       plan.Type.ValueString(),
+		Location:          plan.Location.ValueString(),
+		Image:             plan.Image.ValueString(),
+		SshPublicKey:      plan.SSHKey.ValueString(),
+		StartupScript:     plan.StartupScript.ValueString(),
+		ShutdownScript:    plan.ShutdownScript.ValueString(),
+		IbPartitionId:     plan.IBPartitionID.ValueString(),
+		NetworkInterfaces: newNetworkInterfaces,
+		Disks:             diskIds,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -244,31 +273,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	plan.ID = types.StringValue(instance.Id)
 
-	networkInterfaces := make([]vmNetworkInterfaceResourceModel, 0, len(instance.NetworkInterfaces))
-	for _, networkInterface := range instance.NetworkInterfaces {
-		networkInterfaces = append(networkInterfaces, vmNetworkInterfaceResourceModel{
-			ID:            types.StringValue(networkInterface.Id),
-			Name:          types.StringValue(networkInterface.Name),
-			Network:       types.StringValue(networkInterface.Network),
-			Subnet:        types.StringValue(networkInterface.Subnet),
-			InterfaceType: types.StringValue(networkInterface.InterfaceType),
-			PrivateIpv4: vmIPv4ResourceModel{
-				Address: types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address),
-			},
-			PublicIpv4: vmIPv4ResourceModel{
-				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
-			},
-		})
-	}
-
-	tNetworkInterfaces, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: vmNetworkTypeAttributes}, networkInterfaces)
-
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	plan.NetworkInterfaces = tNetworkInterfaces
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	plan.NetworkInterfaces = networkInterfaces
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -295,6 +301,9 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.ProductName)
 
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	state.NetworkInterfaces = networkInterfaces
+
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {
 		if !disk.IsBootDisk {
@@ -305,18 +314,6 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		// only assign if disks is not empty. otherwise, intentionally keep this nil, for future comparisons
 		state.Disks = disks
 	}
-
-	networkInterfaces := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
-	tNetworkInterfaces, diags := types.ListValueFrom(ctx, types.ObjectType{
-		AttrTypes: vmNetworkTypeAttributes,
-	}, networkInterfaces)
-
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	state.NetworkInterfaces = tNetworkInterfaces
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -381,9 +378,65 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 	}
 
-	state.Disks = plan.Disks
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	// save intermediate results
+	if len(addedDisks) > 0 || len(removedDisks) > 0 {
+		state.Disks = plan.Disks
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+	}
+
+	// handle toggling static/dynamic public IPs
+	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
+		// instances must be running to toggle static public IP
+		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance network interface",
+				fmt.Sprintf("There was an error fetching the instance's current state: %v", err))
+
+			return
+		}
+		defer httpResp.Body.Close()
+		if instance.Instance.State != StateRunning {
+			resp.Diagnostics.AddError("Cannot update instance network interface",
+				"The instance needs to be running before updating its public IP address.")
+
+			return
+		}
+
+		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
+		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
+		resp.Diagnostics.Append(diags...)
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha4{
+			Action: "UPDATE",
+			NetworkInterfaces: []swagger.NetworkInterface{{
+				Ips: []swagger.IpAddresses{{
+					PublicIpv4: &swagger.PublicIpv4Address{
+						Id:    tNetworkInterfaces[0].PublicIpv4.ID.ValueString(),
+						Type_: tNetworkInterfaces[0].PublicIpv4.Type.ValueString(),
+					},
+				}},
+			}},
+		}, state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance network interface",
+				fmt.Sprintf("There was an error requesting to update the instance's network interface: %v", err))
+
+			return
+		}
+		defer httpResp.Body.Close()
+
+		_, err = internal.AwaitOperation(ctx, patchResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance network interface",
+				fmt.Sprintf("There was an error updating the instance's network interfaces: %s", err.Error()))
+
+			return
+		}
+
+		state.NetworkInterfaces = plan.NetworkInterfaces
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+	}
 }
 
 //nolint:gocritic // Implements Terraform defined interface
