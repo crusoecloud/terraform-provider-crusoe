@@ -292,6 +292,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.ProductName)
+	state.NetworkInterfaces = vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {
@@ -303,18 +304,6 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		// only assign if disks is not empty. otherwise, intentionally keep this nil, for future comparisons
 		state.Disks = disks
 	}
-
-	networkInterfaces := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
-	//tNetworkInterfaces, diags := types.ListValueFrom(ctx, types.ObjectType{
-	//	AttrTypes: vmNetworkTypeAttributes,
-	//}, networkInterfaces)
-
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	state.NetworkInterfaces = networkInterfaces
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

@@ -106,14 +106,6 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 				map[string]attr.Type{"address": types.StringType},
 				map[string]attr.Value{"address": types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address)},
 			),
-			// PublicIpv4: types.ObjectValueMust(
-			//	map[string]attr.Type{"id": types.StringType, "address": types.StringType, "type": types.StringType},
-			//	map[string]attr.Value{
-			//		"id":      types.StringValue(networkInterface.Ips[0].PublicIpv4.Id),
-			//		"address": types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
-			//		"type":    types.StringValue(networkInterface.Ips[0].PublicIpv4.Type_),
-			//	},
-			// ),
 			PublicIpv4: vmPublicIPv4ResourceModel{
 				ID:      types.StringValue(networkInterface.Ips[0].PublicIpv4.Id),
 				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),

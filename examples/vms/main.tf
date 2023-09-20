@@ -12,7 +12,7 @@ locals {
 
 // new VM
 resource "crusoe_compute_instance" "my_vm" {
-  name = "andres-tf-test"
+  name = "my-new-vm"
   type = "a40.1x"
   location = "us-northcentral1-a"
 
