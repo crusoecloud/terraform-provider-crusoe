@@ -24,17 +24,17 @@ type vmResource struct {
 }
 
 type vmResourceModel struct {
-	ID                types.String                      `tfsdk:"id"`
-	Name              types.String                      `tfsdk:"name"`
-	Type              types.String                      `tfsdk:"type"`
-	SSHKey            types.String                      `tfsdk:"ssh_key"`
-	Location          types.String                      `tfsdk:"location"`
-	Image             types.String                      `tfsdk:"image"`
-	StartupScript     types.String                      `tfsdk:"startup_script"`
-	ShutdownScript    types.String                      `tfsdk:"shutdown_script"`
-	IBPartitionID     types.String                      `tfsdk:"ib_partition_id"`
-	Disks             []vmDiskResourceModel             `tfsdk:"disks"`
-	NetworkInterfaces []vmNetworkInterfaceResourceModel `tfsdk:"network_interfaces"`
+	ID                types.String          `tfsdk:"id"`
+	Name              types.String          `tfsdk:"name"`
+	Type              types.String          `tfsdk:"type"`
+	SSHKey            types.String          `tfsdk:"ssh_key"`
+	Location          types.String          `tfsdk:"location"`
+	Image             types.String          `tfsdk:"image"`
+	StartupScript     types.String          `tfsdk:"startup_script"`
+	ShutdownScript    types.String          `tfsdk:"shutdown_script"`
+	IBPartitionID     types.String          `tfsdk:"ib_partition_id"`
+	Disks             []vmDiskResourceModel `tfsdk:"disks"`
+	NetworkInterfaces types.List            `tfsdk:"network_interfaces"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -225,14 +225,20 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	// public static IPs
 	var newNetworkInterfaces []swagger.NetworkInterface
-	if len(plan.NetworkInterfaces) == 1 {
-		newNetworkInterfaces = []swagger.NetworkInterface{{
-			Ips: []swagger.IpAddresses{{
-				PublicIpv4: &swagger.PublicIpv4Address{
-					Type_: plan.NetworkInterfaces[0].PublicIpv4.Type.ValueString(),
-				},
-			}},
-		}}
+	if !plan.NetworkInterfaces.IsUnknown() && !plan.NetworkInterfaces.IsNull() {
+		tNetworkInterfaces := make([]vmNetworkInterfaceResourceModel, 0, len(plan.NetworkInterfaces.Elements()))
+		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
+		resp.Diagnostics.Append(diags...)
+
+		for _, networkInterface := range tNetworkInterfaces {
+			newNetworkInterfaces = []swagger.NetworkInterface{{
+				Ips: []swagger.IpAddresses{{
+					PublicIpv4: &swagger.PublicIpv4Address{
+						Type_: networkInterface.PublicIpv4.Type.ValueString(),
+					},
+				}},
+			}}
+		}
 	}
 
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha4{
@@ -266,7 +272,12 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	plan.ID = types.StringValue(instance.Id)
-	plan.NetworkInterfaces = vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+
+	networkInterfaces, warning := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	plan.NetworkInterfaces = networkInterfaces
+	if warning != "" {
+		resp.Diagnostics.AddWarning("Network(s) missing data", warning)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -292,7 +303,12 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.ProductName)
-	state.NetworkInterfaces = vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+
+	networkInterfaces, warning := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	state.NetworkInterfaces = networkInterfaces
+	if warning != "" {
+		resp.Diagnostics.AddWarning("Network(s) missing data", warning)
+	}
 
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {
@@ -376,7 +392,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// handle toggling static/dynamic public IPs
-	if len(plan.NetworkInterfaces) == 1 {
+	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
 		// instances must be running to toggle static public IP
 		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ID.ValueString())
 		if err != nil {
@@ -393,13 +409,16 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			return
 		}
 
+		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
+		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
+		resp.Diagnostics.Append(diags...)
 		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha4{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
 				Ips: []swagger.IpAddresses{{
 					PublicIpv4: &swagger.PublicIpv4Address{
-						Id:    state.NetworkInterfaces[0].PublicIpv4.ID.ValueString(),
-						Type_: plan.NetworkInterfaces[0].PublicIpv4.Type.ValueString(),
+						Id:    tNetworkInterfaces[0].PublicIpv4.ID.ValueString(),
+						Type_: tNetworkInterfaces[0].PublicIpv4.Type.ValueString(),
 					},
 				}},
 			}},

@@ -12,6 +12,28 @@ import (
 
 const StateRunning = "STATE_RUNNING"
 
+var vmNetworkInterfaceSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"id":             types.StringType,
+		"name":           types.StringType,
+		"network":        types.StringType,
+		"subnet":         types.StringType,
+		"interface_type": types.StringType,
+		"private_ipv4": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"address": types.StringType,
+			},
+		},
+		"public_ipv4": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"id":      types.StringType,
+				"address": types.StringType,
+				"type":    types.StringType,
+			},
+		},
+	},
+}
+
 // getDisksDiff compares the disks attached to two VM resource models and returns
 // a diff of disks defined by disk ID.
 func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksRemoved []string) {
@@ -69,11 +91,11 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 	for _, networkInterface := range networkInterfaces {
 		var publicIP string
 		var privateIP string
-		if len(networkInterface.Ips) != 0 {
+		if len(networkInterface.Ips) == 0 {
 			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoeenergy.com" +
 				" and let us know."
 		} else {
-			publicIP = networkInterface.Ips[0].PrivateIpv4.Address
+			publicIP = networkInterface.Ips[0].PublicIpv4.Address
 			privateIP = networkInterface.Ips[0].PrivateIpv4.Address
 		}
 
@@ -93,9 +115,19 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 
 // vmNetworkInterfacesToTerraformResourceModel creates a slice of Terraform-compatible network
 // interface resource instances from Crusoe API network interfaces.
-func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) []vmNetworkInterfaceResourceModel {
+func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) (networkInterfacesList types.List, warning string) {
 	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
 	for _, networkInterface := range networkInterfaces {
+		var publicIP swagger.PublicIpv4Address
+		var privateIP swagger.PrivateIpv4Address
+		if len(networkInterface.Ips) == 0 {
+			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoeenergy.com" +
+				" and let us know."
+		} else {
+			publicIP = *networkInterface.Ips[0].PublicIpv4
+			privateIP = *networkInterface.Ips[0].PrivateIpv4
+		}
+
 		interfaces = append(interfaces, vmNetworkInterfaceResourceModel{
 			ID:            types.StringValue(networkInterface.Id),
 			Name:          types.StringValue(networkInterface.Name),
@@ -104,15 +136,17 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 			InterfaceType: types.StringValue(networkInterface.InterfaceType),
 			PrivateIpv4: types.ObjectValueMust(
 				map[string]attr.Type{"address": types.StringType},
-				map[string]attr.Value{"address": types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address)},
+				map[string]attr.Value{"address": types.StringValue(privateIP.Address)},
 			),
 			PublicIpv4: vmPublicIPv4ResourceModel{
-				ID:      types.StringValue(networkInterface.Ips[0].PublicIpv4.Id),
-				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
-				Type:    types.StringValue(networkInterface.Ips[0].PublicIpv4.Type_),
+				ID:      types.StringValue(publicIP.Id),
+				Address: types.StringValue(publicIP.Address),
+				Type:    types.StringValue(publicIP.Type_),
 			},
 		})
 	}
 
-	return interfaces
+	values, _ := types.ListValueFrom(context.Background(), vmNetworkInterfaceSchema, interfaces)
+
+	return values, warning
 }
