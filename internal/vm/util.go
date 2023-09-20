@@ -25,6 +25,7 @@ var vmNetworkTypeAttributes = map[string]attr.Type{
 	"public_ipv4": types.ObjectType{
 		AttrTypes: map[string]attr.Type{
 			"address": types.StringType,
+			"type":    types.StringType,
 		},
 	},
 }
@@ -87,8 +88,8 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 		var publicIP string
 		var privateIP string
 		if len(networkInterface.Ips) != 0 {
-			warning = "At least one network interface is missing IP addresses. Please reach out support@crusoeenergy.com" +
-				" and let us know this."
+			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoeenergy.com" +
+				" and let us know."
 		} else {
 			publicIP = networkInterface.Ips[0].PrivateIpv4.Address
 			privateIP = networkInterface.Ips[0].PrivateIpv4.Address
@@ -119,11 +120,22 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 			Network:       types.StringValue(networkInterface.Network),
 			Subnet:        types.StringValue(networkInterface.Subnet),
 			InterfaceType: types.StringValue(networkInterface.InterfaceType),
-			PrivateIpv4: vmIPv4ResourceModel{
-				Address: types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address),
-			},
-			PublicIpv4: vmIPv4ResourceModel{
+			PrivateIpv4: types.ObjectValueMust(
+				map[string]attr.Type{"address": types.StringType},
+				map[string]attr.Value{"address": types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address)},
+			),
+			//PublicIpv4: types.ObjectValueMust(
+			//	map[string]attr.Type{"id": types.StringType, "address": types.StringType, "type": types.StringType},
+			//	map[string]attr.Value{
+			//		"id":      types.StringValue(networkInterface.Ips[0].PublicIpv4.Id),
+			//		"address": types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
+			//		"type":    types.StringValue(networkInterface.Ips[0].PublicIpv4.Type_),
+			//	},
+			//),
+			PublicIpv4: vmPublicIPv4ResourceModel{
+				ID:      types.StringValue(networkInterface.Ips[0].PublicIpv4.Id),
 				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
+				Type:    types.StringValue(networkInterface.Ips[0].PublicIpv4.Type_),
 			},
 		})
 	}

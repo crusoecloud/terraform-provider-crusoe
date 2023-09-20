@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	defaultDiskLocation = "us-northcentral1-a"
-	defaultDiskType     = "persistent-ssd"
+	defaultDiskType = "persistent-ssd"
 )
 
 type diskResource struct {
@@ -69,8 +68,7 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"location": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
+				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
@@ -110,11 +108,6 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	diskLocation := plan.Location.ValueString()
-	if diskLocation == "" {
-		diskLocation = defaultDiskLocation
-	}
-
 	diskType := plan.Type.ValueString()
 	if diskType == "" {
 		diskType = defaultDiskType
@@ -129,8 +122,8 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	dataResp, httpResp, err := r.client.DisksApi.CreateDisk(ctx, swagger.DisksPostRequest{
 		RoleId:   roleID,
-		Location: diskLocation,
 		Name:     plan.Name.ValueString(),
+		Location: plan.Location.ValueString(),
 		Type_:    diskType,
 		Size:     plan.Size.ValueString(),
 	})
