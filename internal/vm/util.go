@@ -10,25 +10,7 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 )
 
-// reusable type attributes definition for a VM's network interface
-var vmNetworkTypeAttributes = map[string]attr.Type{
-	"id":             types.StringType,
-	"name":           types.StringType,
-	"network":        types.StringType,
-	"subnet":         types.StringType,
-	"interface_type": types.StringType,
-	"private_ipv4": types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"address": types.StringType,
-		},
-	},
-	"public_ipv4": types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"address": types.StringType,
-			"type":    types.StringType,
-		},
-	},
-}
+const StateRunning = "STATE_RUNNING"
 
 // getDisksDiff compares the disks attached to two VM resource models and returns
 // a diff of disks defined by disk ID.
@@ -124,14 +106,14 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 				map[string]attr.Type{"address": types.StringType},
 				map[string]attr.Value{"address": types.StringValue(networkInterface.Ips[0].PrivateIpv4.Address)},
 			),
-			//PublicIpv4: types.ObjectValueMust(
+			// PublicIpv4: types.ObjectValueMust(
 			//	map[string]attr.Type{"id": types.StringType, "address": types.StringType, "type": types.StringType},
 			//	map[string]attr.Value{
 			//		"id":      types.StringValue(networkInterface.Ips[0].PublicIpv4.Id),
 			//		"address": types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),
 			//		"type":    types.StringValue(networkInterface.Ips[0].PublicIpv4.Type_),
 			//	},
-			//),
+			// ),
 			PublicIpv4: vmPublicIPv4ResourceModel{
 				ID:      types.StringValue(networkInterface.Ips[0].PublicIpv4.Id),
 				Address: types.StringValue(networkInterface.Ips[0].PublicIpv4.Address),

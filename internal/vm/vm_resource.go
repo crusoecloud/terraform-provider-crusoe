@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
-	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -16,6 +13,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
 type vmResource struct {
@@ -44,10 +45,6 @@ type vmNetworkInterfaceResourceModel struct {
 	InterfaceType types.String              `tfsdk:"interface_type"`
 	PrivateIpv4   types.Object              `tfsdk:"private_ipv4"`
 	PublicIpv4    vmPublicIPv4ResourceModel `tfsdk:"public_ipv4"`
-}
-
-type vmPrivateIPv4ResourceModel struct {
-	Address types.String `tfsdk:"address"`
 }
 
 type vmPublicIPv4ResourceModel struct {
@@ -391,6 +388,22 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 
 	// handle toggling static/dynamic public IPs
 	if len(plan.NetworkInterfaces) == 1 {
+		// instances must be running to toggle static public IP
+		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance network interface",
+				fmt.Sprintf("There was an error fetching the instance's current state: %v", err))
+
+			return
+		}
+		defer httpResp.Body.Close()
+		if instance.Instance.State != StateRunning {
+			resp.Diagnostics.AddError("Cannot update instance network interface",
+				"The instance needs to be running before updating its public IP address.")
+
+			return
+		}
+
 		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha4{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
