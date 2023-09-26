@@ -96,7 +96,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create partition",
-			fmt.Sprintf("There was an error creating an Infiniband partition: %s", err.Error()))
+			fmt.Sprintf("There was an error creating an Infiniband partition: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -159,7 +159,7 @@ func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteReq
 	httpResp, err := r.client.IBPartitionsApi.DeleteIBPartition(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete partition",
-			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", internal.UnpackAPIError(err)))
 
 		return
 	}

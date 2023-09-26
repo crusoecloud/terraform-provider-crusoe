@@ -256,7 +256,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
-			fmt.Sprintf("There was an error starting a create instance operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a create instance operation: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -266,7 +266,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		ctx, dataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
-			fmt.Sprintf("There was an error creating a instance: %s", err.Error()))
+			fmt.Sprintf("There was an error creating a instance: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -346,7 +346,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}, state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
-				fmt.Sprintf("There was an error starting an attach disk operation: %s", err.Error()))
+				fmt.Sprintf("There was an error starting an attach disk operation: %s", internal.UnpackAPIError(err)))
 
 			return
 		}
@@ -355,7 +355,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		_, err = internal.AwaitOperation(ctx, attachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
-				fmt.Sprintf("There was an error attaching a disk: %s", err.Error()))
+				fmt.Sprintf("There was an error attaching a disk: %s", internal.UnpackAPIError(err)))
 		}
 	}
 
@@ -365,14 +365,14 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}, state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
-				fmt.Sprintf("There was an error starting a detach disk operation: %s", err.Error()))
+				fmt.Sprintf("There was an error starting a detach disk operation: %s", internal.UnpackAPIError(err)))
 		}
 		defer httpResp.Body.Close()
 
 		_, err = internal.AwaitOperation(ctx, detachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
-				fmt.Sprintf("There was an error detaching a disk: %s", err.Error()))
+				fmt.Sprintf("There was an error detaching a disk: %s", internal.UnpackAPIError(err)))
 
 			return
 		}
@@ -428,7 +428,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		_, err = internal.AwaitOperation(ctx, patchResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
-				fmt.Sprintf("There was an error updating the instance's network interfaces: %s", err.Error()))
+				fmt.Sprintf("There was an error updating the instance's network interfaces: %s", internal.UnpackAPIError(err)))
 
 			return
 		}
@@ -458,7 +458,7 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
-			fmt.Sprintf("There was an error starting a delete instance operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a delete instance operation: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -467,7 +467,7 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	_, _, err = internal.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
-			fmt.Sprintf("There was an error deleting an instance: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting an instance: %s", internal.UnpackAPIError(err)))
 
 		return
 	}

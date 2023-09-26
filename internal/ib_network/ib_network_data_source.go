@@ -75,7 +75,7 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 	dataResp, httpResp, err := ds.client.IBNetworksApi.GetIBNetworks(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch IB Networks",
-			fmt.Sprintf("Could not fetch Infiniband network data at this time: %v", err))
+			fmt.Sprintf("Could not fetch Infiniband network data at this time: %s", internal.UnpackAPIError(err)))
 
 		return
 	}

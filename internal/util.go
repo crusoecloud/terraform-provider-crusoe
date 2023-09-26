@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/antihax/optional"
@@ -15,7 +16,7 @@ import (
 
 const (
 	// TODO: pull from config set during build
-	version = "v0.4.0"
+	version = "v0.4.1"
 
 	pollInterval = 2 * time.Second
 
@@ -165,4 +166,37 @@ func opResultToError(res interface{}) (expectedErr, unexpectedErr error) {
 
 	//nolint:goerr113 //This function is designed to return dynamic errors
 	return fmt.Errorf("%s", resultError.Message), nil
+}
+
+// apiError models the error format returned by the Crusoe API go client.
+type apiError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// UnpackAPIError takes a swagger API error and safely attempts to extract any additional information
+// present in the response. The original error is returned unchanged if it cannot be unpacked.
+func UnpackAPIError(original error) error {
+	apiErr := &swagger.GenericSwaggerError{}
+	if ok := errors.As(original, apiErr); !ok {
+		return original
+	}
+
+	var model apiError
+	err := json.Unmarshal(apiErr.Body(), &model)
+	if err != nil {
+		return original
+	}
+
+	// some error messages are of the format "rpc code = ... desc = ..."
+	// in those cases, we extract the description and return it
+	const two = 2
+	components := strings.Split(model.Message, " desc = ")
+	if len(components) == two {
+		//nolint:goerr113 // error is dynamic
+		return fmt.Errorf("%s", components[1])
+	}
+
+	//nolint:goerr113 // error is dynamic
+	return fmt.Errorf("%s", model.Message)
 }

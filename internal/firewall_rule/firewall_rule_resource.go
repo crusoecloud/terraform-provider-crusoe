@@ -142,7 +142,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
-			fmt.Sprintf("There was an error starting a create firewall rule operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a create firewall rule operation: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -153,7 +153,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
-			fmt.Sprintf("There was an error creating a firewall rule: %s", err.Error()))
+			fmt.Sprintf("There was an error creating a firewall rule: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -229,7 +229,7 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.DeleteVPCFirewallRule(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule",
-			fmt.Sprintf("There was an error starting a delete firewall rule operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a delete firewall rule operation: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -238,6 +238,6 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule",
-			fmt.Sprintf("There was an error deleting a firewall rule: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting a firewall rule: %s", internal.UnpackAPIError(err)))
 	}
 }

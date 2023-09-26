@@ -129,7 +129,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
-			fmt.Sprintf("There was an error starting a create disk operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a create disk operation: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -138,7 +138,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	disk, _, err := internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
-			fmt.Sprintf("There was an error creating a disk: %s", err.Error()))
+			fmt.Sprintf("There was an error creating a disk: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -260,7 +260,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	dataResp, httpResp, err := r.client.DisksApi.DeleteDisk(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
-			fmt.Sprintf("There was an error starting a delete disk operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a delete disk operation: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
@@ -269,7 +269,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
-			fmt.Sprintf("There was an error deleting a disk: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting a disk: %s", internal.UnpackAPIError(err)))
 
 		return
 	}
