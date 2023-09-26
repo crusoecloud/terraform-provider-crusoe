@@ -3,11 +3,12 @@ package disk
 import (
 	"context"
 
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type disksDataSource struct {
@@ -40,7 +41,7 @@ func (ds *disksDataSource) Configure(_ context.Context, req datasource.Configure
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}

@@ -3,11 +3,13 @@ package vm
 import (
 	"context"
 	"fmt"
+
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 const StateRunning = "STATE_RUNNING"
@@ -71,7 +73,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksR
 func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swagger.InstanceV1Alpha4, error) {
 	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, vmID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find VM: %w", internal.UnpackAPIError(err))
+		return nil, fmt.Errorf("failed to find VM: %w", common.UnpackAPIError(err))
 	}
 	defer httpResp.Body.Close()
 

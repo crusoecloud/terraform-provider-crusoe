@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -13,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 const notFoundMessage = "404 Not Found"
@@ -39,7 +40,7 @@ func (r *ibPartitionResource) Configure(ctx context.Context, req resource.Config
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
@@ -82,7 +83,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	roleID, err := internal.GetRole(ctx, r.client)
+	roleID, err := common.GetRole(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
 
@@ -96,7 +97,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create partition",
-			fmt.Sprintf("There was an error creating an Infiniband partition: %s", internal.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error creating an Infiniband partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -159,7 +160,7 @@ func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteReq
 	httpResp, err := r.client.IBPartitionsApi.DeleteIBPartition(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete partition",
-			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", internal.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}
