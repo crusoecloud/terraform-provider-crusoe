@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -13,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
@@ -46,7 +47,7 @@ func (r *diskResource) Configure(ctx context.Context, req resource.ConfigureRequ
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
@@ -113,7 +114,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		diskType = defaultDiskType
 	}
 
-	roleID, err := internal.GetRole(ctx, r.client)
+	roleID, err := common.GetRole(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
 
@@ -129,16 +130,16 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
-			fmt.Sprintf("There was an error starting a create disk operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a create disk operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 	defer httpResp.Body.Close()
 
-	disk, _, err := internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
-			fmt.Sprintf("There was an error creating a disk: %s", err.Error()))
+			fmt.Sprintf("There was an error creating a disk: %s", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -234,7 +235,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	_, _, err = internal.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
@@ -260,16 +261,16 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	dataResp, httpResp, err := r.client.DisksApi.DeleteDisk(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
-			fmt.Sprintf("There was an error starting a delete disk operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a delete disk operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 	defer httpResp.Body.Close()
 
-	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
-			fmt.Sprintf("There was an error deleting a disk: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting a disk: %s", common.UnpackAPIError(err)))
 
 		return
 	}

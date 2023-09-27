@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -13,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
@@ -45,7 +46,7 @@ func (r *firewallRuleResource) Configure(ctx context.Context, req resource.Confi
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
@@ -118,7 +119,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	roleID, err := internal.GetRole(ctx, r.client)
+	roleID, err := common.GetRole(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
 
@@ -142,18 +143,18 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
-			fmt.Sprintf("There was an error starting a create firewall rule operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a create firewall rule operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 	defer httpResp.Body.Close()
 
-	firewallRule, _, err := internal.AwaitOperationAndResolve[swagger.VpcFirewallRule](
+	firewallRule, _, err := common.AwaitOperationAndResolve[swagger.VpcFirewallRule](
 		ctx, dataResp.Operation,
 		r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
-			fmt.Sprintf("There was an error creating a firewall rule: %s", err.Error()))
+			fmt.Sprintf("There was an error creating a firewall rule: %s", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -229,15 +230,15 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.DeleteVPCFirewallRule(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule",
-			fmt.Sprintf("There was an error starting a delete firewall rule operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a delete firewall rule operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 	defer httpResp.Body.Close()
 
-	_, err = internal.AwaitOperation(ctx, dataResp.Operation, r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule",
-			fmt.Sprintf("There was an error deleting a firewall rule: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting a firewall rule: %s", common.UnpackAPIError(err)))
 	}
 }
