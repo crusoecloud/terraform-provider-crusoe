@@ -31,9 +31,9 @@ resource "crusoe_compute_instance" "my_vm1" {
   count = 8
 
   name = "ib-vm-${count.index}"
-  type = "a100-80gb-sxm-ib.8x" # IB enabled VM type
-  location = "us-east1-a" # IB currently only supported at us-east1-a
-  image = "ubuntu20.04-nvidia-sxm-docker:ib-nccl2.18.3" # IB image
+  type = "a100-80gb-sxm-ib.8x" # IB enabled VM type, `a100-80gb-sxm-ib.8x` or h100-80gb-sxm-ib.8x`
+  location = "us-east1-a" # IB currently only supported in `us-east1-a`
+  image = "ubuntu20.04-nvidia-sxm-docker:latest" # IB image, see full list at https://docs.crusoecloud.com/compute/images/overview/index.html#list-of-curated-images
   ib_partition_id = crusoe_ib_partition.my_partition.id
   ssh_key = local.my_ssh_key
 
