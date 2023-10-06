@@ -66,6 +66,7 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 		},
 		"name": schema.StringAttribute{
 			Required: true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 		},
 		"network": schema.StringAttribute{
 			Required:      true,
@@ -249,7 +250,7 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to patch firewall rule",
-			fmt.Sprintf("There was an error updating the firewall rule: %s.", err.Error()))
+			fmt.Sprintf("There was an error updating the firewall rule: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -259,7 +260,7 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	_, _, err = common.AwaitOperationAndResolve[swagger.VpcFirewallRule](ctx, dataResp.Operation, r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to patch firewall rule",
-			fmt.Sprintf("There was an error updating the firewall rule: %s.", err.Error()))
+			fmt.Sprintf("There was an error updating the firewall rule: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
