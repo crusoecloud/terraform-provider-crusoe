@@ -81,23 +81,28 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^ingress"}}, // TODO: support egress once supported by API
 		},
 		"protocols": schema.StringAttribute{
-			Required: true,
+			Required:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"source": schema.StringAttribute{
-			Required: true,
+			Required:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"source_ports": schema.StringAttribute{
-			Required: true,
+			Required:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"destination": schema.StringAttribute{
-			Required: true,
+			Required:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"destination_ports": schema.StringAttribute{
-			Required: true,
+			Required:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 	}}
@@ -218,22 +223,22 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 	patchReq := swagger.VpcFirewallRulesPatchRequest{}
-	if !plan.Name.IsNull() {
+	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
 		patchReq.Name = plan.Name.ValueString()
 	}
-	if !plan.Protocols.IsNull() {
+	if !plan.Protocols.IsNull() && !plan.Protocols.IsUnknown() {
 		patchReq.Protocols = stringToSlice(plan.Protocols.ValueString(), ",")
 	}
-	if !plan.Destination.IsNull() {
+	if !plan.Destination.IsNull() && !plan.Destination.IsUnknown() {
 		patchReq.Destinations = []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Destination.ValueString())}
 	}
-	if !plan.DestinationPorts.IsNull() {
+	if !plan.DestinationPorts.IsNull() && !plan.DestinationPorts.IsUnknown() {
 		patchReq.DestinationPorts = stringToSlice(plan.DestinationPorts.ValueString(), ",")
 	}
-	if !plan.Source.IsNull() {
+	if !plan.Source.IsNull() && !plan.Source.IsUnknown() {
 		patchReq.Sources = []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Source.ValueString())}
 	}
-	if !plan.SourcePorts.IsNull() {
+	if !plan.SourcePorts.IsNull() && !plan.SourcePorts.IsUnknown() {
 		patchReq.SourcePorts = stringToSlice(plan.SourcePorts.ValueString(), ",")
 	}
 
