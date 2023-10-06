@@ -65,8 +65,8 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 		},
 		"name": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			Required: true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 		},
 		"network": schema.StringAttribute{
 			Required:      true,
@@ -84,27 +84,27 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 		},
 		"protocols": schema.StringAttribute{
 			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"source": schema.StringAttribute{
 			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"source_ports": schema.StringAttribute{
 			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"destination": schema.StringAttribute{
 			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 		"destination_ports": schema.StringAttribute{
 			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			// TODO: add validator
 		},
 	}}
@@ -211,11 +211,62 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// This should be unreachable, since all properties are marked as needing replacement on update.
-	resp.Diagnostics.AddWarning("In-place updates not supported",
-		"Updating firewall rules in-place is not currently supported. If you're seeing this message, please reach"+
-			" out to support@crusoecloud.com and let us know. In the meantime, you should be able to update your"+
-			" rule by deleting it and then creating a new one.")
+	var state firewallRuleResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var plan firewallRuleResourceModel
+	diags = req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	patchReq := swagger.VpcFirewallRulesPatchRequest{}
+	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
+		patchReq.Name = plan.Name.ValueString()
+	}
+	if !plan.Protocols.IsNull() && !plan.Protocols.IsUnknown() {
+		patchReq.Protocols = stringToSlice(plan.Protocols.ValueString(), ",")
+	}
+	if !plan.Destination.IsNull() && !plan.Destination.IsUnknown() {
+		patchReq.Destinations = []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Destination.ValueString())}
+	}
+	if !plan.DestinationPorts.IsNull() && !plan.DestinationPorts.IsUnknown() {
+		patchReq.DestinationPorts = stringToSlice(plan.DestinationPorts.ValueString(), ",")
+	}
+	if !plan.Source.IsNull() && !plan.Source.IsUnknown() {
+		patchReq.Sources = []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Source.ValueString())}
+	}
+	if !plan.SourcePorts.IsNull() && !plan.SourcePorts.IsUnknown() {
+		patchReq.SourcePorts = stringToSlice(plan.SourcePorts.ValueString(), ",")
+	}
+
+	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.PatchVPCFirewallRule(ctx,
+		patchReq,
+		plan.ID.ValueString(),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to patch firewall rule",
+			fmt.Sprintf("There was an error updating the firewall rule: %s.", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	defer httpResp.Body.Close()
+
+	_, _, err = common.AwaitOperationAndResolve[swagger.VpcFirewallRule](ctx, dataResp.Operation, r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to patch firewall rule",
+			fmt.Sprintf("There was an error updating the firewall rule: %s.", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
