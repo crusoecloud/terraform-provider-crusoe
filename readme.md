@@ -5,7 +5,7 @@ This repo defines the official Terraform Provider for use with [Crusoe Cloud](ht
 
 ## Getting Started
 
-To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.ai/security/tokens and add the following to `~/.crusoe/config`:
+To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.com/security/tokens and add the following to `~/.crusoe/config`:
 
 ```toml
 [default]
