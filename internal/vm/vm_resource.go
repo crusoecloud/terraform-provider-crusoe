@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
@@ -68,7 +68,7 @@ func (r *vmResource) Configure(ctx context.Context, req resource.ConfigureReques
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
@@ -211,7 +211,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	roleID, err := internal.GetRole(ctx, r.client)
+	roleID, err := common.GetRole(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
 
@@ -256,17 +256,17 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
-			fmt.Sprintf("There was an error starting a create instance operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a create instance operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 	defer httpResp.Body.Close()
 
-	instance, _, err := internal.AwaitOperationAndResolve[swagger.InstanceV1Alpha4](
+	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha4](
 		ctx, dataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
-			fmt.Sprintf("There was an error creating a instance: %s", err.Error()))
+			fmt.Sprintf("There was an error creating a instance: %s", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -346,16 +346,16 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}, state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
-				fmt.Sprintf("There was an error starting an attach disk operation: %s", err.Error()))
+				fmt.Sprintf("There was an error starting an attach disk operation: %s", common.UnpackAPIError(err)))
 
 			return
 		}
 		defer httpResp.Body.Close()
 
-		_, err = internal.AwaitOperation(ctx, attachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, attachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
-				fmt.Sprintf("There was an error attaching a disk: %s", err.Error()))
+				fmt.Sprintf("There was an error attaching a disk: %s", common.UnpackAPIError(err)))
 		}
 	}
 
@@ -365,14 +365,14 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}, state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
-				fmt.Sprintf("There was an error starting a detach disk operation: %s", err.Error()))
+				fmt.Sprintf("There was an error starting a detach disk operation: %s", common.UnpackAPIError(err)))
 		}
 		defer httpResp.Body.Close()
 
-		_, err = internal.AwaitOperation(ctx, detachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, detachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
-				fmt.Sprintf("There was an error detaching a disk: %s", err.Error()))
+				fmt.Sprintf("There was an error detaching a disk: %s", common.UnpackAPIError(err)))
 
 			return
 		}
@@ -425,10 +425,10 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 		defer httpResp.Body.Close()
 
-		_, err = internal.AwaitOperation(ctx, patchResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
-				fmt.Sprintf("There was an error updating the instance's network interfaces: %s", err.Error()))
+				fmt.Sprintf("There was an error updating the instance's network interfaces: %s", common.UnpackAPIError(err)))
 
 			return
 		}
@@ -458,16 +458,16 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
-			fmt.Sprintf("There was an error starting a delete instance operation: %s", err.Error()))
+			fmt.Sprintf("There was an error starting a delete instance operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 	defer delHttpResp.Body.Close()
 
-	_, _, err = internal.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+	_, _, err = common.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
-			fmt.Sprintf("There was an error deleting an instance: %s", err.Error()))
+			fmt.Sprintf("There was an error deleting an instance: %s", common.UnpackAPIError(err)))
 
 		return
 	}

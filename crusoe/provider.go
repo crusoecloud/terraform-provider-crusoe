@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
@@ -73,7 +73,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	clientConfig, err := internal.GetConfig()
+	clientConfig, err := common.GetConfig()
 	if err != nil {
 		// only show a warning, since it's possible that we can't read their home dir (which is unexpected) but
 		// they have everything set via env variables, so we can still proceed.
@@ -107,7 +107,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	// Create an API client and make it available during DataSource and Resource type Configure methods.
-	client := internal.NewAPIClient(clientConfig.ApiEndpoint, clientConfig.AccessKeyID, clientConfig.SecretKey)
+	client := common.NewAPIClient(clientConfig.ApiEndpoint, clientConfig.AccessKeyID, clientConfig.SecretKey)
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type ibNetworksDataSource struct {
@@ -38,7 +38,7 @@ func (ds *ibNetworksDataSource) Configure(_ context.Context, req datasource.Conf
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
@@ -75,7 +75,7 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 	dataResp, httpResp, err := ds.client.IBNetworksApi.GetIBNetworks(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch IB Networks",
-			fmt.Sprintf("Could not fetch Infiniband network data at this time: %v", err))
+			fmt.Sprintf("Could not fetch Infiniband network data at this time: %s", common.UnpackAPIError(err)))
 
 		return
 	}

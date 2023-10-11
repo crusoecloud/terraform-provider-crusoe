@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 // vmDataSource is a Terraform datasource that can be used to fetch a single VM instance.
@@ -52,7 +52,7 @@ func (ds *vmDataSource) Configure(_ context.Context, req datasource.ConfigureReq
 
 	client, ok := req.ProviderData.(*swagger.APIClient)
 	if !ok {
-		resp.Diagnostics.AddError("Failed to initialize provider", internal.ErrorMsgProviderInitFailed)
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
