@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"strings"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -65,7 +65,7 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 		},
 		"name": schema.StringAttribute{
-			Required: true,
+			Required:      true,
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 		},
 		"network": schema.StringAttribute{
