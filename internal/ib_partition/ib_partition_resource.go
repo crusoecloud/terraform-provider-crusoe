@@ -87,8 +87,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	dataResp, httpResp, err := r.client.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha4{
-		RoleId:      plan.ProjectID.ValueString(),
+	dataResp, httpResp, err := r.client.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha5{
 		Name:        plan.Name.ValueString(),
 		IbNetworkId: plan.IBNetworkID.ValueString(),
 	}, plan.ProjectID.ValueString())

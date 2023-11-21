@@ -15,7 +15,7 @@ func getUserOrg(ctx context.Context, apiClient *swagger.APIClient) (string, erro
 	}
 	defer httpResp.Body.Close()
 
-	entities := dataResp.Entities
+	entities := dataResp.Items
 	switch len(entities) {
 	case 0:
 		return "", errors.New("user does not belong to any organizations")

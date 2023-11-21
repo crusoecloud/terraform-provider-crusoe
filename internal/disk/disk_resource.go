@@ -118,8 +118,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		diskType = defaultDiskType
 	}
 
-	dataResp, httpResp, err := r.client.DisksApi.CreateDisk(ctx, swagger.DisksPostRequest{
-		RoleId:   plan.ProjectID.ValueString(),
+	dataResp, httpResp, err := r.client.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1Alpha5{
 		Name:     plan.Name.ValueString(),
 		Location: plan.Location.ValueString(),
 		Type_:    diskType,

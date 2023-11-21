@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -115,11 +114,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	opts := &swagger.ProjectsApiGetProjectsOpts{
-		OrgId: optional.EmptyString(),
-	}
-
-	dataResp, httpResp, err := r.client.ProjectsApi.GetProjects(ctx, opts)
+	project, httpResp, err := r.client.ProjectsApi.GetProject(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get projects",
 			fmt.Sprintf("Fetching Crusoe projects failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", err.Error()))
@@ -127,21 +122,6 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 	defer httpResp.Body.Close()
-
-	var project *swagger.Project
-
-	for i := range dataResp.Items {
-		if dataResp.Items[i].Id == state.ID.ValueString() {
-			project = &dataResp.Items[i]
-		}
-	}
-
-	if project == nil {
-		// disk has most likely been deleted out of band, so we update Terraform state to match
-		resp.State.RemoveResource(ctx)
-
-		return
-	}
 
 	state.Name = types.StringValue(project.Name)
 	state.ID = types.StringValue(project.Id)

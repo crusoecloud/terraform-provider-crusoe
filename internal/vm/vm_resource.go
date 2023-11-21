@@ -220,9 +220,12 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	diskIds := make([]string, 0, len(plan.Disks))
+	diskIds := make([]swagger.DiskAttachment, 0, len(plan.Disks))
 	for _, d := range plan.Disks {
-		diskIds = append(diskIds, d.ID)
+		diskIds = append(diskIds,swagger.DiskAttachment{
+			AttachmentType: d.AttachmentType,
+			DiskId:         d.ID,
+		})
 	}
 
 	// public static IPs
@@ -243,8 +246,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		}
 	}
 
-	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha4{
-		RoleId:            plan.ProjectID.ValueString(),
+	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
 		Name:              plan.Name.ValueString(),
 		ProductName:       plan.Type.ValueString(),
 		Location:          plan.Location.ValueString(),
@@ -408,7 +410,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
-		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha4{
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequest{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
 				Ips: []swagger.IpAddresses{{

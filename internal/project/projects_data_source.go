@@ -74,11 +74,11 @@ func (ds *projectsDataSource) Schema(ctx context.Context, request datasource.Sch
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *projectsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	opts := &swagger.ProjectsApiGetProjectsOpts{
+	opts := &swagger.ProjectsApiListProjectsOpts{
 		OrgId: optional.EmptyString(),
 	}
 
-	dataResp, httpResp, err := ds.client.ProjectsApi.GetProjects(ctx, opts)
+	dataResp, httpResp, err := ds.client.ProjectsApi.ListProjects(ctx, opts)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Projects", "Could not fetch Project data at this time.")
 
