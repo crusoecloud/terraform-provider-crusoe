@@ -68,6 +68,10 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			Required:      true,
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 		},
+		"project_id": schema.StringAttribute{
+			Required:      true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+		},
 		"network": schema.StringAttribute{
 			Required:      true,
 			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},

@@ -6,10 +6,10 @@ terraform {
   }
 }
 
-default project = my_new_project
 
 locals {
-  my_ssh_key = file("~/.ssh/id_ed25519.pub")
+  my_project_id = "d2ee27ac-52db-487a-ba7f-99c43bf159b2"
+  my_ssh_key = file("~/.ssh/id_rsa.pub")
 }
 
 # list IB networks
@@ -26,6 +26,7 @@ resource "crusoe_ib_partition" "my_partition" {
   # above. alternatively, they can be obtain with the CLI by
   #   crusoe networking ib-network list
   ib_network_id = "<ib_network_id>"
+  project_id = local.my_project_id
 }
 
 # create two VMs, both in the same Infiniband partition
@@ -38,6 +39,7 @@ resource "crusoe_compute_instance" "my_vm1" {
   image = "ubuntu20.04-nvidia-sxm-docker:latest" # IB image, see full list at https://docs.crusoecloud.com/compute/images/overview/index.html#list-of-curated-images
   ib_partition_id = crusoe_ib_partition.my_partition.id
   ssh_key = local.my_ssh_key
+  project_id = local.my_project_id
 
   disks = [
     // disk attached at startup
@@ -50,4 +52,5 @@ resource "crusoe_storage_disk" "data_disk" {
   name = "data-disk"
   size = "1TiB"
   location = "us-east1-a"
+  project_id = local.my_project_id
 }

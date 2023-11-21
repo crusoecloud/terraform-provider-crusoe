@@ -4,7 +4,6 @@ package ib_network
 import (
 	"context"
 	"fmt"
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
@@ -26,7 +25,6 @@ type ibNetworksDataSourceFilter struct {
 
 type ibNetworkModel struct {
 	ID        string `tfsdk:"id"`
-	ProjectID string `tfsdk:"project_id"`
 	Name      string `tfsdk:"name"`
 	Location  string `tfsdk:"location"`
 }
