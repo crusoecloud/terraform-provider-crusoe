@@ -93,18 +93,9 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
-			"project_id": schema.ListNestedAttribute{
-				Required: true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							Optional: true,
-						},
-						"name": schema.StringAttribute{
-							Optional: true,
-						},
-					},
-				},
+			"project_id": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
 				Required:      true,

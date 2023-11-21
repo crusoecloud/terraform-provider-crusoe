@@ -7,7 +7,11 @@ terraform {
 }
 
 locals {
-  my_ssh_key = file("~/.ssh/id_ed25519.pub")
+  my_ssh_key = file("~/.ssh/id_rsa.pub")
+}
+
+resource "crusoe_project" "my_project"{
+  name = "my-new-cool-project"
 }
 
 // new VM
@@ -21,6 +25,7 @@ resource "crusoe_compute_instance" "my_vm" {
 
   ssh_key        = local.my_ssh_key
   startup_script = file("startup.sh")
+  project_id = crusoe_project.my_project.id
 
   disks = [
     // attached at startup
@@ -33,6 +38,7 @@ resource "crusoe_storage_disk" "data_disk" {
   name = "data-disk"
   size = "200GiB"
   location = "us-northcentral1-a"
+  project_id = crusoe_project.my_project.id
 }
 
 // firewall rule
