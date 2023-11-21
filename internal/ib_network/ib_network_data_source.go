@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -20,10 +20,15 @@ type ibNetworksDataSourceModel struct {
 	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
 }
 
+type ibNetworksDataSourceFilter struct {
+	ProjectID *string `tfsdk:"project_id"`
+}
+
 type ibNetworkModel struct {
-	ID       string `tfsdk:"id"`
-	Name     string `tfsdk:"name"`
-	Location string `tfsdk:"location"`
+	ID        string `tfsdk:"id"`
+	ProjectID string `tfsdk:"project_id"`
+	Name      string `tfsdk:"name"`
+	Location  string `tfsdk:"location"`
 }
 
 func NewIBNetworkDataSource() datasource.DataSource {
@@ -72,7 +77,13 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 }
 
 func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	dataResp, httpResp, err := ds.client.IBNetworksApi.GetIBNetworks(ctx)
+	var config ibNetworksDataSourceFilter
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	dataResp, httpResp, err := ds.client.IBNetworksApi.ListIBNetworks(ctx, *config.ProjectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch IB Networks",
 			fmt.Sprintf("Could not fetch Infiniband network data at this time: %s", common.UnpackAPIError(err)))
@@ -82,14 +93,14 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 	defer httpResp.Body.Close()
 
 	var state ibNetworksDataSourceModel
-	for i := range dataResp.IbNetworks {
+	for i := range dataResp.Items {
 		state.IBNetworks = append(state.IBNetworks, ibNetworkModel{
-			ID:       dataResp.IbNetworks[i].Id,
-			Name:     dataResp.IbNetworks[i].Name,
-			Location: dataResp.IbNetworks[i].Location,
+			ID:       dataResp.Items[i].Id,
+			Name:     dataResp.Items[i].Name,
+			Location: dataResp.Items[i].Location,
 		})
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

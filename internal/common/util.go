@@ -9,9 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antihax/optional"
-
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
 
 const (
@@ -36,11 +34,7 @@ var (
 	OpInProgress opStatus = "IN_PROGRESS"
 	OpFailed     opStatus = "FAILED"
 
-	errNoOperations     = errors.New("no operation with id found")
 	errUnableToGetOpRes = errors.New("failed to get result of operation")
-
-	errAmbiguousRole     = errors.New("user is associated with multiple roles - please contact support@crusoecloud.com")
-	errNoRoleAssociation = errors.New("user is not associated with any role")
 
 	// fallback error presented to the user in unexpected situations
 	errUnexpected = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
@@ -60,46 +54,19 @@ func NewAPIClient(host, key, secret string) *swagger.APIClient {
 	return swagger.NewAPIClient(cfg)
 }
 
-// GetRole creates a get Role request and calls the API.
-// This function returns a role id if the user's role can be determined
-// (i.e. user only has one role, which is the case for v0).
-func GetRole(ctx context.Context, api *swagger.APIClient) (string, error) {
-	opts := swagger.RolesApiGetRolesOpts{
-		OrgId: optional.EmptyString(),
-	}
-
-	resp, httpResp, err := api.RolesApi.GetRoles(ctx, &opts)
-	if err != nil {
-		return "", fmt.Errorf("could not get roles: %w", err)
-	}
-	defer httpResp.Body.Close()
-
-	switch len(resp.Roles) {
-	case 0:
-		return "", errNoRoleAssociation
-	case 1:
-		return resp.Roles[0].Id, nil
-	default:
-		// user has multiple roles: unable to disambiguate
-		return "", errAmbiguousRole
-	}
-}
-
 // AwaitOperation polls an async API operation until it resolves into a success or failure state.
-func AwaitOperation(ctx context.Context, op *swagger.Operation,
-	getFunc func(context.Context, string) (swagger.ListOperationsResponseV1Alpha4, *http.Response, error)) (
+func AwaitOperation(ctx context.Context, op *swagger.Operation, projectID string,
+	getFunc func(context.Context, string, string) (swagger.Operation, *http.Response, error)) (
 	*swagger.Operation, error,
 ) {
 	for op.State == string(OpInProgress) {
-		updatedOps, httpResp, err := getFunc(ctx, op.OperationId)
+		updatedOps, httpResp, err := getFunc(ctx, projectID, op.OperationId)
 		if err != nil {
 			return nil, fmt.Errorf("error getting operation with id %s: %w", op.OperationId, err)
 		}
 		httpResp.Body.Close()
-		if len(updatedOps.Operations) == 0 {
-			return nil, errNoOperations
-		}
-		op = &updatedOps.Operations[0]
+
+		op = &updatedOps
 
 		time.Sleep(pollInterval)
 	}
@@ -122,10 +89,10 @@ func AwaitOperation(ctx context.Context, op *swagger.Operation,
 
 // AwaitOperationAndResolve awaits an async API operation and attempts to parse the response as an instance of T,
 // if the operation was successful.
-func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation,
-	getFunc func(context.Context, string) (swagger.ListOperationsResponseV1Alpha4, *http.Response, error),
+func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation, projectID string,
+	getFunc func(context.Context, string, string) (swagger.Operation, *http.Response, error),
 ) (*T, *swagger.Operation, error) {
-	op, err := AwaitOperation(ctx, op, getFunc)
+	op, err := AwaitOperation(ctx, op, projectID, getFunc)
 	if err != nil {
 		return nil, op, err
 	}

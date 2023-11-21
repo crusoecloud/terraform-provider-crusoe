@@ -6,7 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -16,6 +16,10 @@ type disksDataSource struct {
 
 type disksDataSourceModel struct {
 	Disks []diskModel `tfsdk:"disks"`
+}
+
+type disksDataSourceFilter struct {
+	ProjectID *string `tfsdk:"project_id"`
 }
 
 type diskModel struct {
@@ -86,7 +90,14 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	dataResp, httpResp, err := ds.client.DisksApi.GetDisks(ctx)
+	var config disksDataSourceFilter
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	dataResp, httpResp, err := ds.client.DisksApi.ListDisks(ctx, *config.ProjectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Disks", "Could not fetch Disk data at this time.")
 
@@ -95,17 +106,17 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	defer httpResp.Body.Close()
 
 	var state disksDataSourceModel
-	for i := range dataResp.Disks {
+	for i := range dataResp.Items {
 		state.Disks = append(state.Disks, diskModel{
-			ID:           dataResp.Disks[i].Id,
-			Name:         dataResp.Disks[i].Name,
-			Location:     dataResp.Disks[i].Location,
-			Type:         dataResp.Disks[i].Type_,
-			Size:         dataResp.Disks[i].Size,
-			SerialNumber: dataResp.Disks[i].SerialNumber,
+			ID:           dataResp.Items[i].Id,
+			Name:         dataResp.Items[i].Name,
+			Location:     dataResp.Items[i].Location,
+			Type:         dataResp.Items[i].Type_,
+			Size:         dataResp.Items[i].Size,
+			SerialNumber: dataResp.Items[i].SerialNumber,
 		})
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

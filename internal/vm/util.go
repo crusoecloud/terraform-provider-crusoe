@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -37,7 +37,7 @@ var vmNetworkInterfaceSchema = types.ObjectType{
 
 // getDisksDiff compares the disks attached to two VM resource models and returns
 // a diff of disks defined by disk ID.
-func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksRemoved []string) {
+func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagger.DiskAttachment, disksRemoved []string) {
 	for _, newDisk := range newDisks {
 		matched := false
 		for _, origDisk := range origDisks {
@@ -48,7 +48,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksR
 			}
 		}
 		if !matched {
-			disksAdded = append(disksAdded, newDisk.ID)
+			disksAdded = append(disksAdded, swagger.DiskAttachment{DiskId: newDisk.ID, AttachmentType: newDisk.AttachmentType})
 		}
 	}
 
@@ -69,18 +69,14 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksR
 	return disksAdded, disksRemoved
 }
 
-func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swagger.InstanceV1Alpha4, error) {
-	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, vmID)
+func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID string) (*swagger.InstanceV1Alpha5, error) {
+	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, projectID, vmID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find VM: %w", common.UnpackAPIError(err))
 	}
 	defer httpResp.Body.Close()
 
-	if dataResp.Instance != nil {
-		return dataResp.Instance, nil
-	}
-
-	return nil, fmt.Errorf("failed to find VM with matching ID: %w", err)
+	return &dataResp, nil
 }
 
 // vmNetworkInterfacesToTerraformDataModel creates a slice of Terraform-compatible network

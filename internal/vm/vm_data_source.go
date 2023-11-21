@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -20,6 +20,7 @@ type vmDataSource struct {
 
 type vmDataSourceFilter struct {
 	ID                *string                       `tfsdk:"id"`
+	ProjectID         *string                       `tfsdk:"project_id"`
 	Name              *string                       `tfsdk:"name"`
 	Type              *string                       `tfsdk:"type"`
 	Disks             []vmDiskResourceModel         `tfsdk:"disks"`
@@ -71,6 +72,9 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 				Required: true,
 			},
 			"name": schema.StringAttribute{
+				Optional: true,
+			},
+			"project_id": schema.StringAttribute{
 				Optional: true,
 			},
 			"type": schema.StringAttribute{
@@ -141,7 +145,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	}
 
 	if config.ID != nil {
-		vm, err := getVM(ctx, ds.client, *config.ID)
+		vm, err := getVM(ctx, ds.client, *config.ProjectID, *config.ID)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get Instance", err.Error())
 
@@ -149,6 +153,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		}
 
 		state.ID = &vm.Id
+		state.ProjectID = &vm.ProjectId
 		state.Name = &vm.Name
 		state.Type = &vm.ProductName
 

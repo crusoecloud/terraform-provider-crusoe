@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -25,6 +25,7 @@ type vmResource struct {
 
 type vmResourceModel struct {
 	ID                types.String          `tfsdk:"id"`
+	ProjectID         types.String          `tfsdk:"project_id"`
 	Name              types.String          `tfsdk:"name"`
 	Type              types.String          `tfsdk:"type"`
 	SSHKey            types.String          `tfsdk:"ssh_key"`
@@ -54,7 +55,8 @@ type vmPublicIPv4ResourceModel struct {
 }
 
 type vmDiskResourceModel struct {
-	ID string `tfsdk:"id"`
+	ID             string `tfsdk:"id"`
+	AttachmentType string `tfsdk:"attachment_type"`
 }
 
 func NewVMResource() resource.Resource {
@@ -91,6 +93,19 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
+			"project_id": schema.ListNestedAttribute{
+				Required: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Optional: true,
+						},
+						"name": schema.StringAttribute{
+							Optional: true,
+						},
+					},
+				},
+			},
 			"type": schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
@@ -126,6 +141,9 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
+							Optional: true,
+						},
+						"attachment_type": schema.StringAttribute{
 							Optional: true,
 						},
 					},
@@ -211,13 +229,6 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	roleID, err := common.GetRole(ctx, r.client)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
-
-		return
-	}
-
 	diskIds := make([]string, 0, len(plan.Disks))
 	for _, d := range plan.Disks {
 		diskIds = append(diskIds, d.ID)
@@ -242,7 +253,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha4{
-		RoleId:            roleID,
+		RoleId:            plan.ProjectID.ValueString(),
 		Name:              plan.Name.ValueString(),
 		ProductName:       plan.Type.ValueString(),
 		Location:          plan.Location.ValueString(),
@@ -253,7 +264,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		IbPartitionId:     plan.IBPartitionID.ValueString(),
 		NetworkInterfaces: newNetworkInterfaces,
 		Disks:             diskIds,
-	})
+	}, plan.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error starting a create instance operation: %s", common.UnpackAPIError(err)))
@@ -262,8 +273,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 	defer httpResp.Body.Close()
 
-	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha4](
-		ctx, dataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](
+		ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error creating a instance: %s", common.UnpackAPIError(err)))
@@ -289,7 +300,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	instance, err := getVM(ctx, r.client, state.ID.ValueString())
+	instance, err := getVM(ctx, r.client, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil || instance == nil {
 		// instance has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
@@ -341,9 +352,9 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// attach/detach disks if requested
 	addedDisks, removedDisks := getDisksDiff(state.Disks, plan.Disks)
 	if len(addedDisks) > 0 {
-		attachResp, httpResp, err := r.client.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha4{
+		attachResp, httpResp, err := r.client.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha5{
 			AttachDisks: addedDisks,
-		}, state.ID.ValueString())
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
 				fmt.Sprintf("There was an error starting an attach disk operation: %s", common.UnpackAPIError(err)))
@@ -352,7 +363,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 		defer httpResp.Body.Close()
 
-		_, err = common.AwaitOperation(ctx, attachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, attachResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
 				fmt.Sprintf("There was an error attaching a disk: %s", common.UnpackAPIError(err)))
@@ -362,14 +373,14 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	if len(removedDisks) > 0 {
 		detachResp, httpResp, err := r.client.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
 			DetachDisks: removedDisks,
-		}, state.ID.ValueString())
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
 				fmt.Sprintf("There was an error starting a detach disk operation: %s", common.UnpackAPIError(err)))
 		}
 		defer httpResp.Body.Close()
 
-		_, err = common.AwaitOperation(ctx, detachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, detachResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
 				fmt.Sprintf("There was an error detaching a disk: %s", common.UnpackAPIError(err)))
@@ -388,7 +399,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// handle toggling static/dynamic public IPs
 	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
 		// instances must be running to toggle static public IP
-		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ID.ValueString())
+		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error fetching the instance's current state: %v", err))
@@ -396,7 +407,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			return
 		}
 		defer httpResp.Body.Close()
-		if instance.Instance.State != StateRunning {
+		if instance.State != StateRunning {
 			resp.Diagnostics.AddError("Cannot update instance network interface",
 				"The instance needs to be running before updating its public IP address.")
 
@@ -416,7 +427,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 					},
 				}},
 			}},
-		}, state.ID.ValueString())
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error requesting to update the instance's network interface: %v", err))
@@ -425,7 +436,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 		defer httpResp.Body.Close()
 
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error updating the instance's network interfaces: %s", common.UnpackAPIError(err)))
@@ -448,14 +459,14 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 		return
 	}
 
-	_, err := getVM(ctx, r.client, state.ID.ValueString())
+	_, err := getVM(ctx, r.client, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
 
 		return
 	}
 
-	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ID.ValueString())
+	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
 			fmt.Sprintf("There was an error starting a delete instance operation: %s", common.UnpackAPIError(err)))
@@ -464,7 +475,8 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	}
 	defer delHttpResp.Body.Close()
 
-	_, _, err = common.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+	_, _, err = common.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, state.ProjectID.ValueString(),
+		r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
 			fmt.Sprintf("There was an error deleting an instance: %s", common.UnpackAPIError(err)))
