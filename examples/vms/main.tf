@@ -8,18 +8,17 @@ terraform {
 
 locals {
   my_ssh_key = file("~/.ssh/id_rsa.pub")
-  my_project_id = "d2ee27ac-52db-487a-ba7f-99c43bf159b2"
 }
 
 resource "crusoe_project" "my_cool_project2" {
-  name = "my_cool_project2"
+  name = "my_cool_project3"
 }
 
 // new VM
 resource "crusoe_compute_instance" "my_vm" {
   name = "my-new-vm"
-  type = "a40.1x"
-  location = "us-northcentralstaging1-a"
+  type = "a100-80gb.1x"
+  location = "us-northcentral1-a"
 
   # optionally specify a different base image
   #image = "nvidia-docker"
@@ -28,6 +27,21 @@ resource "crusoe_compute_instance" "my_vm" {
   startup_script = file("startup.sh")
   project_id = crusoe_project.my_cool_project2.id
 
+  disks = [
+    // disk attached at startup
+    {
+      id = crusoe_storage_disk.data_disk.id
+      attachment_type = "disk-readwrite"
+    }
+  ]
+
+}
+
+resource "crusoe_storage_disk" "data_disk" {
+  name = "data-disk"
+  size = "200GiB"
+  project_id = crusoe_project.my_cool_project2.id
+  location = "us-northcentral1-a"
 }
 
 // firewall rule
