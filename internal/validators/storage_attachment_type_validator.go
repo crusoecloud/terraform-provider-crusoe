@@ -34,7 +34,7 @@ func (v StorageAttachmentTypeValidator) ValidateString(ctx context.Context, req 
 	input := req.ConfigValue.ValueString()
 	input = strings.ToLower(input)
 
-	if !(input == string(DiskReadOnly)) && !(input == string(DiskReadWrite)){
+	if input != string(DiskReadOnly) && input != string(DiskReadWrite){
 		resp.Diagnostics.AddAttributeError(req.Path, "Unsupported Disk Attachment Type",
 			"Disk attachment type must be either 'disk-readonly' or 'disk-readwrite'")
 	}
