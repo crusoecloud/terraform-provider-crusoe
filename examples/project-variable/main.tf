@@ -10,8 +10,9 @@ locals {
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
-resource "crusoe_project" "my_project" {
-  name = "my-new-project"
+variable "my_project_id" {
+  type    = string
+  default = "<project_id>"
 }
 
 // new VM
@@ -24,8 +25,7 @@ resource "crusoe_compute_instance" "my_vm" {
   #image = "nvidia-docker"
 
   ssh_key = local.my_ssh_key
-  startup_script = file("startup.sh")
-  project_id = crusoe_project.my_project.id
+  project_id = var.my_project_id
 
   disks = [
     // disk attached at startup
@@ -40,7 +40,7 @@ resource "crusoe_compute_instance" "my_vm" {
 resource "crusoe_storage_disk" "data_disk" {
   name = "data-disk"
   size = "200GiB"
-  project_id = crusoe_project.my_project.id
+  project_id = var.my_project_id
   location = "us-northcentral1-a"
 }
 
@@ -56,5 +56,5 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   source_ports      = "1-65535"
   destination       = crusoe_compute_instance.my_vm.network_interfaces[0].public_ipv4.address
   destination_ports = "1-65535"
-  project_id = crusoe_project.my_project.id
+  project_id = var.my_project_id
 }

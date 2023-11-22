@@ -80,7 +80,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	orgID, err := getUserOrg(ctx, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create project",
-			fmt.Sprintf("There was an error starting a create project operation: %s", err))
+			fmt.Sprintf("There was an error fetching the user's organization: %s", err))
 
 		return
 	}

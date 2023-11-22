@@ -22,10 +22,6 @@ type projectsDataSourceModel struct {
 type projectModel struct {
 	ID           string `tfsdk:"id"`
 	Name         string `tfsdk:"name"`
-	Location     string `tfsdk:"location"`
-	Type         string `tfsdk:"type"`
-	Size         string `tfsdk:"size"`
-	SerialNumber string `tfsdk:"serial_number"`
 }
 
 func NewProjectsDataSource() datasource.DataSource {
@@ -64,7 +60,7 @@ func (ds *projectsDataSource) Schema(ctx context.Context, request datasource.Sch
 						Computed: true,
 					},
 					"name": schema.StringAttribute{
-						Required: true,
+						Computed: true,
 					},
 				},
 			},

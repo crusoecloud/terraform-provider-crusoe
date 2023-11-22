@@ -69,7 +69,8 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 			},
 			"project_id": schema.StringAttribute{
 				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 		},
 	}

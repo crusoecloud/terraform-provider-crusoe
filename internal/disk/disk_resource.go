@@ -70,7 +70,8 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"project_id": schema.StringAttribute{
 				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace()},
 			},
 			"location": schema.StringAttribute{
 				Required:      true,
