@@ -10,8 +10,8 @@ locals {
   my_ssh_key = file("~/.ssh/id_rsa.pub")
 }
 
-resource "crusoe_project" "my_cool_project2" {
-  name = "my_cool_project3"
+resource "crusoe_project" "my_project" {
+  name = "my_new_project"
 }
 
 // new VM
@@ -25,13 +25,13 @@ resource "crusoe_compute_instance" "my_vm" {
 
   ssh_key        = local.my_ssh_key
   startup_script = file("startup.sh")
-  project_id = crusoe_project.my_cool_project2.id
+  project_id = crusoe_project.my_project.id
 
   disks = [
     // disk attached at startup
     {
       id = crusoe_storage_disk.data_disk.id
-      attachment_type = "disk-readwrite"
+      attachment_type = "disk-readonly"
     }
   ]
 
@@ -40,8 +40,8 @@ resource "crusoe_compute_instance" "my_vm" {
 resource "crusoe_storage_disk" "data_disk" {
   name = "data-disk"
   size = "200GiB"
-  project_id = crusoe_project.my_cool_project2.id
-  location = "us-northcentral1-a"
+  project_id = crusoe_project.my_project.id
+  location = "us-northcentraldevelopment1-a"
 }
 
 // firewall rule
@@ -56,5 +56,5 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   source_ports      = "1-65535"
   destination       = crusoe_compute_instance.my_vm.network_interfaces[0].public_ipv4.address
   destination_ports = "1-65535"
-  project_id = crusoe_project.my_cool_project2.id
+  project_id = crusoe_project.my_project.id
 }
