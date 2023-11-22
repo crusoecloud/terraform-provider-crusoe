@@ -132,7 +132,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var state projectResource
+	var state projectResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -164,19 +164,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state projectResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 
-	httpResp, err := r.client.ProjectsApi.DeleteProject(ctx, state.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to delete project",
-			fmt.Sprintf("There was an error starting a delete project operation: %s", common.UnpackAPIError(err)))
-
-		return
-	}
-	defer httpResp.Body.Close()
+	resp.Diagnostics.AddWarning("Delete not supported",
+		"Deleting projects is not currently supported. If you're seeing this message, please reach"+
+			" out to support@crusoecloud.com and let us know.")
 }

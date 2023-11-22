@@ -3,8 +3,8 @@ package vm
 import (
 	"context"
 	"fmt"
-
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
@@ -35,13 +35,20 @@ var vmNetworkInterfaceSchema = types.ObjectType{
 	},
 }
 
+var vmDiskAttachmentSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"id":              types.StringType,
+		"attachment_type": types.StringType,
+	},
+}
+
 // getDisksDiff compares the disks attached to two VM resource models and returns
 // a diff of disks defined by disk ID.
 func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagger.DiskAttachment, disksRemoved []string) {
 	for _, newDisk := range newDisks {
 		matched := false
 		for _, origDisk := range origDisks {
-			if newDisk.ID == origDisk.ID {
+			if newDisk.ID == origDisk.ID && newDisk.AttachmentType == origDisk.AttachmentType {
 				matched = true
 
 				break
@@ -55,7 +62,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 	for _, origDisk := range origDisks {
 		matched := false
 		for _, newDisk := range newDisks {
-			if newDisk.ID == origDisk.ID {
+			if newDisk.ID == origDisk.ID && newDisk.AttachmentType == origDisk.AttachmentType {
 				matched = true
 
 				break
@@ -65,7 +72,6 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 			disksRemoved = append(disksRemoved, origDisk.ID)
 		}
 	}
-
 	return disksAdded, disksRemoved
 }
 
@@ -146,4 +152,17 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 	values, _ := types.ListValueFrom(context.Background(), vmNetworkInterfaceSchema, interfaces)
 
 	return values, warning
+}
+
+func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsList types.List, diags diag.Diagnostics) {
+	attachments := make([]vmDiskResourceModel, 0, len(diskAttachments))
+	for _, diskAttachment := range diskAttachments {
+		attachments = append(attachments, vmDiskResourceModel{
+			ID:             diskAttachment.DiskId,
+			AttachmentType: diskAttachment.AttachmentType,
+		})
+	}
+
+	diskAttachmentsList, diags = types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
+	return diskAttachmentsList, diags
 }

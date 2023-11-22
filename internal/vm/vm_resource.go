@@ -24,18 +24,18 @@ type vmResource struct {
 }
 
 type vmResourceModel struct {
-	ID                types.String          `tfsdk:"id"`
-	ProjectID         types.String          `tfsdk:"project_id"`
-	Name              types.String          `tfsdk:"name"`
-	Type              types.String          `tfsdk:"type"`
-	SSHKey            types.String          `tfsdk:"ssh_key"`
-	Location          types.String          `tfsdk:"location"`
-	Image             types.String          `tfsdk:"image"`
-	StartupScript     types.String          `tfsdk:"startup_script"`
-	ShutdownScript    types.String          `tfsdk:"shutdown_script"`
-	IBPartitionID     types.String          `tfsdk:"ib_partition_id"`
-	Disks             []vmDiskResourceModel `tfsdk:"disks"`
-	NetworkInterfaces types.List            `tfsdk:"network_interfaces"`
+	ID                types.String `tfsdk:"id"`
+	ProjectID         types.String `tfsdk:"project_id"`
+	Name              types.String `tfsdk:"name"`
+	Type              types.String `tfsdk:"type"`
+	SSHKey            types.String `tfsdk:"ssh_key"`
+	Location          types.String `tfsdk:"location"`
+	Image             types.String `tfsdk:"image"`
+	StartupScript     types.String `tfsdk:"startup_script"`
+	ShutdownScript    types.String `tfsdk:"shutdown_script"`
+	IBPartitionID     types.String `tfsdk:"ib_partition_id"`
+	Disks             types.List   `tfsdk:"disks"`
+	NetworkInterfaces types.List   `tfsdk:"network_interfaces"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -136,6 +136,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 						"attachment_type": schema.StringAttribute{
 							Optional: true,
+							Validators: []validator.String{validators.StorageAttachmentTypeValidator{}},
 						},
 					},
 				},
@@ -220,9 +221,16 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	diskIds := make([]swagger.DiskAttachment, 0, len(plan.Disks))
-	for _, d := range plan.Disks {
-		diskIds = append(diskIds,swagger.DiskAttachment{
+	tDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
+	diags = plan.Disks.ElementsAs(ctx, &tDisks, true)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	diskIds := make([]swagger.DiskAttachment, 0, len(tDisks))
+	for _, d := range tDisks {
+		diskIds = append(diskIds, swagger.DiskAttachment{
 			AttachmentType: d.AttachmentType,
 			DiskId:         d.ID,
 		})
@@ -279,6 +287,12 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	plan.NetworkInterfaces = networkInterfaces
+	disks, diags := vmDiskAttachmentToTerraformResourceModel(diskIds)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	plan.Disks = disks
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -311,12 +325,23 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {
 		if !disk.IsBootDisk {
-			disks = append(disks, vmDiskResourceModel{ID: disk.Id})
+			attachmentType := ""
+			for _, attachment := range disk.AttachedTo {
+				if attachment.VmId == instance.Id {
+					attachmentType = attachment.AttachmentType
+					break
+				}
+			}
+			disks = append(disks, vmDiskResourceModel{
+				ID:             disk.Id,
+				AttachmentType: attachmentType,
+			})
 		}
 	}
 	if len(disks) > 0 {
 		// only assign if disks is not empty. otherwise, intentionally keep this nil, for future comparisons
-		state.Disks = disks
+		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
+		state.Disks = tDisks
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -343,7 +368,34 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// attach/detach disks if requested
-	addedDisks, removedDisks := getDisksDiff(state.Disks, plan.Disks)
+	tPlanDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
+	diags = plan.Disks.ElementsAs(ctx, &tPlanDisks, true)
+
+	tStateDisks := make([]vmDiskResourceModel, 0, len(state.Disks.Elements()))
+	diags = state.Disks.ElementsAs(ctx, &tStateDisks, true)
+
+	addedDisks, removedDisks := getDisksDiff(tStateDisks, tPlanDisks)
+
+	if len(removedDisks) > 0 {
+
+		detachResp, httpResp, err := r.client.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
+			DetachDisks: removedDisks,
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to detach disk",
+				fmt.Sprintf("There was an error starting a detach disk operation: %s", common.UnpackAPIError(err)))
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, detachResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to detach disk",
+				fmt.Sprintf("There was an error detaching a disk: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+	}
+
 	if len(addedDisks) > 0 {
 		attachResp, httpResp, err := r.client.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha5{
 			AttachDisks: addedDisks,
@@ -363,30 +415,14 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 	}
 
-	if len(removedDisks) > 0 {
-		detachResp, httpResp, err := r.client.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
-			DetachDisks: removedDisks,
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to detach disk",
-				fmt.Sprintf("There was an error starting a detach disk operation: %s", common.UnpackAPIError(err)))
-		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, detachResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to detach disk",
-				fmt.Sprintf("There was an error detaching a disk: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-	}
-
 	// save intermediate results
 	if len(addedDisks) > 0 || len(removedDisks) > 0 {
 		state.Disks = plan.Disks
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// handle toggling static/dynamic public IPs
