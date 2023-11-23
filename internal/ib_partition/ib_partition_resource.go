@@ -68,7 +68,8 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
-				Required:      true,
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
@@ -88,10 +89,24 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	projectID := ""
+	if plan.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create partition",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = plan.ProjectID.ValueString()
+	}
+
 	dataResp, httpResp, err := r.client.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha5{
 		Name:        plan.Name.ValueString(),
 		IbNetworkId: plan.IBNetworkID.ValueString(),
-	}, plan.ProjectID.ValueString())
+	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create partition",
 			fmt.Sprintf("There was an error creating an Infiniband partition: %s", common.UnpackAPIError(err)))
@@ -101,6 +116,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Id)
+	plan.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

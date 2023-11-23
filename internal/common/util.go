@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/antihax/optional"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"net/http"
 	"strings"
 	"time"
@@ -37,7 +39,8 @@ var (
 	errUnableToGetOpRes = errors.New("failed to get result of operation")
 
 	// fallback error presented to the user in unexpected situations
-	errUnexpected = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
+	errMultipleProjects = errors.New("User has multiple projects. Please specify a project to be used.")
+	errUnexpected       = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
 )
 
 // NewAPIClient initializes a new Crusoe API client with the given configuration.
@@ -103,6 +106,53 @@ func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation,
 	}
 
 	return result, op, nil
+}
+
+// GetFallbackProject queries the API to get the list of projects belonging to the
+// logged in user. If there is one project belonging to the user, it returns that project
+// else it adds an error to the diagnostics and returns.
+func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diag *diag.Diagnostics) (string, error) {
+
+	config, err := GetConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to get config: %v", err)
+	}
+
+	var opts = &swagger.ProjectsApiListProjectsOpts{
+		OrgId: optional.EmptyString(),
+	}
+
+	if config.DefaultProject != "" {
+		opts.ProjectName = optional.NewString(config.DefaultProject)
+	}
+
+	dataResp, httpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
+	defer httpResp.Body.Close()
+
+	if err != nil {
+		diag.AddError("Failed to retrieve project ID",
+			"Failed to retrieve project ID for the authenticated user.")
+
+		return "", err
+	}
+
+	if len(dataResp.Items) != 1 {
+		diag.AddError("Multiple projects found.",
+			"Multiple projects found for the authenticated user. Unable to determine which project to use.")
+
+		return "", errMultipleProjects
+	}
+
+	projectID := dataResp.Items[0].Id
+
+	if config.DefaultProject == "" {
+		diag.AddWarning("Default project not specified",
+			fmt.Sprintf("A project_id was not specified in the configuration file. "+
+				"Please specify a project in the terraform file or set a 'default_project' in your configuration file. "+
+			"Falling back to project: %s.", dataResp.Items[0].Name))
+	}
+
+	return projectID, nil
 }
 
 func parseOpResult[T any](opResult interface{}) (*T, error) {

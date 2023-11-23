@@ -94,7 +94,8 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
-				Required:      true,
+				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
@@ -135,7 +136,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 							Optional: true,
 						},
 						"attachment_type": schema.StringAttribute{
-							Optional: true,
+							Optional:   true,
 							Validators: []validator.String{validators.StorageAttachmentTypeValidator{}},
 						},
 					},
@@ -228,6 +229,20 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
+	projectID := ""
+	if plan.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create instance",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = plan.ProjectID.ValueString()
+	}
+
 	diskIds := make([]swagger.DiskAttachment, 0, len(tDisks))
 	for _, d := range tDisks {
 		diskIds = append(diskIds, swagger.DiskAttachment{
@@ -265,7 +280,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		IbPartitionId:     plan.IBPartitionID.ValueString(),
 		NetworkInterfaces: newNetworkInterfaces,
 		Disks:             diskIds,
-	}, plan.ProjectID.ValueString())
+	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error starting a create instance operation: %s", common.UnpackAPIError(err)))
@@ -275,7 +290,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	defer httpResp.Body.Close()
 
 	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](
-		ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		ctx, dataResp.Operation, projectID, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error creating a instance: %s", common.UnpackAPIError(err)))
@@ -293,6 +308,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 	plan.Disks = disks
+	plan.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

@@ -69,7 +69,8 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Required:      true,
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace()},
 			},
@@ -119,21 +120,35 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		diskType = defaultDiskType
 	}
 
+	projectID := ""
+	if plan.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+
+			resp.Diagnostics.AddError("Failed to create disk",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+			return
+		}
+		projectID = project
+	} else {
+		projectID = plan.ProjectID.ValueString()
+	}
+
 	dataResp, httpResp, err := r.client.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1Alpha5{
 		Name:     plan.Name.ValueString(),
 		Location: plan.Location.ValueString(),
 		Type_:    diskType,
 		Size:     plan.Size.ValueString(),
-	}, plan.ProjectID.ValueString())
+	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
-			fmt.Sprintf("There was an error starting a create disk operation: %s", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error starting a create disk operation (%s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
 	defer httpResp.Body.Close()
 
-	disk, _, err := common.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, projectID, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error creating a disk: %s", common.UnpackAPIError(err)))
@@ -145,6 +160,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	plan.Type = types.StringValue(disk.Type_)
 	plan.Location = types.StringValue(disk.Location)
 	plan.SerialNumber = types.StringValue(disk.SerialNumber)
+	plan.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

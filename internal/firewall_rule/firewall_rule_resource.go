@@ -69,7 +69,8 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 		},
 		"project_id": schema.StringAttribute{
-			Required:      true,
+			Optional:      true,
+			Computed:      true,
 			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 		},
 		"network": schema.StringAttribute{
@@ -125,6 +126,20 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	sourcePortsStr := strings.ReplaceAll(plan.SourcePorts.ValueString(), "*", "1-65535")
 	destPortsStr := strings.ReplaceAll(plan.DestinationPorts.ValueString(), "*", "1-65535")
 
+	projectID := ""
+	if plan.ProjectID.ValueString() == ""{
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create firewall rule",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = plan.ProjectID.ValueString()
+	}
+
 	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequestV1Alpha5{
 		VpcNetworkId:     plan.Network.ValueString(),
 		Name:             plan.Name.ValueString(),
@@ -135,7 +150,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		SourcePorts:      stringToSlice(sourcePortsStr, ","),
 		Destinations:     []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Destination.ValueString())},
 		DestinationPorts: stringToSlice(destPortsStr, ","),
-	}, plan.ProjectID.ValueString())
+	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
 			fmt.Sprintf("There was an error starting a create firewall rule operation: %s", common.UnpackAPIError(err)))
@@ -145,7 +160,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	defer httpResp.Body.Close()
 
 	firewallRule, _, err := common.AwaitOperationAndResolve[swagger.VpcFirewallRule](
-		ctx, dataResp.Operation, plan.ProjectID.ValueString(),
+		ctx, dataResp.Operation, projectID,
 		r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
@@ -155,6 +170,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	plan.ID = types.StringValue(firewallRule.Id)
+	plan.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
