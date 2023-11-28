@@ -8,7 +8,7 @@ terraform {
 
 
 locals {
-  my_ssh_key = file("~/.ssh/id_ed25519.pub")
+  my_ssh_key = file("~/.ssh/id_rsa.pub")
 }
 
 resource "crusoe_project" "my_project" {
@@ -48,7 +48,7 @@ resource "crusoe_compute_instance" "my_vm1" {
     // disk attached at startup
     {
       id = crusoe_storage_disk.data_disk.id
-      attachment_type = "disk-readwrite"
+      attachment_type = "disk-readonly"
     }
   ]
 }

@@ -19,14 +19,10 @@ type ibNetworksDataSourceModel struct {
 	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
 }
 
-type ibNetworksDataSourceFilter struct {
-	ProjectID *string `tfsdk:"project_id"`
-}
-
 type ibNetworkModel struct {
-	ID        string `tfsdk:"id"`
-	Name      string `tfsdk:"name"`
-	Location  string `tfsdk:"location"`
+	ID       string `tfsdk:"id"`
+	Name     string `tfsdk:"name"`
+	Location string `tfsdk:"location"`
 }
 
 func NewIBNetworkDataSource() datasource.DataSource {
@@ -75,13 +71,15 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 }
 
 func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config ibNetworksDataSourceFilter
-	diags := req.Config.Get(ctx, &config)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	projectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch IB networks",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 		return
 	}
-	dataResp, httpResp, err := ds.client.IBNetworksApi.ListIBNetworks(ctx, *config.ProjectID)
+
+	dataResp, httpResp, err := ds.client.IBNetworksApi.ListIBNetworks(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch IB Networks",
 			fmt.Sprintf("Could not fetch Infiniband network data at this time: %s", common.UnpackAPIError(err)))
@@ -99,6 +97,6 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 		})
 	}
 
-	diags = resp.State.Set(ctx, &state)
+	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

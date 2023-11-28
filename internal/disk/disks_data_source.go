@@ -2,6 +2,7 @@ package disk
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -90,14 +91,15 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config disksDataSourceFilter
-	diags := req.Config.Get(ctx, &config)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	projectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch disks",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 		return
 	}
 
-	dataResp, httpResp, err := ds.client.DisksApi.ListDisks(ctx, *config.ProjectID)
+	dataResp, httpResp, err := ds.client.DisksApi.ListDisks(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Disks", "Could not fetch Disk data at this time.")
 
@@ -117,6 +119,6 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		})
 	}
 
-	diags = resp.State.Set(ctx, &state)
+	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
