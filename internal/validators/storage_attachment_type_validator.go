@@ -7,11 +7,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-type DiskAttachmentType string
+type DiskModeType string
 
 const (
-	DiskReadOnly  DiskAttachmentType = "read-only"
-	DiskReadWrite DiskAttachmentType = "read-write"
+	DiskReadOnly  DiskModeType = "read-only"
+	DiskReadWrite DiskModeType = "read-write"
 )
 
 // StorageModeValidator validates that a given data storage size is accepted by the storage API.
@@ -35,8 +35,8 @@ func (v StorageModeValidator) ValidateString(ctx context.Context, req validator.
 	input = strings.ToLower(input)
 
 	if input != string(DiskReadOnly) && input != string(DiskReadWrite){
-		resp.Diagnostics.AddAttributeError(req.Path, "Unsupported Disk Attachment Type",
-			"Disk attachment type must be either 'disk-readonly' or 'disk-readwrite'")
+		resp.Diagnostics.AddAttributeError(req.Path, "Unsupported Disk Mode Type",
+			"Disk mode type must be either 'read-only' or 'read-write'")
 	}
 
 	return

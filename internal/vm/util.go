@@ -39,6 +39,13 @@ var vmDiskAttachmentSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"id":              types.StringType,
 		"attachment_type": types.StringType,
+		"mode":            types.StringType,
+	},
+}
+
+var vmHostChannelAdapterSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"ib_partition_id": types.StringType,
 	},
 }
 
@@ -154,12 +161,27 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 	return values, warning
 }
 
+func vmPartialHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter) (hostChannelAdaptersList types.List, warning string) {
+	hcas := make([]vmHostChannelAdapterResourceModel, 0, len(hostChannelAdapters))
+	for _, hca := range hostChannelAdapters {
+
+		hcas = append(hcas, vmHostChannelAdapterResourceModel{
+			IBPartitionID: hca.IbPartitionId,
+		})
+	}
+
+	values, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hcas)
+
+	return values, warning
+}
+
 func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsList types.List, diags diag.Diagnostics) {
 	attachments := make([]vmDiskResourceModel, 0, len(diskAttachments))
 	for _, diskAttachment := range diskAttachments {
 		attachments = append(attachments, vmDiskResourceModel{
 			ID:             diskAttachment.DiskId,
 			AttachmentType: diskAttachment.AttachmentType,
+			Mode:           diskAttachment.Mode,
 		})
 	}
 

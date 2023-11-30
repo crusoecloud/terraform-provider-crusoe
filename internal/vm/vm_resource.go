@@ -3,7 +3,6 @@ package vm
 import (
 	"context"
 	"fmt"
-
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -33,7 +32,6 @@ type vmResourceModel struct {
 	Image               types.String `tfsdk:"image"`
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
-	IBPartitionID       types.String `tfsdk:"ib_partition_id"`
 	Disks               types.List   `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
@@ -61,7 +59,7 @@ type vmDiskResourceModel struct {
 	Mode           string `tfsdk:"mode"`
 }
 
-type vmHostChannelAdapter struct {
+type vmHostChannelAdapterResourceModel struct {
 	IBPartitionID string `tfsdk:"ib_partition_id"`
 }
 
@@ -142,7 +140,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 							Optional: true,
 						},
 						"attachment_type": schema.StringAttribute{
-							Optional:   true,
+							Optional: true,
 						},
 						"mode": schema.StringAttribute{
 							Optional:   true,
@@ -290,23 +288,30 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	var hostChannelAdapters []swagger.PartialHostChannelAdapter
-	if !plan.IBPartitionID.IsUnknown() && !plan.IBPartitionID.IsNull() {
-		hostChannelAdapters = make([]swagger.PartialHostChannelAdapter, 0, 1)
-		hostChannelAdapters = append(hostChannelAdapters, swagger.PartialHostChannelAdapter{
-			IbPartitionId: plan.IBPartitionID.ValueString(),
-		})
+	if !plan.HostChannelAdapters.IsUnknown() && !plan.HostChannelAdapters.IsNull() {
+		tHostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(plan.HostChannelAdapters.Elements()))
+		diags = plan.HostChannelAdapters.ElementsAs(ctx, &tHostChannelAdapters, true)
+		resp.Diagnostics.Append(diags...)
+
+		for _, hca := range tHostChannelAdapters {
+			hostChannelAdapters = []swagger.PartialHostChannelAdapter{
+				{
+					IbPartitionId: hca.IBPartitionID,
+				},
+			}
+		}
 	}
 
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
-		Name:              plan.Name.ValueString(),
-		Type_:             plan.Type.ValueString(),
-		Location:          plan.Location.ValueString(),
-		Image:             plan.Image.ValueString(),
-		SshPublicKey:      plan.SSHKey.ValueString(),
-		StartupScript:     plan.StartupScript.ValueString(),
-		ShutdownScript:    plan.ShutdownScript.ValueString(),
-		NetworkInterfaces: newNetworkInterfaces,
-		Disks:             diskIds,
+		Name:                plan.Name.ValueString(),
+		Type_:               plan.Type.ValueString(),
+		Location:            plan.Location.ValueString(),
+		Image:               plan.Image.ValueString(),
+		SshPublicKey:        plan.SSHKey.ValueString(),
+		StartupScript:       plan.StartupScript.ValueString(),
+		ShutdownScript:      plan.ShutdownScript.ValueString(),
+		NetworkInterfaces:   newNetworkInterfaces,
+		Disks:               diskIds,
 		HostChannelAdapters: hostChannelAdapters,
 	}, projectID)
 	if err != nil {
@@ -330,13 +335,18 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	plan.NetworkInterfaces = networkInterfaces
-	disks, diags := vmDiskAttachmentToTerraformResourceModel(diskIds)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+	if len(diskIds) > 0 {
+		disks, diags := vmDiskAttachmentToTerraformResourceModel(diskIds)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Disks = disks
 	}
-	plan.Disks = disks
+
 	plan.ProjectID = types.StringValue(projectID)
+	hcas, _ := vmPartialHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
+	plan.HostChannelAdapters = hcas
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -491,11 +501,18 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 
 		var hostChannelAdapters []swagger.PartialHostChannelAdapter
-		if !plan.IBPartitionID.IsUnknown() && !plan.IBPartitionID.IsNull() {
-			hostChannelAdapters = make([]swagger.PartialHostChannelAdapter, 0, 1)
-			hostChannelAdapters = append(hostChannelAdapters, swagger.PartialHostChannelAdapter{
-				IbPartitionId: plan.IBPartitionID.ValueString(),
-			})
+		if !plan.HostChannelAdapters.IsUnknown() && !plan.HostChannelAdapters.IsNull() {
+			tHostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(plan.HostChannelAdapters.Elements()))
+			diags = plan.HostChannelAdapters.ElementsAs(ctx, &tHostChannelAdapters, true)
+			resp.Diagnostics.Append(diags...)
+
+			for _, hca := range tHostChannelAdapters {
+				hostChannelAdapters = []swagger.PartialHostChannelAdapter{
+					{
+						IbPartitionId: hca.IBPartitionID,
+					},
+				}
+			}
 		}
 
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel

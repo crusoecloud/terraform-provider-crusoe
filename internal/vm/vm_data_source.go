@@ -90,6 +90,9 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 						"attachment_type": schema.StringAttribute{
 							Required: true,
 						},
+						"mode": schema.StringAttribute{
+							Required: true,
+						},
 					},
 				},
 			},
@@ -158,19 +161,21 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		state.ID = &vm.Id
 		state.ProjectID = &vm.ProjectId
 		state.Name = &vm.Name
-		state.Type = &vm.ProductName
+		state.Type = &vm.Type_
 		attachedDisks := make([]vmDiskResourceModel, 0, len(vm.Disks))
-		for _, disk := range vm.Disks{
+		for _, disk := range vm.Disks {
 			attachmentType := ""
-			for _,attachment:=range disk.AttachedTo {
-				if attachment.VmId ==vm.Id {
+			mode := ""
+			for _, attachment := range disk.AttachedTo {
+				if attachment.VmId == vm.Id {
 					attachmentType = attachment.AttachmentType
 					break
 				}
 			}
 			attachedDisks = append(attachedDisks, vmDiskResourceModel{
-				ID:            disk.Id,
+				ID:             disk.Id,
 				AttachmentType: attachmentType,
+				Mode:           mode,
 			})
 		}
 
