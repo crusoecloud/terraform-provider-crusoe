@@ -148,7 +148,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	disk, _, err := common.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, projectID, r.client.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, projectID, r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error creating a disk: %s", common.UnpackAPIError(err)))
@@ -184,7 +184,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 	defer httpResp.Body.Close()
 
-	var disk *swagger.Disk
+	var disk *swagger.DiskV1Alpha5
 	for i := range dataResp.Items {
 		if dataResp.Items[i].Id == state.ID.ValueString() {
 			disk = &dataResp.Items[i]
@@ -238,7 +238,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.Disk](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.DiskOperationsApi.GetStorageDisksOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+

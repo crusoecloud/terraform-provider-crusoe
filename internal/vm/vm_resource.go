@@ -24,18 +24,19 @@ type vmResource struct {
 }
 
 type vmResourceModel struct {
-	ID                types.String `tfsdk:"id"`
-	ProjectID         types.String `tfsdk:"project_id"`
-	Name              types.String `tfsdk:"name"`
-	Type              types.String `tfsdk:"type"`
-	SSHKey            types.String `tfsdk:"ssh_key"`
-	Location          types.String `tfsdk:"location"`
-	Image             types.String `tfsdk:"image"`
-	StartupScript     types.String `tfsdk:"startup_script"`
-	ShutdownScript    types.String `tfsdk:"shutdown_script"`
-	IBPartitionID     types.String `tfsdk:"ib_partition_id"`
-	Disks             types.List   `tfsdk:"disks"`
-	NetworkInterfaces types.List   `tfsdk:"network_interfaces"`
+	ID                  types.String `tfsdk:"id"`
+	ProjectID           types.String `tfsdk:"project_id"`
+	Name                types.String `tfsdk:"name"`
+	Type                types.String `tfsdk:"type"`
+	SSHKey              types.String `tfsdk:"ssh_key"`
+	Location            types.String `tfsdk:"location"`
+	Image               types.String `tfsdk:"image"`
+	StartupScript       types.String `tfsdk:"startup_script"`
+	ShutdownScript      types.String `tfsdk:"shutdown_script"`
+	IBPartitionID       types.String `tfsdk:"ib_partition_id"`
+	Disks               types.List   `tfsdk:"disks"`
+	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
+	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -57,6 +58,11 @@ type vmPublicIPv4ResourceModel struct {
 type vmDiskResourceModel struct {
 	ID             string `tfsdk:"id"`
 	AttachmentType string `tfsdk:"attachment_type"`
+	Mode           string `tfsdk:"mode"`
+}
+
+type vmHostChannelAdapter struct {
+	IBPartitionID string `tfsdk:"ib_partition_id"`
 }
 
 func NewVMResource() resource.Resource {
@@ -137,7 +143,10 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 						"attachment_type": schema.StringAttribute{
 							Optional:   true,
-							Validators: []validator.String{validators.StorageAttachmentTypeValidator{}},
+						},
+						"mode": schema.StringAttribute{
+							Optional:   true,
+							Validators: []validator.String{validators.StorageModeValidator{}},
 						},
 					},
 				},
@@ -200,10 +209,20 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 					},
 				},
 			},
-			"ib_partition_id": schema.StringAttribute{
+			"host_channel_adapters": schema.ListNestedAttribute{
+				Computed:      true,
 				Optional:      true,
-				Description:   "Infiniband Partition ID",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				NestedObject: schema.NestedAttributeObject{
+					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+					Attributes: map[string]schema.Attribute{
+						"ib_partition_id": schema.StringAttribute{
+							Optional:      true,
+							Description:   "Infiniband Partition ID",
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+					},
+				},
 			},
 		},
 	}
@@ -248,6 +267,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		diskIds = append(diskIds, swagger.DiskAttachment{
 			AttachmentType: d.AttachmentType,
 			DiskId:         d.ID,
+			Mode:           d.Mode,
 		})
 	}
 
@@ -269,17 +289,25 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		}
 	}
 
+	var hostChannelAdapters []swagger.PartialHostChannelAdapter
+	if !plan.IBPartitionID.IsUnknown() && !plan.IBPartitionID.IsNull() {
+		hostChannelAdapters = make([]swagger.PartialHostChannelAdapter, 0, 1)
+		hostChannelAdapters = append(hostChannelAdapters, swagger.PartialHostChannelAdapter{
+			IbPartitionId: plan.IBPartitionID.ValueString(),
+		})
+	}
+
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
 		Name:              plan.Name.ValueString(),
-		ProductName:       plan.Type.ValueString(),
+		Type_:             plan.Type.ValueString(),
 		Location:          plan.Location.ValueString(),
 		Image:             plan.Image.ValueString(),
 		SshPublicKey:      plan.SSHKey.ValueString(),
 		StartupScript:     plan.StartupScript.ValueString(),
 		ShutdownScript:    plan.ShutdownScript.ValueString(),
-		IbPartitionId:     plan.IBPartitionID.ValueString(),
 		NetworkInterfaces: newNetworkInterfaces,
 		Disks:             diskIds,
+		HostChannelAdapters: hostChannelAdapters,
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -333,24 +361,27 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
-	state.Type = types.StringValue(instance.ProductName)
+	state.Type = types.StringValue(instance.Type_)
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
 
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {
-		if !disk.IsBootDisk {
+		if disk.AttachmentType != "os" {
 			attachmentType := ""
+			mode := ""
 			for _, attachment := range disk.AttachedTo {
 				if attachment.VmId == instance.Id {
 					attachmentType = attachment.AttachmentType
+					mode = attachment.Mode
 					break
 				}
 			}
 			disks = append(disks, vmDiskResourceModel{
 				ID:             disk.Id,
 				AttachmentType: attachmentType,
+				Mode:           mode,
 			})
 		}
 	}
@@ -459,10 +490,18 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			return
 		}
 
+		var hostChannelAdapters []swagger.PartialHostChannelAdapter
+		if !plan.IBPartitionID.IsUnknown() && !plan.IBPartitionID.IsNull() {
+			hostChannelAdapters = make([]swagger.PartialHostChannelAdapter, 0, 1)
+			hostChannelAdapters = append(hostChannelAdapters, swagger.PartialHostChannelAdapter{
+				IbPartitionId: plan.IBPartitionID.ValueString(),
+			})
+		}
+
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
-		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequest{
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
 				Ips: []swagger.IpAddresses{{
@@ -472,6 +511,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 					},
 				}},
 			}},
+			HostChannelAdapters: hostChannelAdapters,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",

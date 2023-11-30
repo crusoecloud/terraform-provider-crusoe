@@ -48,7 +48,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 	for _, newDisk := range newDisks {
 		matched := false
 		for _, origDisk := range origDisks {
-			if newDisk.ID == origDisk.ID && newDisk.AttachmentType == origDisk.AttachmentType {
+			if newDisk.ID == origDisk.ID && newDisk.Mode == origDisk.Mode {
 				matched = true
 
 				break
@@ -62,7 +62,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 	for _, origDisk := range origDisks {
 		matched := false
 		for _, newDisk := range newDisks {
-			if newDisk.ID == origDisk.ID && newDisk.AttachmentType == origDisk.AttachmentType {
+			if newDisk.ID == origDisk.ID && newDisk.Mode == origDisk.Mode {
 				matched = true
 
 				break
