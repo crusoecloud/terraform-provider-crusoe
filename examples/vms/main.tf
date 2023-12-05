@@ -17,7 +17,7 @@ resource "crusoe_compute_instance" "my_vm" {
   location = "us-northcentral1-a"
 
   # optionally specify a different base image
-  #image = "nvidia-docker"
+  image = "ubuntu20.04:latest"
 
   disks = [
       // disk attached at startup

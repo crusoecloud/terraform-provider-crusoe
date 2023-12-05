@@ -379,19 +379,10 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {
 		if disk.AttachmentType != "os" {
-			attachmentType := ""
-			mode := ""
-			for _, attachment := range disk.AttachedTo {
-				if attachment.VmId == instance.Id {
-					attachmentType = attachment.AttachmentType
-					mode = attachment.Mode
-					break
-				}
-			}
 			disks = append(disks, vmDiskResourceModel{
 				ID:             disk.Id,
-				AttachmentType: attachmentType,
-				Mode:           mode,
+				AttachmentType: disk.AttachmentType,
+				Mode:           disk.Mode,
 			})
 		}
 	}
