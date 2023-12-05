@@ -12,7 +12,7 @@ locals {
 
 variable "project_id" {
   type    = string
-  default = "<project_id>"
+  default = "<MY_PROJECT_ID>"
 }
 
 // new VM
@@ -21,14 +21,14 @@ resource "crusoe_compute_instance" "my_vm" {
   type = "a40.1x"
   location = "us-northcentral1-a"
 
-  # optionally specify a different base image
+  # specify the base image
   image = "ubuntu20.04:latest"
 
   disks = [
       // disk attached at startup
       {
         id = crusoe_storage_disk.data_disk.id
-        mode = "read-only"
+        mode = "read-write"
         attachment_type = "data"
       }
     ]

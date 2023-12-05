@@ -90,7 +90,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create project",
-			fmt.Sprintf("There was an error starting a create project operation: %s", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error starting a create project operation: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -114,10 +114,11 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+
 	project, httpResp, err := r.client.ProjectsApi.GetProject(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get projects",
-			fmt.Sprintf("Fetching Crusoe projects failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", err.Error()))
+			fmt.Sprintf("Fetching Crusoe projects failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -152,7 +153,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update project",
-			fmt.Sprintf("There was an error starting an update project operation: %s.", err.Error()))
+			fmt.Sprintf("There was an error starting an update project operation: %s.", common.UnpackAPIError(err)))
 
 		return
 	}

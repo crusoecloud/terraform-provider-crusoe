@@ -16,7 +16,7 @@ import (
 
 const (
 	// TODO: pull from config set during build
-	version = "v0.4.1"
+	version = "v0.5.0"
 
 	pollInterval = 2 * time.Second
 
@@ -127,6 +127,7 @@ func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diag *di
 	}
 
 	dataResp, httpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
+
 	defer httpResp.Body.Close()
 
 	if err != nil {

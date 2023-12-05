@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -153,7 +154,8 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	if config.ID != nil {
 		vm, err := getVM(ctx, ds.client, *config.ProjectID, *config.ID)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to get Instance", err.Error())
+			resp.Diagnostics.AddError("Failed to get Instance", fmt.Sprintf("Failed to get instance: %s.",
+				common.UnpackAPIError(err)))
 
 			return
 		}

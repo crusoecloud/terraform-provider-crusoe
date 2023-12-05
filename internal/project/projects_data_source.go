@@ -2,8 +2,9 @@ package project
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/antihax/optional"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
@@ -76,7 +77,8 @@ func (ds *projectsDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	dataResp, httpResp, err := ds.client.ProjectsApi.ListProjects(ctx, opts)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to Fetch Projects", "Could not fetch Project data at this time.")
+		resp.Diagnostics.AddError("Failed to Fetch Projects",
+			fmt.Sprintf("Could not fetch Project data at this time: %v.", common.UnpackAPIError(err)))
 
 		return
 	}

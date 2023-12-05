@@ -2,10 +2,7 @@ github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/antihax/optional v1.0.0 h1:xK2lYat7ZLaVVcIuj82J8kIro4V6kDe0AUDFboUCwcg=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
-github.com/crusoecloud/client-go v0.1.30 h1:/nH1JGB2uGpwdFXIn4GZdSLuCT/r94l85UVWyagFj/4=
-github.com/crusoecloud/client-go v0.1.30/go.mod h1:k1FgpUllEJtE53osEwsF+JfbFKILn5t3UuBdHYBVpdY=
-github.com/crusoecloud/client-go v0.1.31 h1:a/ojZrto+cheZYQn5Sblhw2pvNLNDu7uqnR3Rm4N3A8=
-github.com/crusoecloud/client-go v0.1.31/go.mod h1:k1FgpUllEJtE53osEwsF+JfbFKILn5t3UuBdHYBVpdY=
+github.com/crusoecloud/client-go v0.1.32 h1:c1f0lo8/T/3dkdF5KbxjWSjP1fnG+DE0luOo6q1jKWY=
 github.com/crusoecloud/client-go v0.1.32/go.mod h1:k1FgpUllEJtE53osEwsF+JfbFKILn5t3UuBdHYBVpdY=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

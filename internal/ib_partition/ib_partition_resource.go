@@ -140,7 +140,7 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		}
 
 		resp.Diagnostics.AddError("Failed to get IB partition",
-			fmt.Sprintf("Fetching Crusoe Infiniband partition failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", err.Error()))
+			fmt.Sprintf("Fetching Crusoe Infiniband partition failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}

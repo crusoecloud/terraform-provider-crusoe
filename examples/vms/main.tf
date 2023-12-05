@@ -16,7 +16,7 @@ resource "crusoe_compute_instance" "my_vm" {
   type = "a40.1x"
   location = "us-northcentral1-a"
 
-  # optionally specify a different base image
+  # specify the base image
   image = "ubuntu20.04:latest"
 
   disks = [

@@ -178,7 +178,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	dataResp, httpResp, err := r.client.DisksApi.ListDisks(ctx, state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
-			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", err.Error()))
+			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -232,7 +232,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error starting a resize operation: %s.\n\n"+
 				"Make sure the disk still exists, you are englarging the disk,"+
-				" and if the disk is attached to a VM, the VM is powered off.", err.Error()))
+				" and if the disk is attached to a VM, the VM is powered off.", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -243,7 +243,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
 				"Make sure the disk still exists, you are englarging the disk,"+
-				" and if the disk is attached to a VM, the VM is powered off.", err.Error()))
+				" and if the disk is attached to a VM, the VM is powered off.", common.UnpackAPIError(err)))
 
 		return
 	}
