@@ -175,7 +175,23 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	dataResp, httpResp, err := r.client.DisksApi.ListDisks(ctx, state.ProjectID.ValueString())
+	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// have project ID stored. So we will try to get a fallback project to pass to the API.
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+
+			resp.Diagnostics.AddError("Failed to create disk",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	dataResp, httpResp, err := r.client.DisksApi.ListDisks(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
 			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))

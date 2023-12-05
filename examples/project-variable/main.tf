@@ -7,22 +7,19 @@ terraform {
 }
 
 locals {
-  my_ssh_key = file("~/.ssh/id_ed25519.pub")
+  my_ssh_key = file("~/.ssh/id_rsa.pub")
 }
 
 variable "project_id" {
   type    = string
-  default = "<MY_PROJECT_ID>"
+  default = "d64251a8-3a40-4692-a146-abc536e3922c"
 }
 
 // new VM
 resource "crusoe_compute_instance" "my_vm" {
-  name = "my-new-vm"
+  name = "ajeyaraj-my-new-vm"
   type = "a40.1x"
   location = "us-northcentral1-a"
-
-  # specify the base image
-  image = "ubuntu20.04:latest"
 
   disks = [
       // disk attached at startup
@@ -34,13 +31,12 @@ resource "crusoe_compute_instance" "my_vm" {
     ]
 
   ssh_key = local.my_ssh_key
-  startup_script = file("startup.sh")
   project_id = var.project_id
 
 }
 
 resource "crusoe_storage_disk" "data_disk" {
-  name = "data-disk"
+  name = "ajeyaraj-data-disk"
   size = "200GiB"
   project_id = var.project_id
   location = "us-northcentral1-a"
@@ -50,7 +46,7 @@ resource "crusoe_storage_disk" "data_disk" {
 // note: this allows all ingress over TCP to our VM
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   network           = crusoe_compute_instance.my_vm.network_interfaces[0].network
-  name              = "example-terraform-rule"
+  name              = "ajeyaraj-example-terraform-rule"
   action            = "allow"
   direction         = "ingress"
   protocols         = "tcp"

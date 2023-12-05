@@ -100,7 +100,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"project_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
 				Required:      true,
@@ -122,7 +122,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			},
 			"image": schema.StringAttribute{
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
@@ -137,13 +137,13 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Optional: true,
+							Required: true,
 						},
 						"attachment_type": schema.StringAttribute{
-							Optional: true,
+							Required: true,
 						},
 						"mode": schema.StringAttribute{
-							Optional:   true,
+							Required:   true,
 							Validators: []validator.String{validators.StorageModeValidator{}},
 						},
 					},
@@ -361,7 +361,23 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	instance, err := getVM(ctx, r.client, state.ProjectID.ValueString(), state.ID.ValueString())
+	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// have project ID stored. So we will try to get a fallback project to pass to the API.
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+
+			resp.Diagnostics.AddError("Failed to create disk",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	instance, err := getVM(ctx, r.client, projectID, state.ID.ValueString())
 	if err != nil || instance == nil {
 		// instance has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
@@ -372,6 +388,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.Type_)
+	state.ProjectID = types.StringValue(instance.ProjectId)
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces

@@ -11,10 +11,6 @@ locals {
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
-resource "crusoe_project" "my_project" {
-  name = "my-new-project"
-}
-
 # list IB networks
 data "crusoe_ib_networks" "ib_networks" {}
 output "crusoe_ib" {
@@ -39,7 +35,7 @@ resource "crusoe_compute_instance" "my_vm1" {
   name = "ib-vm-${count.index}"
   type = "a100-80gb-sxm-ib.8x" # IB enabled VM type
   location = "us-east1-a" # IB currently only supported at us-east1-a
-  image = "ubuntu20.04-nvidia-sxm-docker:ib-nccl2.18.3" # IB image
+  image = "ubuntu22.04-nvidia-sxm-docker:latest" # IB image
 
   ssh_key = local.my_ssh_key
 
@@ -63,5 +59,4 @@ resource "crusoe_storage_disk" "data_disk" {
   name = "data-disk"
   size = "1TiB"
   location = "us-east1-a"
-  project_id = crusoe_project.my_project.id
 }
