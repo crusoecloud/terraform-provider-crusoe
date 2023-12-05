@@ -10,7 +10,7 @@ import (
 const (
 	configFilePath = "/.crusoe/config" // full path is this appended to the user's home path
 
-	defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"
+	defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha5"
 )
 
 // Config holds options that can be set via ~/.crusoe/config and env variables.
