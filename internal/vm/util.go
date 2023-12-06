@@ -63,9 +63,9 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 		}
 		if !matched {
 			disksAdded = append(disksAdded, swagger.DiskAttachment{
-				DiskId: newDisk.ID,
+				DiskId:         newDisk.ID,
 				AttachmentType: newDisk.AttachmentType,
-				Mode: newDisk.Mode,
+				Mode:           newDisk.Mode,
 			})
 		}
 	}
@@ -168,7 +168,6 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 func vmPartialHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter) (hostChannelAdaptersList types.List, warning string) {
 	hcas := make([]vmHostChannelAdapterResourceModel, 0, len(hostChannelAdapters))
 	for _, hca := range hostChannelAdapters {
-
 		hcas = append(hcas, vmHostChannelAdapterResourceModel{
 			IBPartitionID: hca.IbPartitionId,
 		})
