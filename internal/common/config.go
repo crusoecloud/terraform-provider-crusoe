@@ -10,7 +10,7 @@ import (
 const (
 	configFilePath = "/.crusoe/config" // full path is this appended to the user's home path
 
-	defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha4"
+	defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha5"
 )
 
 // Config holds options that can be set via ~/.crusoe/config and env variables.
@@ -19,6 +19,7 @@ type Config struct {
 	SecretKey        string `toml:"secret_key"`
 	SSHPublicKeyFile string `toml:"ssh_public_key_file"`
 	ApiEndpoint      string `toml:"api_endpoint"`
+	DefaultProject   string `toml:"default_project"`
 }
 
 // ConfigFile reflects the structure of a valid Crusoe config, which should have a default profile at the root level.
@@ -48,6 +49,7 @@ func GetConfig() (*Config, error) {
 		config.AccessKeyID = configFile.Default.AccessKeyID
 		config.SecretKey = configFile.Default.SecretKey
 		config.SSHPublicKeyFile = configFile.Default.SSHPublicKeyFile
+		config.DefaultProject = configFile.Default.DefaultProject
 
 		if configFile.Default.ApiEndpoint != "" {
 			config.ApiEndpoint = configFile.Default.ApiEndpoint

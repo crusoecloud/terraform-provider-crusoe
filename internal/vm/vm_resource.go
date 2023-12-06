@@ -3,7 +3,6 @@ package vm
 import (
 	"context"
 	"fmt"
-
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -14,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -24,17 +23,18 @@ type vmResource struct {
 }
 
 type vmResourceModel struct {
-	ID                types.String          `tfsdk:"id"`
-	Name              types.String          `tfsdk:"name"`
-	Type              types.String          `tfsdk:"type"`
-	SSHKey            types.String          `tfsdk:"ssh_key"`
-	Location          types.String          `tfsdk:"location"`
-	Image             types.String          `tfsdk:"image"`
-	StartupScript     types.String          `tfsdk:"startup_script"`
-	ShutdownScript    types.String          `tfsdk:"shutdown_script"`
-	IBPartitionID     types.String          `tfsdk:"ib_partition_id"`
-	Disks             []vmDiskResourceModel `tfsdk:"disks"`
-	NetworkInterfaces types.List            `tfsdk:"network_interfaces"`
+	ID                  types.String `tfsdk:"id"`
+	ProjectID           types.String `tfsdk:"project_id"`
+	Name                types.String `tfsdk:"name"`
+	Type                types.String `tfsdk:"type"`
+	SSHKey              types.String `tfsdk:"ssh_key"`
+	Location            types.String `tfsdk:"location"`
+	Image               types.String `tfsdk:"image"`
+	StartupScript       types.String `tfsdk:"startup_script"`
+	ShutdownScript      types.String `tfsdk:"shutdown_script"`
+	Disks               types.List   `tfsdk:"disks"`
+	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
+	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -54,7 +54,13 @@ type vmPublicIPv4ResourceModel struct {
 }
 
 type vmDiskResourceModel struct {
-	ID string `tfsdk:"id"`
+	ID             string `tfsdk:"id"`
+	AttachmentType string `tfsdk:"attachment_type"`
+	Mode           string `tfsdk:"mode"`
+}
+
+type vmHostChannelAdapterResourceModel struct {
+	IBPartitionID string `tfsdk:"ib_partition_id"`
 }
 
 func NewVMResource() resource.Resource {
@@ -91,6 +97,11 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
+			"project_id": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+			},
 			"type": schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
@@ -111,7 +122,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			},
 			"image": schema.StringAttribute{
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
@@ -126,7 +137,14 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Optional: true,
+							Required: true,
+						},
+						"attachment_type": schema.StringAttribute{
+							Required: true,
+						},
+						"mode": schema.StringAttribute{
+							Required:   true,
+							Validators: []validator.String{validators.StorageModeValidator{}},
 						},
 					},
 				},
@@ -189,10 +207,20 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 					},
 				},
 			},
-			"ib_partition_id": schema.StringAttribute{
+			"host_channel_adapters": schema.ListNestedAttribute{
+				Computed:      true,
 				Optional:      true,
-				Description:   "Infiniband Partition ID",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				NestedObject: schema.NestedAttributeObject{
+					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+					Attributes: map[string]schema.Attribute{
+						"ib_partition_id": schema.StringAttribute{
+							Optional:      true,
+							Description:   "Infiniband Partition ID",
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+					},
+				},
 			},
 		},
 	}
@@ -211,16 +239,34 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	roleID, err := common.GetRole(ctx, r.client)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
-
+	tDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
+	diags = plan.Disks.ElementsAs(ctx, &tDisks, true)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	diskIds := make([]string, 0, len(plan.Disks))
-	for _, d := range plan.Disks {
-		diskIds = append(diskIds, d.ID)
+	projectID := ""
+	if plan.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create instance",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = plan.ProjectID.ValueString()
+	}
+
+	diskIds := make([]swagger.DiskAttachment, 0, len(tDisks))
+	for _, d := range tDisks {
+		diskIds = append(diskIds, swagger.DiskAttachment{
+			AttachmentType: d.AttachmentType,
+			DiskId:         d.ID,
+			Mode:           d.Mode,
+		})
 	}
 
 	// public static IPs
@@ -241,19 +287,33 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		}
 	}
 
-	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha4{
-		RoleId:            roleID,
-		Name:              plan.Name.ValueString(),
-		ProductName:       plan.Type.ValueString(),
-		Location:          plan.Location.ValueString(),
-		Image:             plan.Image.ValueString(),
-		SshPublicKey:      plan.SSHKey.ValueString(),
-		StartupScript:     plan.StartupScript.ValueString(),
-		ShutdownScript:    plan.ShutdownScript.ValueString(),
-		IbPartitionId:     plan.IBPartitionID.ValueString(),
-		NetworkInterfaces: newNetworkInterfaces,
-		Disks:             diskIds,
-	})
+	var hostChannelAdapters []swagger.PartialHostChannelAdapter
+	if !plan.HostChannelAdapters.IsUnknown() && !plan.HostChannelAdapters.IsNull() {
+		tHostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(plan.HostChannelAdapters.Elements()))
+		diags = plan.HostChannelAdapters.ElementsAs(ctx, &tHostChannelAdapters, true)
+		resp.Diagnostics.Append(diags...)
+
+		for _, hca := range tHostChannelAdapters {
+			hostChannelAdapters = []swagger.PartialHostChannelAdapter{
+				{
+					IbPartitionId: hca.IBPartitionID,
+				},
+			}
+		}
+	}
+
+	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
+		Name:                plan.Name.ValueString(),
+		Type_:               plan.Type.ValueString(),
+		Location:            plan.Location.ValueString(),
+		Image:               plan.Image.ValueString(),
+		SshPublicKey:        plan.SSHKey.ValueString(),
+		StartupScript:       plan.StartupScript.ValueString(),
+		ShutdownScript:      plan.ShutdownScript.ValueString(),
+		NetworkInterfaces:   newNetworkInterfaces,
+		Disks:               diskIds,
+		HostChannelAdapters: hostChannelAdapters,
+	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error starting a create instance operation: %s", common.UnpackAPIError(err)))
@@ -262,8 +322,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 	defer httpResp.Body.Close()
 
-	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha4](
-		ctx, dataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](
+		ctx, dataResp.Operation, projectID, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error creating a instance: %s", common.UnpackAPIError(err)))
@@ -275,6 +335,18 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	plan.NetworkInterfaces = networkInterfaces
+	if len(diskIds) > 0 {
+		disks, diags := vmDiskAttachmentToTerraformResourceModel(diskIds)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Disks = disks
+	}
+
+	plan.ProjectID = types.StringValue(projectID)
+	hcas, _ := vmPartialHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
+	plan.HostChannelAdapters = hcas
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -289,7 +361,23 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	instance, err := getVM(ctx, r.client, state.ID.ValueString())
+	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// have project ID stored. So we will try to get a fallback project to pass to the API.
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+
+			resp.Diagnostics.AddError("Failed to create disk",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	instance, err := getVM(ctx, r.client, projectID, state.ID.ValueString())
 	if err != nil || instance == nil {
 		// instance has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
@@ -299,20 +387,26 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
-	state.Type = types.StringValue(instance.ProductName)
+	state.Type = types.StringValue(instance.Type_)
+	state.ProjectID = types.StringValue(instance.ProjectId)
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
 
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for _, disk := range instance.Disks {
-		if !disk.IsBootDisk {
-			disks = append(disks, vmDiskResourceModel{ID: disk.Id})
+		if disk.AttachmentType != "os" {
+			disks = append(disks, vmDiskResourceModel{
+				ID:             disk.Id,
+				AttachmentType: disk.AttachmentType,
+				Mode:           disk.Mode,
+			})
 		}
 	}
 	if len(disks) > 0 {
 		// only assign if disks is not empty. otherwise, intentionally keep this nil, for future comparisons
-		state.Disks = disks
+		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
+		state.Disks = tDisks
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -339,37 +433,26 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// attach/detach disks if requested
-	addedDisks, removedDisks := getDisksDiff(state.Disks, plan.Disks)
-	if len(addedDisks) > 0 {
-		attachResp, httpResp, err := r.client.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha4{
-			AttachDisks: addedDisks,
-		}, state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to attach disk",
-				fmt.Sprintf("There was an error starting an attach disk operation: %s", common.UnpackAPIError(err)))
+	tPlanDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
+	diags = plan.Disks.ElementsAs(ctx, &tPlanDisks, true)
 
-			return
-		}
-		defer httpResp.Body.Close()
+	tStateDisks := make([]vmDiskResourceModel, 0, len(state.Disks.Elements()))
+	diags = state.Disks.ElementsAs(ctx, &tStateDisks, true)
 
-		_, err = common.AwaitOperation(ctx, attachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to attach disk",
-				fmt.Sprintf("There was an error attaching a disk: %s", common.UnpackAPIError(err)))
-		}
-	}
+	addedDisks, removedDisks := getDisksDiff(tStateDisks, tPlanDisks)
 
 	if len(removedDisks) > 0 {
+
 		detachResp, httpResp, err := r.client.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
 			DetachDisks: removedDisks,
-		}, state.ID.ValueString())
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
 				fmt.Sprintf("There was an error starting a detach disk operation: %s", common.UnpackAPIError(err)))
 		}
 		defer httpResp.Body.Close()
 
-		_, err = common.AwaitOperation(ctx, detachResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, detachResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
 				fmt.Sprintf("There was an error detaching a disk: %s", common.UnpackAPIError(err)))
@@ -378,17 +461,39 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 	}
 
+	if len(addedDisks) > 0 {
+		attachResp, httpResp, err := r.client.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha5{
+			AttachDisks: addedDisks,
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to attach disk",
+				fmt.Sprintf("There was an error starting an attach disk operation: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, attachResp.Operation, plan.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to attach disk",
+				fmt.Sprintf("There was an error attaching a disk: %s", common.UnpackAPIError(err)))
+		}
+	}
+
 	// save intermediate results
 	if len(addedDisks) > 0 || len(removedDisks) > 0 {
 		state.Disks = plan.Disks
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// handle toggling static/dynamic public IPs
 	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
 		// instances must be running to toggle static public IP
-		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ID.ValueString())
+		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error fetching the instance's current state: %v", err))
@@ -396,17 +501,32 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			return
 		}
 		defer httpResp.Body.Close()
-		if instance.Instance.State != StateRunning {
+		if instance.State != StateRunning {
 			resp.Diagnostics.AddError("Cannot update instance network interface",
 				"The instance needs to be running before updating its public IP address.")
 
 			return
 		}
 
+		var hostChannelAdapters []swagger.PartialHostChannelAdapter
+		if !plan.HostChannelAdapters.IsUnknown() && !plan.HostChannelAdapters.IsNull() {
+			tHostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(plan.HostChannelAdapters.Elements()))
+			diags = plan.HostChannelAdapters.ElementsAs(ctx, &tHostChannelAdapters, true)
+			resp.Diagnostics.Append(diags...)
+
+			for _, hca := range tHostChannelAdapters {
+				hostChannelAdapters = []swagger.PartialHostChannelAdapter{
+					{
+						IbPartitionId: hca.IBPartitionID,
+					},
+				}
+			}
+		}
+
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
-		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha4{
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
 				Ips: []swagger.IpAddresses{{
@@ -416,7 +536,8 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 					},
 				}},
 			}},
-		}, state.ID.ValueString())
+			HostChannelAdapters: hostChannelAdapters,
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error requesting to update the instance's network interface: %v", err))
@@ -425,7 +546,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 		defer httpResp.Body.Close()
 
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error updating the instance's network interfaces: %s", common.UnpackAPIError(err)))
@@ -448,14 +569,14 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 		return
 	}
 
-	_, err := getVM(ctx, r.client, state.ID.ValueString())
+	_, err := getVM(ctx, r.client, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to find instance", "Could not find a matching VM instance.")
 
 		return
 	}
 
-	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ID.ValueString())
+	delDataResp, delHttpResp, err := r.client.VMsApi.DeleteInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
 			fmt.Sprintf("There was an error starting a delete instance operation: %s", common.UnpackAPIError(err)))
@@ -464,7 +585,8 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	}
 	defer delHttpResp.Body.Close()
 
-	_, _, err = common.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+	_, _, err = common.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, state.ProjectID.ValueString(),
+		r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
 			fmt.Sprintf("There was an error deleting an instance: %s", common.UnpackAPIError(err)))

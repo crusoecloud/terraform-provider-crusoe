@@ -3,11 +3,11 @@ package vm
 import (
 	"context"
 	"fmt"
-
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -35,27 +35,45 @@ var vmNetworkInterfaceSchema = types.ObjectType{
 	},
 }
 
+var vmDiskAttachmentSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"id":              types.StringType,
+		"attachment_type": types.StringType,
+		"mode":            types.StringType,
+	},
+}
+
+var vmHostChannelAdapterSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"ib_partition_id": types.StringType,
+	},
+}
+
 // getDisksDiff compares the disks attached to two VM resource models and returns
 // a diff of disks defined by disk ID.
-func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksRemoved []string) {
+func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagger.DiskAttachment, disksRemoved []string) {
 	for _, newDisk := range newDisks {
 		matched := false
 		for _, origDisk := range origDisks {
-			if newDisk.ID == origDisk.ID {
+			if newDisk.ID == origDisk.ID && newDisk.Mode == origDisk.Mode {
 				matched = true
 
 				break
 			}
 		}
 		if !matched {
-			disksAdded = append(disksAdded, newDisk.ID)
+			disksAdded = append(disksAdded, swagger.DiskAttachment{
+				DiskId: newDisk.ID,
+				AttachmentType: newDisk.AttachmentType,
+				Mode: newDisk.Mode,
+			})
 		}
 	}
 
 	for _, origDisk := range origDisks {
 		matched := false
 		for _, newDisk := range newDisks {
-			if newDisk.ID == origDisk.ID {
+			if newDisk.ID == origDisk.ID && newDisk.Mode == origDisk.Mode {
 				matched = true
 
 				break
@@ -65,22 +83,17 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded, disksR
 			disksRemoved = append(disksRemoved, origDisk.ID)
 		}
 	}
-
 	return disksAdded, disksRemoved
 }
 
-func getVM(ctx context.Context, apiClient *swagger.APIClient, vmID string) (*swagger.InstanceV1Alpha4, error) {
-	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, vmID)
+func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID string) (*swagger.InstanceV1Alpha5, error) {
+	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, projectID, vmID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find VM: %w", common.UnpackAPIError(err))
 	}
 	defer httpResp.Body.Close()
 
-	if dataResp.Instance != nil {
-		return dataResp.Instance, nil
-	}
-
-	return nil, fmt.Errorf("failed to find VM with matching ID: %w", err)
+	return &dataResp, nil
 }
 
 // vmNetworkInterfacesToTerraformDataModel creates a slice of Terraform-compatible network
@@ -150,4 +163,32 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 	values, _ := types.ListValueFrom(context.Background(), vmNetworkInterfaceSchema, interfaces)
 
 	return values, warning
+}
+
+func vmPartialHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter) (hostChannelAdaptersList types.List, warning string) {
+	hcas := make([]vmHostChannelAdapterResourceModel, 0, len(hostChannelAdapters))
+	for _, hca := range hostChannelAdapters {
+
+		hcas = append(hcas, vmHostChannelAdapterResourceModel{
+			IBPartitionID: hca.IbPartitionId,
+		})
+	}
+
+	values, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hcas)
+
+	return values, warning
+}
+
+func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsList types.List, diags diag.Diagnostics) {
+	attachments := make([]vmDiskResourceModel, 0, len(diskAttachments))
+	for _, diskAttachment := range diskAttachments {
+		attachments = append(attachments, vmDiskResourceModel{
+			ID:             diskAttachment.DiskId,
+			AttachmentType: diskAttachment.AttachmentType,
+			Mode:           diskAttachment.Mode,
+		})
+	}
+
+	diskAttachmentsList, diags = types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
+	return diskAttachmentsList, diags
 }

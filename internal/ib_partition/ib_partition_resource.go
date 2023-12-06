@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -24,6 +24,7 @@ type ibPartitionResource struct {
 
 type ibPartitionResourceModel struct {
 	ID          types.String `tfsdk:"id"`
+	ProjectID   types.String `tfsdk:"project_id"`
 	Name        types.String `tfsdk:"name"`
 	IBNetworkID types.String `tfsdk:"ib_network_id"`
 }
@@ -66,6 +67,12 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
+			"project_id": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
 		},
 	}
 }
@@ -82,18 +89,24 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	roleID, err := common.GetRole(ctx, r.client)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get Role ID", err.Error())
+	projectID := ""
+	if plan.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create partition",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
-		return
+			return
+		}
+		projectID = project
+	} else {
+		projectID = plan.ProjectID.ValueString()
 	}
 
-	dataResp, httpResp, err := r.client.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha4{
-		RoleId:      roleID,
+	dataResp, httpResp, err := r.client.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha5{
 		Name:        plan.Name.ValueString(),
 		IbNetworkId: plan.IBNetworkID.ValueString(),
-	})
+	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create partition",
 			fmt.Sprintf("There was an error creating an Infiniband partition: %s", common.UnpackAPIError(err)))
@@ -103,6 +116,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Id)
+	plan.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -116,7 +130,7 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	partition, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, state.ID.ValueString())
+	partition, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		if err.Error() == notFoundMessage {
 			// partition has most likely been deleted out of band, so we update Terraform state to match
@@ -126,7 +140,7 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		}
 
 		resp.Diagnostics.AddError("Failed to get IB partition",
-			fmt.Sprintf("Fetching Crusoe Infiniband partition failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", err.Error()))
+			fmt.Sprintf("Fetching Crusoe Infiniband partition failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -156,7 +170,7 @@ func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	httpResp, err := r.client.IBPartitionsApi.DeleteIBPartition(ctx, state.ID.ValueString())
+	httpResp, err := r.client.IBPartitionsApi.DeleteIBPartition(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete partition",
 			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", common.UnpackAPIError(err)))
