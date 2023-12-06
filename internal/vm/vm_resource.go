@@ -332,6 +332,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	plan.ID = types.StringValue(instance.Id)
+	plan.ProjectID = types.StringValue(projectID)
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	plan.NetworkInterfaces = networkInterfaces
@@ -343,10 +344,6 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		}
 		plan.Disks = disks
 	}
-
-	plan.ProjectID = types.StringValue(projectID)
-	hcas, _ := vmPartialHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
-	plan.HostChannelAdapters = hcas
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
