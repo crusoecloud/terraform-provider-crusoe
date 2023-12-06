@@ -17,36 +17,36 @@ variable "project_id" {
 
 // new VM
 resource "crusoe_compute_instance" "my_vm" {
-  name = "my-new-vm"
-  type = "a40.1x"
+  name     = "my-new-vm"
+  type     = "a40.1x"
   location = "us-northcentral1-a"
 
   disks = [
-      // disk attached at startup
-      {
-        id = crusoe_storage_disk.data_disk.id
-        mode = "read-write"
-        attachment_type = "data"
-      }
-    ]
+    // disk attached at startup
+    {
+      id              = crusoe_storage_disk.data_disk.id
+      mode            = "read-write"
+      attachment_type = "data"
+    }
+  ]
 
-  ssh_key = local.my_ssh_key
+  ssh_key    = local.my_ssh_key
   project_id = var.project_id
 
 }
 
 resource "crusoe_storage_disk" "data_disk" {
-  name = "ajeyaraj-data-disk"
-  size = "200GiB"
+  name       = "data-disk"
+  size       = "200GiB"
   project_id = var.project_id
-  location = "us-northcentral1-a"
+  location   = "us-northcentral1-a"
 }
 
 // firewall rule
 // note: this allows all ingress over TCP to our VM
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   network           = crusoe_compute_instance.my_vm.network_interfaces[0].network
-  name              = "ajeyaraj-example-terraform-rule"
+  name              = "example-terraform-rule"
   action            = "allow"
   direction         = "ingress"
   protocols         = "tcp"
