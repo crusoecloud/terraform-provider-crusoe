@@ -62,7 +62,11 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 			}
 		}
 		if !matched {
-			disksAdded = append(disksAdded, swagger.DiskAttachment{DiskId: newDisk.ID, AttachmentType: newDisk.AttachmentType})
+			disksAdded = append(disksAdded, swagger.DiskAttachment{
+				DiskId: newDisk.ID,
+				AttachmentType: newDisk.AttachmentType,
+				Mode: newDisk.Mode,
+			})
 		}
 	}
 
