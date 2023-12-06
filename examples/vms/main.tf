@@ -7,7 +7,7 @@ terraform {
 }
 
 locals {
-  my_ssh_key = file("~/.ssh/id_rsa.pub")
+  my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
 // new VM
@@ -29,7 +29,6 @@ resource "crusoe_compute_instance" "my_vm" {
     ]
 
   ssh_key = local.my_ssh_key
-  startup_script = file("startup.sh")
 
 }
 

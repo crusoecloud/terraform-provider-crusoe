@@ -7,17 +7,17 @@ terraform {
 }
 
 locals {
-  my_ssh_key = file("~/.ssh/id_rsa.pub")
+  my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
 variable "project_id" {
   type    = string
-  default = "d64251a8-3a40-4692-a146-abc536e3922c"
+  default = "<PROJECT_ID>"
 }
 
 // new VM
 resource "crusoe_compute_instance" "my_vm" {
-  name = "ajeyaraj-my-new-vm"
+  name = "my-new-vm"
   type = "a40.1x"
   location = "us-northcentral1-a"
 
@@ -54,5 +54,5 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   source_ports      = "1-65535"
   destination       = crusoe_compute_instance.my_vm.network_interfaces[0].public_ipv4.address
   destination_ports = "1-65535"
-  project_id = var.project_id
+  project_id        = var.project_id
 }
