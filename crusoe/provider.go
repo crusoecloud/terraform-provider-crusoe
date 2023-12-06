@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -17,6 +16,7 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 )
 
@@ -52,6 +52,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		vm.NewVMDataSource,
 		disk.NewDisksDataSource,
 		ib_network.NewIBNetworkDataSource,
+		project.NewProjectsDataSource,
 	}
 }
 
@@ -62,6 +63,7 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		disk.NewDiskResource,
 		firewall_rule.NewFirewallRuleResource,
 		ib_partition.NewIBPartitionResource,
+		project.NewProjectResource,
 	}
 }
 
@@ -99,6 +101,16 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			"Missing Crusoe API Secret",
 			"The provider cannot create the Crusoe API client as there is a missing or empty value for the Crusoe API secret. "+
 				"Set the value in ~/.crusoe/config or use the CRUSOE_SECRET_KEY environment variable. "+
+				"If either is already set, ensure the value is not empty.",
+		)
+	}
+
+	if clientConfig.DefaultProject == "" {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("default_project"),
+			"Missing Crusoe Default Project",
+			"The provider did not find a default project specified in the configuration file and will attempt to infer the project to use if not specified. "+
+				"Set the value in ~/.crusoe/config. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}

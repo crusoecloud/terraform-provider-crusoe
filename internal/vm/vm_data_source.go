@@ -2,14 +2,14 @@ package vm
 
 import (
 	"context"
-
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha4"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -21,6 +21,7 @@ type vmDataSource struct {
 
 type vmDataSourceFilter struct {
 	ID                *string                       `tfsdk:"id"`
+	ProjectID         *string                       `tfsdk:"project_id"`
 	Name              *string                       `tfsdk:"name"`
 	Type              *string                       `tfsdk:"type"`
 	Disks             []vmDiskResourceModel         `tfsdk:"disks"`
@@ -74,6 +75,9 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 			"name": schema.StringAttribute{
 				Optional: true,
 			},
+			"project_id": schema.StringAttribute{
+				Optional: true,
+			},
 			"type": schema.StringAttribute{
 				Computed: true,
 			},
@@ -82,6 +86,12 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
+							Required: true,
+						},
+						"attachment_type": schema.StringAttribute{
+							Required: true,
+						},
+						"mode": schema.StringAttribute{
 							Required: true,
 						},
 					},
@@ -142,16 +152,26 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	}
 
 	if config.ID != nil {
-		vm, err := getVM(ctx, ds.client, *config.ID)
+		vm, err := getVM(ctx, ds.client, *config.ProjectID, *config.ID)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to get Instance", err.Error())
+			resp.Diagnostics.AddError("Failed to get Instance", fmt.Sprintf("Failed to get instance: %s.",
+				common.UnpackAPIError(err)))
 
 			return
 		}
 
 		state.ID = &vm.Id
+		state.ProjectID = &vm.ProjectId
 		state.Name = &vm.Name
-		state.Type = &vm.ProductName
+		state.Type = &vm.Type_
+		attachedDisks := make([]vmDiskResourceModel, 0, len(vm.Disks))
+		for _, disk := range vm.Disks {
+			attachedDisks = append(attachedDisks, vmDiskResourceModel{
+				ID:             disk.Id,
+				AttachmentType: disk.AttachmentType,
+				Mode:           disk.Mode,
+			})
+		}
 
 		networkInterfaces, _ := vmNetworkInterfacesToTerraformDataModel(vm.NetworkInterfaces)
 		state.NetworkInterfaces = networkInterfaces
