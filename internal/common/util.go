@@ -16,7 +16,7 @@ import (
 
 const (
 	// TODO: pull from config set during build
-	version = "v0.5.0"
+	version = "v0.5.1"
 
 	pollInterval = 2 * time.Second
 
@@ -150,7 +150,7 @@ func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diag *di
 		diag.AddWarning("Default project not specified",
 			fmt.Sprintf("A project_id was not specified in the configuration file. "+
 				"Please specify a project in the terraform file or set a 'default_project' in your configuration file. "+
-			"Falling back to project: %s.", dataResp.Items[0].Name))
+				"Falling back to project: %s.", dataResp.Items[0].Name))
 	}
 
 	return projectID, nil
