@@ -16,7 +16,7 @@ import (
 
 const (
 	// TODO: pull from config set during build
-	version = "v0.5.1"
+	version = "v0.5.2"
 
 	pollInterval = 2 * time.Second
 

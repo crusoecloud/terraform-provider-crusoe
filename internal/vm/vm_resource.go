@@ -208,8 +208,8 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
-				Computed:      true,
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -300,6 +300,9 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 				},
 			}
 		}
+	} else {
+		// explicitly set a null value for non IB enabled VMs
+		plan.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
 	}
 
 	dataResp, httpResp, err := r.client.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
