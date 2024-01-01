@@ -278,6 +278,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 		for _, networkInterface := range tNetworkInterfaces {
 			newNetworkInterfaces = []swagger.NetworkInterface{{
+				Subnet: networkInterface.Subnet.ValueString(),
 				Ips: []swagger.IpAddresses{{
 					PublicIpv4: &swagger.PublicIpv4Address{
 						Type_: networkInterface.PublicIpv4.Type.ValueString(),
