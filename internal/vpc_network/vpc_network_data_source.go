@@ -3,6 +3,7 @@ package vpc_network
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -59,7 +60,7 @@ func (ds *vpcNetworksDataSource) Metadata(ctx context.Context, request datasourc
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *vpcNetworksDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"vpcNetworkss": schema.ListNestedAttribute{
+		"vpc_networks": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
@@ -76,6 +77,7 @@ func (ds *vpcNetworksDataSource) Schema(ctx context.Context, request datasource.
 						Required: true,
 					},
 					"subnets": schema.ListAttribute{
+						ElementType: types.StringType,
 						Optional: true,
 					},
 				},

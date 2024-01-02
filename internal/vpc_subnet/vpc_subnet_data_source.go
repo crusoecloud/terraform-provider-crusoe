@@ -24,11 +24,11 @@ type vpcSubnetsDataSourceFilter struct {
 }
 
 type vpcSubnetsModel struct {
-	ID      string   `tfsdk:"id"`
-	Name    string   `tfsdk:"name"`
-	CIDR    string   `tfsdk:"cidr"`
-	Gateway string   `tfsdk:"gateway"`
-	Subnets []string `tfsdk:"subnets"`
+	ID       string `tfsdk:"id"`
+	Name     string `tfsdk:"name"`
+	CIDR     string `tfsdk:"cidr"`
+	Location string `tfsdk:"location"`
+	Network  string `tfsdk:"network"`
 }
 
 func NewVPCSubnetsDataSource() datasource.DataSource {
@@ -59,7 +59,7 @@ func (ds *vpcSubnetsDataSource) Metadata(ctx context.Context, request datasource
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *vpcSubnetsDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"vpcSubnetss": schema.ListNestedAttribute{
+		"vpc_subnets": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
@@ -72,11 +72,11 @@ func (ds *vpcSubnetsDataSource) Schema(ctx context.Context, request datasource.S
 					"cidr": schema.StringAttribute{
 						Required: true,
 					},
-					"gateway": schema.StringAttribute{
-						Required: true,
+					"location": schema.StringAttribute{
+						Computed: true,
 					},
-					"subnets": schema.ListAttribute{
-						Optional: true,
+					"network": schema.StringAttribute{
+						Computed: true,
 					},
 				},
 			},
@@ -105,11 +105,11 @@ func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadReq
 	var state vpcSubnetsDataSourceModel
 	for i := range dataResp.Items {
 		state.VPCSubnets = append(state.VPCSubnets, vpcSubnetsModel{
-			ID:      dataResp.Items[i].Id,
-			Name:    dataResp.Items[i].Name,
-			CIDR:    dataResp.Items[i].Cidr,
-			Gateway: dataResp.Items[i].Gateway,
-			Subnets: dataResp.Items[i].Subnets,
+			ID:       dataResp.Items[i].Id,
+			Name:     dataResp.Items[i].Name,
+			CIDR:     dataResp.Items[i].Cidr,
+			Location: dataResp.Items[i].Location,
+			Network:  dataResp.Items[i].VpcNetworkId,
 		})
 	}
 

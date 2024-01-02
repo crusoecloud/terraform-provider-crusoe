@@ -82,7 +82,8 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 
 			},
 			"subnets": schema.ListAttribute{
-				Required:      true,
+				ElementType: types.StringType,
+				Computed:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 		},

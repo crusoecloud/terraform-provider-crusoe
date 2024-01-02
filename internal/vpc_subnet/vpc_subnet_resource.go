@@ -21,12 +21,12 @@ type vpcSubnetResource struct {
 }
 
 type vpcSubnetResourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	ProjectID    types.String `tfsdk:"project_id"`
-	Name         types.String `tfsdk:"name"`
-	CIDR         types.String `tfsdk:"cidr"`
-	Location     types.String `tfsdk:"location"`
-	VPCNetworkID types.String `tfsdk:"vpc_network_id"`
+	ID        types.String `tfsdk:"id"`
+	ProjectID types.String `tfsdk:"project_id"`
+	Name      types.String `tfsdk:"name"`
+	CIDR      types.String `tfsdk:"cidr"`
+	Location  types.String `tfsdk:"location"`
+	Network   types.String `tfsdk:"network"`
 }
 
 func NewVPCSubnetResource() resource.Resource {
@@ -80,7 +80,7 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
-			"vpc_network_id": schema.StringAttribute{
+			"network": schema.StringAttribute{
 				Required: true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -120,7 +120,7 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 		Name:         plan.Name.ValueString(),
 		Cidr:         plan.CIDR.ValueString(),
 		Location:     plan.Location.ValueString(),
-		VpcNetworkId: plan.VPCNetworkID.ValueString(),
+		VpcNetworkId: plan.Network.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VPC Subnet",
@@ -134,7 +134,7 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 	plan.Name = types.StringValue(dataResp.Subnet.Name)
 	plan.CIDR = types.StringValue(dataResp.Subnet.Cidr)
 	plan.Location = types.StringValue(dataResp.Subnet.Location)
-	plan.VPCNetworkID = types.StringValue(dataResp.Subnet.VpcNetworkId)
+	plan.Network = types.StringValue(dataResp.Subnet.VpcNetworkId)
 	plan.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, plan)
@@ -169,7 +169,7 @@ func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, 
 	state.Name = types.StringValue(vpcSubnet.Name)
 	state.CIDR = types.StringValue(vpcSubnet.Cidr)
 	state.Location = types.StringValue(vpcSubnet.Location)
-	state.VPCNetworkID = types.StringValue(vpcSubnet.VpcNetworkId)
+	state.Network = types.StringValue(vpcSubnet.VpcNetworkId)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
