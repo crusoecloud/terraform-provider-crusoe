@@ -19,7 +19,6 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
 }
 
 // firewall rule
-// note: this allows all ingress over TCP to our VM
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   network           = crusoe_vpc_network.my_vpc_network.id
   name              = "example-terraform-rule"
