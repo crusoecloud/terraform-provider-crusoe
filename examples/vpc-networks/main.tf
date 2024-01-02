@@ -30,4 +30,6 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   source_ports      = "1-65535"
   destination       = crusoe_vpc_network.my_vpc_network.cidr
   destination_ports = "1-65535"
+
+  depends_on = [crusoe_vpc_subnet.my_vpc_subnet]
 }
