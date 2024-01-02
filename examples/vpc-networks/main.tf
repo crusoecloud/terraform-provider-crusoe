@@ -7,12 +7,12 @@ terraform {
 }
 
 resource "crusoe_vpc_network" "my_vpc_network" {
-  name = "change-name"
+  name = "my-new-network"
   cidr = "10.0.0.0/8"
 }
 
 resource "crusoe_vpc_subnet" "my_vpc_subnet" {
-  name = "change-name"
+  name = "my-new-subnet"
   cidr = "10.0.0.0/16"
   location = "us-northcentralstaging1-a"
   network = crusoe_vpc_network.my_vpc_network.id
