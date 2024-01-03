@@ -170,6 +170,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 						"subnet": schema.StringAttribute{
 							Computed:      true,
+							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"interface_type": schema.StringAttribute{
