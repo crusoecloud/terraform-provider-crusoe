@@ -30,8 +30,7 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   destination       = crusoe_vpc_network.my_vpc_network.cidr
   destination_ports = "1-65535"
 
-  // It is currently not possible to create subnets and firewall rules at the same time.
-  // This directive should be specified when creating firewall rules and subnets
-  // to avoid failures.
+  // It is currently not possible for terraform to create subnets and firewall rules concurrently.
+  // This directive should be specified when creating firewall rules and subnets to avoid failures.
   depends_on = [crusoe_vpc_subnet.my_vpc_subnet]
 }
