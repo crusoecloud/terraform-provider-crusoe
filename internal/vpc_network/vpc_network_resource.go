@@ -207,7 +207,9 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 	defer httpResp.Body.Close()
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+		return r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID, &swagger.VPCNetworkOperationsApiGetNetworkingVPCNetworksOperationOpts{})
+	} )
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Network",
 			fmt.Sprintf("There was an error updating the VPC Network: %s.\n\n", common.UnpackAPIError(err)))
@@ -237,7 +239,9 @@ func (r *vpcNetworkResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 	defer httpResp.Body.Close()
 
-	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation)
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+		return r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID, &swagger.VPCNetworkOperationsApiGetNetworkingVPCNetworksOperationOpts{})
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VPC Network",
 			fmt.Sprintf("There was an error deleting a VPC Network: %s", common.UnpackAPIError(err)))

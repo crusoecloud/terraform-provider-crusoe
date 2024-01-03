@@ -14,7 +14,7 @@ resource "crusoe_vpc_network" "my_vpc_network" {
 resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   name = "my-new-subnet"
   cidr = "10.0.0.0/16"
-  location = "us-northcentralstaging1-b"
+  location = "us-northcentral1-a"
   network = crusoe_vpc_network.my_vpc_network.id
 }
 
@@ -31,7 +31,7 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   destination_ports = "1-65535"
 
   // It is currently not possible to create subnets and firewall rules at the same time.
-  // This directive should be specified when creating both these resources at the same time
+  // This directive should be specified when creating firewall rules and subnets
   // to avoid failures.
   depends_on = [crusoe_vpc_subnet.my_vpc_subnet]
 }
