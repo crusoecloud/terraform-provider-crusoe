@@ -3,6 +3,7 @@ package crusoe
 import (
 	"context"
 	"fmt"
+
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_subnet"
 
