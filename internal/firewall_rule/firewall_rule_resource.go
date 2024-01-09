@@ -85,7 +85,7 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 		"direction": schema.StringAttribute{
 			Required:      true,
 			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^ingress"}}, // TODO: support egress once supported by API
+			Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(ingress|egress)"}},
 		},
 		"protocols": schema.StringAttribute{
 			Required:      true,
@@ -125,7 +125,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	projectID := ""
-	if plan.ProjectID.ValueString() == ""{
+	if plan.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to create firewall rule",
