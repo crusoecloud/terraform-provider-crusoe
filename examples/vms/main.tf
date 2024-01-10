@@ -39,7 +39,7 @@ resource "crusoe_storage_disk" "data_disk" {
 }
 
 // firewall rule
-// note: this allows all ingress over TCP to our VM
+// this example rule allows all ingress over TCP to port 3000 on our VM
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   network           = crusoe_compute_instance.my_vm.network_interfaces[0].network
   name              = "example-terraform-rule"
@@ -48,6 +48,6 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   protocols         = "tcp"
   source            = "0.0.0.0/0"
   source_ports      = "1-65535"
-  destination       = crusoe_compute_instance.my_vm.network_interfaces[0].public_ipv4.address
-  destination_ports = "1-65535"
+  destination       = crusoe_compute_instance.my_vm.network_interfaces[0].private_ipv4.address
+  destination_ports = "3000"
 }
