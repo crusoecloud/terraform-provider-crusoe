@@ -1,11 +1,12 @@
-# By default, all Crusoe Cloud devs are codeowners of a file
+# default = everyone is codeowner
 * @crusoeenergy/island
 
-.gitlab/CODEOWNERS  @lanwall12 @nitper @ksosnowski3
+.gitlab/CODEOWNERS @lanwall12 @nitper @bsherrycrusoe @ksosnowski3 @dpattishall
 
-# More restrictive ownership for adding dependencies and changing ci/builds
-Makefile            @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
-.golangci.yml       @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
-.goreleaser.yml     @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
-go.mod              @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
-go.sum              @lanwall12 @nitper @imackenzie @ksosnowski3 @agutierrez8 
+# more restrictive ownership for adding dependencies and changing ci/build
+.gitlab-ci.yml     @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
+.golangci-lint.yml @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
+go.mod             @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
+Makefile           @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
+Dockerfile         @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
+Dockerfile.*       @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
