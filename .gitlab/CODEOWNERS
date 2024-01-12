@@ -4,9 +4,9 @@
 .gitlab/CODEOWNERS @lanwall12 @nitper @bsherrycrusoe @ksosnowski3 @dpattishall
 
 # more restrictive ownership for adding dependencies and changing ci/build
-.gitlab-ci.yml     @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
-.golangci-lint.yml @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
-go.mod             @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
-Makefile           @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
-Dockerfile         @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
-Dockerfile.*       @lanwall12 @nitper @ajeyaraj1 @imackenzie @azhang1982133 @blim3 @tim_kralj @prangel1 @agutierrez8
+.gitlab-ci.yml     @lanwall12 @nitper @crusoeenergy/island/ccx
+.golangci-lint.yml @lanwall12 @nitper @crusoeenergy/island/ccx
+go.mod             @lanwall12 @nitper @crusoeenergy/island/ccx
+Makefile           @lanwall12 @nitper @crusoeenergy/island/ccx
+Dockerfile         @lanwall12 @nitper @crusoeenergy/island/ccx
+Dockerfile.*       @lanwall12 @nitper @crusoeenergy/island/ccx
