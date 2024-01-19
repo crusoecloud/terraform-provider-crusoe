@@ -1,9 +1,13 @@
+stages:
+  - lint
+
 .cache-setup: &cache-setup
   - mkdir -p .cache
   - export GOPATH="$CI_PROJECT_DIR/.cache"
   - export PATH=$PATH:$GOPATH/bin
 
 .test_and_lint:
+  stage: lint
   needs: []
   cache:
     paths:
