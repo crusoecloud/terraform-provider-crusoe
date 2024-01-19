@@ -3,6 +3,7 @@ package vm
 import (
 	"context"
 	"fmt"
+
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -342,8 +343,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	plan.NetworkInterfaces = networkInterfaces
 	if len(diskIds) > 0 {
-		disks, diags := vmDiskAttachmentToTerraformResourceModel(diskIds)
-		resp.Diagnostics.Append(diags...)
+		disks, diag := vmDiskAttachmentToTerraformResourceModel(diskIds)
+		resp.Diagnostics.Append(diag...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -369,9 +370,9 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	if state.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
-
 			resp.Diagnostics.AddError("Failed to create disk",
 				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 			return
 		}
 		projectID = project
@@ -437,14 +438,15 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	// attach/detach disks if requested
 	tPlanDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
 	diags = plan.Disks.ElementsAs(ctx, &tPlanDisks, true)
+	resp.Diagnostics.Append(diags...)
 
 	tStateDisks := make([]vmDiskResourceModel, 0, len(state.Disks.Elements()))
 	diags = state.Disks.ElementsAs(ctx, &tStateDisks, true)
+	resp.Diagnostics.Append(diags...)
 
 	addedDisks, removedDisks := getDisksDiff(tStateDisks, tPlanDisks)
 
 	if len(removedDisks) > 0 {
-
 		detachResp, httpResp, err := r.client.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
 			DetachDisks: removedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())

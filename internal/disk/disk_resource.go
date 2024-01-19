@@ -71,8 +71,10 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"project_id": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"location": schema.StringAttribute{
 				Required:      true,
@@ -124,9 +126,9 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if plan.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
-
 			resp.Diagnostics.AddError("Failed to create disk",
 				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 			return
 		}
 		projectID = project
@@ -181,9 +183,9 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if state.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
-
 			resp.Diagnostics.AddError("Failed to create disk",
 				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 			return
 		}
 		projectID = project

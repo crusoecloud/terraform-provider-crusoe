@@ -1,0 +1,13 @@
+stages:
+  - lint
+
+lint:
+  stage: lint
+  image: golang:1.19
+  script:
+    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+    - golangci-lint run
+  only:
+    - main
+    - tags/^v.*/
+    - merge_requests

@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/antihax/optional"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/antihax/optional"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
@@ -111,14 +112,13 @@ func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation,
 // GetFallbackProject queries the API to get the list of projects belonging to the
 // logged in user. If there is one project belonging to the user, it returns that project
 // else it adds an error to the diagnostics and returns.
-func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diag *diag.Diagnostics) (string, error) {
-
+func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diagg *diag.Diagnostics) (string, error) {
 	config, err := GetConfig()
 	if err != nil {
-		return "", fmt.Errorf("failed to get config: %v", err)
+		return "", fmt.Errorf("failed to get config: %w", err)
 	}
 
-	var opts = &swagger.ProjectsApiListProjectsOpts{
+	opts := &swagger.ProjectsApiListProjectsOpts{
 		OrgId: optional.EmptyString(),
 	}
 
@@ -131,14 +131,14 @@ func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diag *di
 	defer httpResp.Body.Close()
 
 	if err != nil {
-		diag.AddError("Failed to retrieve project ID",
+		diagg.AddError("Failed to retrieve project ID",
 			"Failed to retrieve project ID for the authenticated user.")
 
 		return "", err
 	}
 
 	if len(dataResp.Items) != 1 {
-		diag.AddError("Multiple projects found.",
+		diagg.AddError("Multiple projects found.",
 			"Multiple projects found for the authenticated user. Unable to determine which project to use.")
 
 		return "", errMultipleProjects
@@ -147,7 +147,7 @@ func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diag *di
 	projectID := dataResp.Items[0].Id
 
 	if config.DefaultProject == "" {
-		diag.AddWarning("Default project not specified",
+		diagg.AddWarning("Default project not specified",
 			fmt.Sprintf("A project_id was not specified in the configuration file. "+
 				"Please specify a project in the terraform file or set a 'default_project' in your configuration file. "+
 				"Falling back to project: %s.", dataResp.Items[0].Name))
