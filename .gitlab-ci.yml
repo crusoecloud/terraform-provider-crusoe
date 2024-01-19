@@ -1,3 +1,10 @@
+# We are using anchors here because it seems that scripts do not
+# do well with references
+.cache-setup: &cache-setup
+  - mkdir -p .cache
+  - export GOPATH="$CI_PROJECT_DIR/.cache"
+  - export PATH=$PATH:$GOPATH/bin
+
 .test_and_lint:
   needs: []
   cache:
@@ -26,9 +33,3 @@
         coverage_format: cobertura
         path: ${SUBPROJECT_PATH}coverage.xml
 
-# We are using anchors here because it seems that scripts do not
-# do well with references
-.cache-setup: &cache-setup
-  - mkdir -p .cache
-  - export GOPATH="$CI_PROJECT_DIR/.cache"
-  - export PATH=$PATH:$GOPATH/bin
