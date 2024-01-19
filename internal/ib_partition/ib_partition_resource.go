@@ -70,8 +70,11 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 			"project_id": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				// cannot be updated in place
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}

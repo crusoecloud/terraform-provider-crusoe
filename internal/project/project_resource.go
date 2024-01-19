@@ -114,7 +114,6 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-
 	project, httpResp, err := r.client.ProjectsApi.GetProject(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get projects",
@@ -165,7 +164,6 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
 	resp.Diagnostics.AddWarning("Delete not supported",
 		"Deleting projects is not currently supported. If you're seeing this message, please reach"+
 			" out to support@crusoecloud.com and let us know.")

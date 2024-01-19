@@ -3,12 +3,12 @@ package vpc_network
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -66,8 +66,10 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"project_id": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"cidr": schema.StringAttribute{
 				Required:      true,
@@ -82,7 +84,7 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 
 			},
 			"subnets": schema.ListAttribute{
-				ElementType: types.StringType,
+				ElementType:   types.StringType,
 				Computed:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
@@ -107,9 +109,9 @@ func (r *vpcNetworkResource) Create(ctx context.Context, req resource.CreateRequ
 	if plan.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
-
 			resp.Diagnostics.AddError("Failed to create VPC Network",
 				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 			return
 		}
 		projectID = project
@@ -209,7 +211,7 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID, &swagger.VPCNetworkOperationsApiGetNetworkingVPCNetworksOperationOpts{})
-	} )
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Network",
 			fmt.Sprintf("There was an error updating the VPC Network: %s.\n\n", common.UnpackAPIError(err)))
