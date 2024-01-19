@@ -1,5 +1,3 @@
-# We are using anchors here because it seems that scripts do not
-# do well with references
 .cache-setup: &cache-setup
   - mkdir -p .cache
   - export GOPATH="$CI_PROJECT_DIR/.cache"
@@ -12,7 +10,6 @@
       - .cache/
   script:
     - *cache-setup
-    # run unit tests and linters
     - |-
       cd ${SUBPROJECT_REL_PATH}
       make ci || if [ -f "golangci-lint.json" ]; then
@@ -32,4 +29,3 @@
       coverage_report:
         coverage_format: cobertura
         path: ${SUBPROJECT_PATH}coverage.xml
-
