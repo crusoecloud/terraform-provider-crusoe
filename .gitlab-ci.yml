@@ -1,19 +1,19 @@
 stages:
   - lint
 
-.cache-setup: &cache-setup
-  - mkdir -p .cache
-  - export GOPATH="$CI_PROJECT_DIR/.cache"
-  - export PATH=$PATH:$GOPATH/bin
+# .cache-setup: &cache-setup
+#   - mkdir -p .cache
+#   - export GOPATH="$CI_PROJECT_DIR/.cache"
+#   - export PATH=$PATH:$GOPATH/bin
 
 .test_and_lint:
   stage: lint
   needs: []
-  cache:
-    paths:
-      - .cache/
+  # cache:
+  #   paths:
+  #     - .cache/
   script:
-    - *cache-setup
+    # - *cache-setup
     - |-
       make ci || if [ -f "golangci-lint.json" ]; then
         jq '.[] += { "severity": "critical" }' golangci-lint.json > golangci-lint.json.tmp && mv golangci-lint.json.tmp golangci-lint.json
