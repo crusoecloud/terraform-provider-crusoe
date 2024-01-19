@@ -1,7 +1,7 @@
 stages:
   - lint
 
-lint_job:
+lint:
   stage: lint
   image: golang:1.19
   script:
