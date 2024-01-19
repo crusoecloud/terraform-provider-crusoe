@@ -3,10 +3,10 @@ package vpc_network
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -18,10 +18,6 @@ type vpcNetworksDataSource struct {
 
 type vpcNetworksDataSourceModel struct {
 	VPCNetworks []vpcNetworksModel `tfsdk:"vpc_networks"`
-}
-
-type vpcNetworksDataSourceFilter struct {
-	ProjectID *string `tfsdk:"project_id"`
 }
 
 type vpcNetworksModel struct {
@@ -78,7 +74,7 @@ func (ds *vpcNetworksDataSource) Schema(ctx context.Context, request datasource.
 					},
 					"subnets": schema.ListAttribute{
 						ElementType: types.StringType,
-						Optional: true,
+						Optional:    true,
 					},
 				},
 			},

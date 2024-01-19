@@ -3,8 +3,8 @@ package project
 import (
 	"context"
 	"fmt"
-	"github.com/antihax/optional"
 
+	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
@@ -21,8 +21,8 @@ type projectsDataSourceModel struct {
 }
 
 type projectModel struct {
-	ID           string `tfsdk:"id"`
-	Name         string `tfsdk:"name"`
+	ID   string `tfsdk:"id"`
+	Name string `tfsdk:"name"`
 }
 
 func NewProjectsDataSource() datasource.DataSource {

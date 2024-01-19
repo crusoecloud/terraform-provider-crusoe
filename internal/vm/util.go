@@ -3,6 +3,7 @@ package vm
 import (
 	"context"
 	"fmt"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -83,6 +84,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 			disksRemoved = append(disksRemoved, origDisk.ID)
 		}
 	}
+
 	return disksAdded, disksRemoved
 }
 
@@ -165,19 +167,6 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 	return values, warning
 }
 
-func vmPartialHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter) (hostChannelAdaptersList types.List, warning string) {
-	hcas := make([]vmHostChannelAdapterResourceModel, 0, len(hostChannelAdapters))
-	for _, hca := range hostChannelAdapters {
-		hcas = append(hcas, vmHostChannelAdapterResourceModel{
-			IBPartitionID: hca.IbPartitionId,
-		})
-	}
-
-	values, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hcas)
-
-	return values, warning
-}
-
 func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsList types.List, diags diag.Diagnostics) {
 	attachments := make([]vmDiskResourceModel, 0, len(diskAttachments))
 	for _, diskAttachment := range diskAttachments {
@@ -189,5 +178,6 @@ func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAtta
 	}
 
 	diskAttachmentsList, diags = types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
+
 	return diskAttachmentsList, diags
 }

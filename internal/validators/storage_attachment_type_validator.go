@@ -34,10 +34,8 @@ func (v StorageModeValidator) ValidateString(ctx context.Context, req validator.
 	input := req.ConfigValue.ValueString()
 	input = strings.ToLower(input)
 
-	if input != string(DiskReadOnly) && input != string(DiskReadWrite){
+	if input != string(DiskReadOnly) && input != string(DiskReadWrite) {
 		resp.Diagnostics.AddAttributeError(req.Path, "Unsupported Disk Mode Type",
 			"Disk mode type must be either 'read-only' or 'read-write'")
 	}
-
-	return
 }

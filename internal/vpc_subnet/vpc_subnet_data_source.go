@@ -19,10 +19,6 @@ type vpcSubnetsDataSourceModel struct {
 	VPCSubnets []vpcSubnetsModel `tfsdk:"vpc_subnets"`
 }
 
-type vpcSubnetsDataSourceFilter struct {
-	ProjectID *string `tfsdk:"project_id"`
-}
-
 type vpcSubnetsModel struct {
 	ID       string `tfsdk:"id"`
 	Name     string `tfsdk:"name"`

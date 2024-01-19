@@ -65,8 +65,10 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 			"project_id": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"cidr": schema.StringAttribute{
 				Required:      true,
@@ -77,13 +79,17 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"location": schema.StringAttribute{
 				Required: true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(),
-					stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				}, // maintain across updates
 			},
 			"network": schema.StringAttribute{
 				Required: true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(),
-					stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				}, // maintain across updates
 			},
 		},
 	}
@@ -106,9 +112,9 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 	if plan.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
-
 			resp.Diagnostics.AddError("Failed to create VPC Subnet",
 				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 			return
 		}
 		projectID = project
