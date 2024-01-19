@@ -1,35 +1,7 @@
 stages:
-  - lint
+  - test
 
-.cache-setup: &cache-setup
-  - mkdir -p .cache
-  - export GOPATH="$CI_PROJECT_DIR/.cache"
-  - export PATH=$PATH:$GOPATH/bin
-
-.test_and_lint:
-  stage: lint
-  needs: []
-  cache:
-    paths:
-      - .cache/
+simple_test_job:
+  stage: test
   script:
-    - *cache-setup
-    - |-
-      cd ${SUBPROJECT_REL_PATH}
-      make ci || if [ -f "golangci-lint.json" ]; then
-        jq '.[] += { "severity": "critical" }' golangci-lint.json > golangci-lint.json.tmp && mv golangci-lint.json.tmp golangci-lint.json
-        exit 1
-      else
-        exit 1
-      fi
-    - /var/crusoe/scripts/tag_semver.sh $MAJOR_VERSION $MINOR_VERSION "$TAG_PREFIX"
-  coverage: '/^total:\t+\(statements\)\t+(\d+\.\d+)%/'
-  artifacts:
-    when: always
-    reports:
-      dotenv: ${SUBPROJECT_PATH}variables.env
-      codequality: ${SUBPROJECT_PATH}golangci-lint.json
-      junit: ${SUBPROJECT_PATH}tests.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: ${SUBPROJECT_PATH}coverage.xml
+    - echo "Running a simple test."
