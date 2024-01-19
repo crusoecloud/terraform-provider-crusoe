@@ -1,34 +1,13 @@
 stages:
   - lint
 
-# .cache-setup: &cache-setup
-#   - mkdir -p .cache
-#   - export GOPATH="$CI_PROJECT_DIR/.cache"
-#   - export PATH=$PATH:$GOPATH/bin
-
-.test_and_lint:
+lint_job:
   stage: lint
-  needs: []
-  # cache:
-  #   paths:
-  #     - .cache/
+  image: golang:1.18  # Using the official Golang Docker image with version 1.18
   script:
-    # - *cache-setup
-    - |-
-      make ci || if [ -f "golangci-lint.json" ]; then
-        jq '.[] += { "severity": "critical" }' golangci-lint.json > golangci-lint.json.tmp && mv golangci-lint.json.tmp golangci-lint.json
-        exit 1
-      else
-        exit 1
-      fi
-    - /var/crusoe/scripts/tag_semver.sh $MAJOR_VERSION $MINOR_VERSION "$TAG_PREFIX"
-  coverage: '/^total:\t+\(statements\)\t+(\d+\.\d+)%/'
-  artifacts:
-    when: always
-    reports:
-      dotenv: variables.env
-      codequality: golangci-lint.json
-      junit: tests.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
+    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+    - golangci-lint run
+  only:
+    - main
+    - tags/^v.*/
+    - merge_requests
