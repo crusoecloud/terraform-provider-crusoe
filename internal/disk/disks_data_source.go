@@ -19,10 +19,6 @@ type disksDataSourceModel struct {
 	Disks []diskModel `tfsdk:"disks"`
 }
 
-type disksDataSourceFilter struct {
-	ProjectID *string `tfsdk:"project_id"`
-}
-
 type diskModel struct {
 	ID           string `tfsdk:"id"`
 	Name         string `tfsdk:"name"`

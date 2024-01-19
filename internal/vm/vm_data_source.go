@@ -173,6 +173,8 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 			})
 		}
 
+		state.Disks = attachedDisks
+
 		networkInterfaces, _ := vmNetworkInterfacesToTerraformDataModel(vm.NetworkInterfaces)
 		state.NetworkInterfaces = networkInterfaces
 
