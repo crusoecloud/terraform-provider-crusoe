@@ -211,7 +211,7 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.VpcSubnet](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID, &swagger.VPCSubnetOperationsApiGetNetworkingVPCSubnetsOperationOpts{})
+		return r.client.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID)
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Subnet",
@@ -243,7 +243,7 @@ func (r *vpcSubnetResource) Delete(ctx context.Context, req resource.DeleteReque
 	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID, &swagger.VPCSubnetOperationsApiGetNetworkingVPCSubnetsOperationOpts{})
+		return r.client.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID)
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VPC Subnet",

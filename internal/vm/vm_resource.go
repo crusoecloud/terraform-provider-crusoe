@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -19,6 +20,8 @@ import (
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
+var errProjectNotFound = errors.New("project for instance not found")
+
 type vmResource struct {
 	client *swagger.APIClient
 }
@@ -33,6 +36,7 @@ type vmResourceModel struct {
 	Image               types.String `tfsdk:"image"`
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
+	FQDN                types.String `tfsdk:"fqdn"`
 	Disks               types.List   `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
@@ -89,6 +93,7 @@ func (r *vmResource) Metadata(ctx context.Context, req resource.MetadataRequest,
 
 func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -149,6 +154,10 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 					},
 				},
+			},
+			"fqdn": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{
 				Computed:      true,
@@ -211,7 +220,6 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
 				Optional:      true,
-				Computed:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -338,6 +346,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	plan.ID = types.StringValue(instance.Id)
+	plan.FQDN = types.StringValue(instance.Fqdn)
 	plan.ProjectID = types.StringValue(projectID)
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
@@ -388,29 +397,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	state.ID = types.StringValue(instance.Id)
-	state.Name = types.StringValue(instance.Name)
-	state.Type = types.StringValue(instance.Type_)
-	state.ProjectID = types.StringValue(instance.ProjectId)
-
-	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
-	state.NetworkInterfaces = networkInterfaces
-
-	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
-	for _, disk := range instance.Disks {
-		if disk.AttachmentType != "os" {
-			disks = append(disks, vmDiskResourceModel{
-				ID:             disk.Id,
-				AttachmentType: disk.AttachmentType,
-				Mode:           disk.Mode,
-			})
-		}
-	}
-	if len(disks) > 0 {
-		// only assign if disks is not empty. otherwise, intentionally keep this nil, for future comparisons
-		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
-		state.Disks = tDisks
-	}
+	vmToTerraformResourceModel(instance, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
