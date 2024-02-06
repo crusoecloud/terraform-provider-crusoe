@@ -12,9 +12,11 @@ import (
 // vmResourceModelV0 is the minimal set of attributes that we will need from a prior state to
 // rebuild an instance's state because these fields are not returned by the API.
 type vmResourceModelV0 struct {
-	ID     types.String `tfsdk:"id"`
-	SSHKey types.String `tfsdk:"ssh_key"`
-	Image  types.String `tfsdk:"image"`
+	ID             types.String `tfsdk:"id"`
+	SSHKey         types.String `tfsdk:"ssh_key"`
+	Image          types.String `tfsdk:"image"`
+	StartupScript  types.String `tfsdk:"startup_script"`
+	ShutdownScript types.String `tfsdk:"shutdown_script"`
 }
 
 func (r *vmResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
@@ -29,6 +31,12 @@ func (r *vmResource) UpgradeState(context.Context) map[int64]resource.StateUpgra
 						Required: true,
 					},
 					"image": schema.StringAttribute{
+						Optional: true,
+					},
+					"startup_script": schema.StringAttribute{
+						Optional: true,
+					},
+					"shutdown_script": schema.StringAttribute{
 						Optional: true,
 					},
 				},
@@ -64,6 +72,8 @@ func (r *vmResource) UpgradeState(context.Context) map[int64]resource.StateUpgra
 				vmToTerraformResourceModel(instance, &state)
 				state.SSHKey = priorStateData.SSHKey
 				state.Image = priorStateData.Image
+				state.StartupScript = priorStateData.StartupScript
+				state.ShutdownScript = priorStateData.ShutdownScript
 
 				resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 				if resp.Diagnostics.HasError() {
