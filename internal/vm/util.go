@@ -232,6 +232,7 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.Type_)
 	state.ProjectID = types.StringValue(instance.ProjectId)
+	state.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	state.Location = types.StringValue(instance.Location)
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
