@@ -1,0 +1,43 @@
+name: semver tag
+
+on:
+  push:
+    branches:
+      - release
+
+permissions:
+  contents: write
+
+jobs:
+  semver-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config user.name "crusoe-cloud"
+          git config user.email "support@crusoecloud.com"
+
+      - name: Load versions from text file
+        run: |
+          source versions.env
+          echo "MAJOR_VERSION=${MAJOR_VERSION}" >> $GITHUB_ENV
+          echo "MINOR_VERSION=${MINOR_VERSION}" >> $GITHUB_ENV
+
+      - name: Calculate and set new version
+        run: |
+          chmod +x ./scripts/tag_semver.sh
+          ./scripts/tag_semver.sh $MAJOR_VERSION $MINOR_VERSION ""
+        shell: bash
+
+      - name: Read version and push tag
+        run: |
+          source variables.env
+          echo "Calculated version: $RELEASE_VERSION"
+          source variables.env
+          git tag $RELEASE_VERSION
+          git push origin $RELEASE_VERSION

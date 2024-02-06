@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -12,7 +13,10 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
-const StateRunning = "STATE_RUNNING"
+const (
+	DiskOS       = "os"
+	StateRunning = "STATE_RUNNING"
+)
 
 var vmNetworkInterfaceSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
@@ -167,6 +171,19 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 	return values, warning
 }
 
+// vmHostChannelAdaptersToTerraformResourceModel creates a slice of Terraform-compatible host channel adapters
+// instances from Crusoe API host channel adapters interfaces.
+func vmHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter) (hcaList types.List) {
+	hcas := make([]vmHostChannelAdapterResourceModel, 0, 1)
+	if len(hostChannelAdapters) >= 1 {
+		hcas = append(hcas, vmHostChannelAdapterResourceModel{IBPartitionID: hostChannelAdapters[0].IbPartitionId})
+	}
+
+	values, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hcas)
+
+	return values
+}
+
 func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsList types.List, diags diag.Diagnostics) {
 	attachments := make([]vmDiskResourceModel, 0, len(diskAttachments))
 	for _, diskAttachment := range diskAttachments {
@@ -180,4 +197,67 @@ func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAtta
 	diskAttachmentsList, diags = types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
 
 	return diskAttachmentsList, diags
+}
+
+func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1Alpha5, error) {
+	opts := &swagger.ProjectsApiListProjectsOpts{
+		OrgId: optional.EmptyString(),
+	}
+
+	projectsResp, projectHttpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
+
+	defer projectHttpResp.Body.Close()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query for projects: %w", err)
+	}
+
+	for _, project := range projectsResp.Items {
+		vm, getVMErr := getVM(ctx, client, project.Id, instanceID)
+
+		if getVMErr != nil {
+			continue
+		}
+
+		if vm.Id == instanceID {
+			return vm, nil
+		}
+	}
+
+	return nil, errProjectNotFound
+}
+
+func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
+	state.ID = types.StringValue(instance.Id)
+	state.Name = types.StringValue(instance.Name)
+	state.Type = types.StringValue(instance.Type_)
+	state.ProjectID = types.StringValue(instance.ProjectId)
+	state.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+	state.Location = types.StringValue(instance.Location)
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	state.NetworkInterfaces = networkInterfaces
+
+	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
+	for i := range instance.Disks {
+		disk := instance.Disks[i]
+		if disk.AttachmentType != DiskOS {
+			disks = append(disks, vmDiskResourceModel{
+				ID:             disk.Id,
+				AttachmentType: disk.AttachmentType,
+				Mode:           disk.Mode,
+			})
+		}
+	}
+	if len(disks) > 0 {
+		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
+		state.Disks = tDisks
+	} else {
+		state.Disks = types.ListNull(vmDiskAttachmentSchema)
+	}
+
+	if len(instance.HostChannelAdapters) > 0 {
+		state.HostChannelAdapters = vmHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
+	} else {
+		state.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
+	}
 }
