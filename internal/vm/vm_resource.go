@@ -36,7 +36,6 @@ type vmResourceModel struct {
 	Image               types.String `tfsdk:"image"`
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
-	FQDN                types.String `tfsdk:"fqdn"`
 	Disks               types.List   `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
@@ -154,10 +153,6 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 					},
 				},
-			},
-			"fqdn": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{
 				Computed:      true,
@@ -346,7 +341,6 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	plan.ID = types.StringValue(instance.Id)
-	plan.FQDN = types.StringValue(instance.Fqdn)
 	plan.ProjectID = types.StringValue(projectID)
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
