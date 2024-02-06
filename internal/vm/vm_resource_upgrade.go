@@ -66,6 +66,12 @@ func (r *vmResource) UpgradeState(context.Context) map[int64]resource.StateUpgra
 				state.Image = priorStateData.Image
 
 				resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+				if resp.Diagnostics.HasError() {
+					resp.Diagnostics.AddError("Failed to migrate instance to current version",
+						"There was an error migrating the instance to the current version.")
+
+					return
+				}
 				resp.Diagnostics.AddWarning("Successfully migrated instance to current version",
 					"Terraform State has been successfully migrated to a new version. Please refer to"+
 						" docs.crusoecloud.com for information about the updates.")

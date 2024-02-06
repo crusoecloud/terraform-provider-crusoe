@@ -249,12 +249,13 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 		}
 	}
 	if len(disks) > 0 {
-		// only assign if disks is not empty. otherwise, intentionally keep this nil, for future comparisons
 		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
 		state.Disks = tDisks
+	} else {
+		state.Disks = types.ListNull(vmDiskAttachmentSchema)
 	}
 
-	if instance.HostChannelAdapters != nil {
+	if len(instance.HostChannelAdapters) > 0 {
 		state.HostChannelAdapters = vmHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
 	} else {
 		state.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
