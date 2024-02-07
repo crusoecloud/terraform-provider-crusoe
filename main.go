@@ -8,6 +8,8 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/crusoe"
 )
 
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
+
 func main() {
 	err := providerserver.Serve(context.Background(), crusoe.New, providerserver.ServeOpts{
 		Address: "registry.terraform.io/crusoecloud/crusoe",
