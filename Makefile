@@ -4,7 +4,7 @@ TFPLUGINDOCS_VERSION = v0.18.0
 default: install
 
 .PHONY: dev
-dev: build-deps lint docs ## TODO: add tests to this once we have fixed the test suite
+dev: build-deps lint docs ## TODO: CRUSOE-6492 add tests to this once we have fixed the test suite
 
 .PHONY: build-deps
 build-deps:

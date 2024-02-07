@@ -8,6 +8,8 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/crusoe"
 )
 
+// This directive will run the doc generation tool and traverse our provider and generate documentation
+// for our resources and datasources.
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
 
 func main() {
