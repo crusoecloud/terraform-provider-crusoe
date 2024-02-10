@@ -16,6 +16,7 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/instance_template"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_network"
@@ -57,6 +58,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		project.NewProjectsDataSource,
 		vpc_network.NewVPCNetworksDataSource,
 		vpc_subnet.NewVPCSubnetsDataSource,
+		instance_template.NewInstanceTemplatesDataSource,
 	}
 }
 
@@ -70,6 +72,7 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		project.NewProjectResource,
 		vpc_network.NewVPCNetworkResource,
 		vpc_subnet.NewVPCSubnetResource,
+		instance_template.NewInstanceTemplateResource,
 	}
 }
 
