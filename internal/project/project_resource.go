@@ -152,7 +152,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update project",
-			fmt.Sprintf("There was an error starting an update project operation: %s.", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error updating the project: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -176,7 +176,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete project",
-			fmt.Sprintf("There was an error starting a delete project operation: %s.", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error deleting the project: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
