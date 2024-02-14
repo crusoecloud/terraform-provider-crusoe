@@ -152,7 +152,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update project",
-			fmt.Sprintf("There was an error starting an update project operation: %s.", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error updating the project: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
@@ -164,7 +164,21 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	resp.Diagnostics.AddWarning("Delete not supported",
-		"Deleting projects is not currently supported. If you're seeing this message, please reach"+
-			" out to support@crusoecloud.com and let us know.")
+	var state projectResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	httpResp, err := r.client.ProjectsApi.DeleteProject(ctx,
+		state.ID.ValueString(),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete project",
+			fmt.Sprintf("There was an error deleting the project: %s.", common.UnpackAPIError(err)))
+
+		return
+	}
+	defer httpResp.Body.Close()
 }
