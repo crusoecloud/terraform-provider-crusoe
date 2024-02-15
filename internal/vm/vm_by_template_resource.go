@@ -26,6 +26,7 @@ type vmByTemplateResource struct {
 
 type vmByTemplateResourceModel struct {
 	vmResourceModel
+	NamePrefix         types.String `tfsdk:"name_prefix"`
 	InstanceTemplateID types.String `tfsdk:"instance_template"`
 }
 
@@ -60,18 +61,23 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
-			"name": schema.StringAttribute{
+			"instance_template": schema.StringAttribute{
 				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
+			"name_prefix": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
+			"name": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-			},
-			"instance_template": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
 				Optional:      true,
@@ -243,7 +249,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	defer httpResp.Body.Close()
 
 	dataResp, httpResp, err := r.client.VMsApi.BulkCreateInstance(ctx, swagger.BulkInstancePostRequestV1Alpha5{
-		NamePrefix:         plan.Name.ValueString(),
+		NamePrefix:         plan.NamePrefix.ValueString(),
 		Count:              1,
 		InstanceTemplateId: instanceTemplateID,
 	}, projectID)
