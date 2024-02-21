@@ -31,7 +31,7 @@ func Test_getDisksDiff(t *testing.T) {
 			args: args{
 				orig: []vmDiskResourceModel{{ID: "1234", AttachmentType: "data", Mode: "read-write"}},
 				new:  []vmDiskResourceModel{
-					{ID: "1234", AttachmentType: "data", Mode: "read-only"},
+					{ID: "1234", AttachmentType: "data", Mode: "read-write"},
 					{ID: "2345", AttachmentType: "data", Mode: "read-only"},
 				},
 			},
@@ -45,7 +45,7 @@ func Test_getDisksDiff(t *testing.T) {
 					{ID: "1234", AttachmentType: "data", Mode: "read-only"},
 					{ID: "2345", AttachmentType: "data", Mode: "read-only"},
 				},
-				new:  []vmDiskResourceModel{{ID: "2345"}},
+				new:  []vmDiskResourceModel{{ID: "2345", AttachmentType: "data", Mode: "read-only"}},
 			},
 			wantDisksAdded:   nil,
 			wantDisksRemoved: []string{"1234"},
