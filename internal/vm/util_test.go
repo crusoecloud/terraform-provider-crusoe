@@ -1,9 +1,10 @@
 package vm
 
 import (
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"reflect"
 	"testing"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
 
 func Test_getDisksDiff(t *testing.T) {
@@ -30,7 +31,7 @@ func Test_getDisksDiff(t *testing.T) {
 			name: "disk added",
 			args: args{
 				orig: []vmDiskResourceModel{{ID: "1234", AttachmentType: "data", Mode: "read-write"}},
-				new:  []vmDiskResourceModel{
+				new: []vmDiskResourceModel{
 					{ID: "1234", AttachmentType: "data", Mode: "read-write"},
 					{ID: "2345", AttachmentType: "data", Mode: "read-only"},
 				},
@@ -45,7 +46,7 @@ func Test_getDisksDiff(t *testing.T) {
 					{ID: "1234", AttachmentType: "data", Mode: "read-only"},
 					{ID: "2345", AttachmentType: "data", Mode: "read-only"},
 				},
-				new:  []vmDiskResourceModel{{ID: "2345", AttachmentType: "data", Mode: "read-only"}},
+				new: []vmDiskResourceModel{{ID: "2345", AttachmentType: "data", Mode: "read-only"}},
 			},
 			wantDisksAdded:   nil,
 			wantDisksRemoved: []string{"1234"},
