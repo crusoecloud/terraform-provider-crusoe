@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - release
+    paths-ignore:
+      - 'docs/**'
+      - 'CHANGELOG.md'
 
 permissions:
   contents: write
