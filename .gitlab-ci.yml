@@ -1,9 +1,8 @@
 stages:
-  - lint
-  - test
+  - test_and_lint
 
 lint:
-  stage: lint
+  stage: test_and_lint
   image: golang:1.19
   script:
     - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
@@ -14,7 +13,7 @@ lint:
     - merge_requests
 
 test:
-  stage: test
+  stage: test_and_lint
   image: golang:1.19
   script:
     - go test -count=1 -parallel=4 ./...
