@@ -77,7 +77,7 @@ Our `main` branch is primarily used for development. Once features are ready to 
 ## Maintaining Changelog
 
 The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
-Updates to the changelog should be made separately from (and outside of) merge requests with code changes.
+Updates to the changelog should be made separately from (and outside of) merge requests with code changes with a merge request into the `main` branch.
 
 ## Contributing
 
