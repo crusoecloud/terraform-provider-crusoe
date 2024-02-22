@@ -66,3 +66,21 @@ provider_installation {
 ```
 
 Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples.
+
+## Versioning
+
+A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub. 
+This generates a new tag and triggers our `goreleaser` pipeline which will handle distributing the new Terraform version.
+
+Our `main` branch is primarily used for development. Once features are ready to be deployed, a Crusoe Cloud maintainer will merge the changes from `main` into `release` to deploy a new version. 
+
+## Maintaining Changelog
+
+The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
+Updates to the changelog should be made separately from (and outside of) merge requests with code changes.
+
+## Contributing
+
+We welcome (and have already had several!) open-source contributions to the Crusoe Cloud Terraform Provider.
+If you would like to make a contribution to the Crusoe Cloud Terraform provider, make a branch off `main` and open a pull request into main.
+A Crusoe Cloud maintainer will review the pull request and, once approved, merge it into the `main` branch.
