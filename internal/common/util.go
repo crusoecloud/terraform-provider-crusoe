@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -16,14 +18,28 @@ import (
 )
 
 const (
-	// TODO: pull from config set during build
-	version = "v0.5.2"
-
 	pollInterval = 2 * time.Second
 
 	ErrorMsgProviderInitFailed = "Could not initialize the Crusoe provider." +
 		" Please check your Crusoe configuration and try again, and if the problem persists, contact support@crusoecloud.com."
+
+	latestVersionURL = "https://api.github.com/repos/crusoecloud/terraform-provider-crusoe/releases/latest"
+	colorGreen       = "\033[32m"
+	colorYellow      = "\033[33m"
+	colorRed         = "\033[31m"
+	colorReset       = "\033[0m"
+	metadataFile     = "/.crusoe/.metadata"
 )
+
+var version string
+
+func GetVersion() string {
+	if version == "" {
+		return "v0.0.0-unspecified"
+	}
+
+	return version
+}
 
 type opStatus string
 
@@ -43,6 +59,10 @@ var (
 	errMultipleProjects = errors.New("User has multiple projects. Please specify a project to be used.")
 	errUnexpected       = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
 )
+
+type Metadata struct {
+	VersionCheckDate string `json:"versionCheckDate"`
+}
 
 // NewAPIClient initializes a new Crusoe API client with the given configuration.
 func NewAPIClient(host, key, secret string) *swagger.APIClient {
@@ -217,4 +237,112 @@ func UnpackAPIError(original error) error {
 
 	//nolint:goerr113 // error is dynamic
 	return fmt.Errorf("%s", model.Message)
+}
+
+// GetUpdateMessageIfValid checks if the current terraform provider version is up-to-date with the latest release and
+// returns a banner if the version needs an update. A new check is only performed if the last one
+// was over 24 hours ago.
+//
+//nolint:cyclop,nestif // breaking up function would hurt readability
+func GetUpdateMessageIfValid(ctx context.Context) string {
+	metadata := Metadata{}
+
+	// Parse metadata file
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	metadataFilePath := homeDir + metadataFile
+
+	_, fileErr := os.Stat(metadataFilePath)
+	if os.IsNotExist(fileErr) {
+		// create a new file in the config directory to store metadata
+		_, err := os.Create(metadataFilePath)
+		if err != nil {
+			return ""
+		}
+	} else {
+		fileContent, err := os.ReadFile(metadataFilePath)
+		if err != nil {
+			return ""
+		}
+		err = json.Unmarshal(fileContent, &metadata)
+		if err != nil {
+			return ""
+		}
+		versionCheckDate, err := time.Parse(time.RFC3339, metadata.VersionCheckDate)
+		if err != nil {
+			return ""
+		}
+		// do not check again if version was checked within a day
+		if time.Since(versionCheckDate) < time.Hour*24 {
+			return ""
+		}
+	}
+
+	latestVersion, err := getLatestVersion(ctx)
+	if err != nil {
+		return ""
+	}
+	currentVersion := GetVersion()
+
+	metadata.VersionCheckDate = time.Now().UTC().Format(time.RFC3339)
+	b, err := json.Marshal(metadata)
+	if err == nil {
+		os.WriteFile(metadataFilePath, b, os.ModePerm)
+	}
+
+	if currentVersion < latestVersion {
+		return FormatUpdateMessage(currentVersion, latestVersion)
+	}
+
+	return ""
+}
+
+func getLatestVersion(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestVersionURL, http.NoBody)
+	if err != nil {
+		return "", fmt.Errorf("unable to get latest version: %w", err)
+	}
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("unable to get latest version: %w", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("unable to get latest version: %w", err)
+	}
+	resp.Body.Close()
+	bodyStruct := make(map[string]interface{})
+	err = json.Unmarshal(body, &bodyStruct)
+	if err != nil {
+		return "", fmt.Errorf("unable to get latest version: %w", err)
+	}
+	latestVersion := fmt.Sprintf("%v", bodyStruct["tag_name"])
+
+	return latestVersion, nil
+}
+
+func FormatUpdateMessage(currentVersion, latestVersion string) string {
+	// use red if major version update needed
+	if strings.Split(currentVersion, ".")[0] < strings.Split(latestVersion, ".")[0] {
+		currentVersion = colorRed + currentVersion + colorReset
+	} else {
+		currentVersion = colorYellow + currentVersion + colorReset
+	}
+	latestVersion = colorGreen + latestVersion + colorReset
+	body := fmt.Sprintf("    Update available: %s -> %s    ", currentVersion, latestVersion)
+	border := ""
+	emptyLine := ""
+	colorLen := len(colorGreen + colorReset)
+	for i := 0; i < len(body)-2*colorLen; i++ { // len(body) includes color escape sequences
+		border += "─"
+		emptyLine += " "
+	}
+	body = "│" + body + "│"
+	emptyLine = "│" + emptyLine + "│"
+	msg := fmt.Sprintf("\n┌%s┐\n%s\n%s\n%s\n└%s┘\n", border, emptyLine, body, emptyLine, border)
+
+	return msg
 }

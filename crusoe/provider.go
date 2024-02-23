@@ -82,6 +82,11 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
+	if updateMessage := common.GetUpdateMessageIfValid(context.Background()); updateMessage != "" {
+		resp.Diagnostics.AddWarning("Update available",
+			fmt.Sprintf("There is an update available for Crusoe Terraform Provider.\n%s", updateMessage))
+	}
+
 	clientConfig, err := common.GetConfig()
 	if err != nil {
 		// only show a warning, since it's possible that we can't read their home dir (which is unexpected) but
