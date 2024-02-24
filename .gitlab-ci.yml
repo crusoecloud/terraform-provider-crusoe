@@ -1,7 +1,6 @@
 include:
   - project: 'crusoeenergy/tools'
     file: '/templates/go.gitlab-ci.yml'
-  - '/versions.yml'
 
 test_and_lint:
   rules:
