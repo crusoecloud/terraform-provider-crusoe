@@ -1,23 +1,36 @@
-stages:
-  - test_and_lint
+include:
+  - project: 'crusoeenergy/tools'
+    file: '/templates/go.gitlab-ci.yml'
+  - '/versions.yml'
 
-lint:
-  stage: test_and_lint
-  image: golang:1.19
-  script:
-    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
-    - golangci-lint run
-  only:
-    - main
-    - tags/^v.*/
-    - merge_requests
-
-test:
-  stage: test_and_lint
-  image: golang:1.19
-  script:
-    - go test -count=1 -parallel=4 ./...
-  only:
-    - main
-    - tags/^v.*/
-    - merge_requests
+test_and_lint:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "release"'
+      changes: !reference [.code-changes, changes]
+    - if: '$CI_MERGE_REQUEST_ID'
+      changes: !reference [.code-changes, changes]
+    # don't run CI for semver tags, do run it for custom tags
+    - if: '$CI_COMMIT_TAG && $CI_COMMIT_TAG !~ /^(.+\/)?v[0-9]+\.[0-9]+\.[0-9]+$/'
+#stages:
+#  - test_and_lint
+#
+#lint:
+#  stage: test_and_lint
+#  image: golang:1.19
+#  script:
+#    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+#    - golangci-lint run
+#  only:
+#    - main
+#    - tags/^v.*/
+#    - merge_requests
+#
+#test:
+#  stage: test_and_lint
+#  image: golang:1.19
+#  script:
+#    - go test -count=1 -parallel=4 ./...
+#  only:
+#    - main
+#    - tags/^v.*/
+#    - merge_requests
