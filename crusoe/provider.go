@@ -83,7 +83,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	if updateMessage := common.GetUpdateMessageIfValid(context.Background()); updateMessage != "" {
-		resp.Diagnostics.AddWarning("Update available",
+		resp.Diagnostics.AddWarning("Update Available",
 			fmt.Sprintf("There is a newer version available for the Crusoe Terraform Provider.\n%s", updateMessage))
 	}
 
