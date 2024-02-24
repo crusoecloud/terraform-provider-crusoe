@@ -243,7 +243,7 @@ func UnpackAPIError(original error) error {
 // returns a banner if the version needs an update. A new check is only performed if the last one
 // was over 24 hours ago.
 //
-//nolint:cyclop,nestif // breaking up function would hurt readability
+//nolint:cyclop,nestif,govet // breaking up function would hurt readability
 func GetUpdateMessageIfValid(ctx context.Context) string {
 	metadata := Metadata{}
 
@@ -288,8 +288,12 @@ func GetUpdateMessageIfValid(ctx context.Context) string {
 
 	metadata.VersionCheckDate = time.Now().UTC().Format(time.RFC3339)
 	b, err := json.Marshal(metadata)
-	if err == nil {
-		os.WriteFile(metadataFilePath, b, os.ModePerm)
+	if err != nil {
+		return ""
+	}
+	err = os.WriteFile(metadataFilePath, b, os.ModePerm)
+	if err != nil {
+		return ""
 	}
 
 	if currentVersion < latestVersion {
