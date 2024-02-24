@@ -14,7 +14,8 @@ dev: build-deps test lint docs
 
 .PHONY: build-deps
 build-deps:
-	go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@$(TFPLUGINDOCS_VERSION)
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_VERSION)
+	@go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@$(TFPLUGINDOCS_VERSION)
 
 .PHONY: ci
 ci: test-ci build-deps lint-ci docs-ci ## Runs test, build-deps, lint and docs
@@ -48,7 +49,7 @@ precommit: test
 .PHONY: lint
 lint:
 	@echo "==> $@"
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_VERSION)
+	@golangci-lint version
 	@golangci-lint run
 
 .PHONY: lint-ci
