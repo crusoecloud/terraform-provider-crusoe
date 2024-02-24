@@ -74,13 +74,17 @@ This generates a new tag and triggers our `goreleaser` pipeline which will handl
 
 Our `main` branch is primarily used for development. Once features are ready to be deployed, a Crusoe Cloud maintainer will merge the changes from `main` into `release` to deploy a new version. 
 
-## Maintaining Changelog
-
-The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
-Updates to the changelog should be made separately from (and outside of) merge requests with code changes with a merge request into the `main` branch.
-
 ## Contributing
 
 We welcome (and have already had several!) open-source contributions to the Crusoe Cloud Terraform Provider.
-If you would like to make a contribution to the Crusoe Cloud Terraform provider, make a branch off `main` and open a pull request into main.
-A Crusoe Cloud maintainer will review the pull request and, once approved, merge it into the `main` branch.
+Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
+1. Make a branch off `main` and open a pull request from your branch into `main`.
+2. A Crusoe Cloud maintainer will review the pull request and, once approved, merge it into the `main` branch.
+3. Once your pull request has been approved, make a separate pull request to add your changes to the changelog into the `main` branch. There will be an (Unreleased) version that you can add your changes to.
+4. To release your changes, you can make a separate pull request from the `main` branch into the `release` branch. Merges into the release branch trigger our `goreleaser` job which handles distributing a new version.
+5. Once the pull request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released.
+6. A separate pull request will be made by a Crusoe Cloud maintainer to update the changelog with the date the newest version has been released.
+
+## Maintaining Changelog
+
+The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.

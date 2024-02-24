@@ -19,9 +19,9 @@ ENHANCEMENTS:
 
 ## 0.5.7 (February 5, 2024)
 
-BUG FIXES:
+ENHANCEMENTS:
 
-* If a VM has no disks attached, explicitly set the list of attachments to nil.
+* Update Crusoe Cloud API version to ensure FQDN values are not populated from the API.
 
 ## 0.5.6 (February 5, 2024)
 
