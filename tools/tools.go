@@ -3,6 +3,6 @@
 package tools
 
 import (
-	// Import used for doc autogeneration
+	// Import used for Terraform public doc autogeneration
 	_ "github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs"
 )
