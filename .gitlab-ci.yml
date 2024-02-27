@@ -10,7 +10,11 @@ test_and_lint:
       changes: !reference [.code-changes, changes]
     # don't run CI for semver tags, do run it for custom tags
     - if: '$CI_COMMIT_TAG && $CI_COMMIT_TAG !~ /^(.+\/)?v[0-9]+\.[0-9]+\.[0-9]+$/'
-      
+
+# Remove the tag_semver and pages jobs from merges into main.
+# The tag_semver job will be run using a GitHub action on
+# merges into the release branch, and we will only ever
+# want to tag them using that job.
 tag_semver:
   rules:
     - when: never
