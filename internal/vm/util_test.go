@@ -3,6 +3,8 @@ package vm
 import (
 	"reflect"
 	"testing"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
 
 func Test_getDisksDiff(t *testing.T) {
@@ -13,14 +15,14 @@ func Test_getDisksDiff(t *testing.T) {
 	tests := []struct {
 		name             string
 		args             args
-		wantDisksAdded   []string
+		wantDisksAdded   []swagger.DiskAttachment
 		wantDisksRemoved []string
 	}{
 		{
 			name: "all match",
 			args: args{
-				orig: []vmDiskResourceModel{{ID: "1234"}},
-				new:  []vmDiskResourceModel{{ID: "1234"}},
+				orig: []vmDiskResourceModel{{ID: "1234", AttachmentType: "data", Mode: "read-write"}},
+				new:  []vmDiskResourceModel{{ID: "1234", AttachmentType: "data", Mode: "read-write"}},
 			},
 			wantDisksAdded:   nil,
 			wantDisksRemoved: nil,
@@ -28,17 +30,23 @@ func Test_getDisksDiff(t *testing.T) {
 		{
 			name: "disk added",
 			args: args{
-				orig: []vmDiskResourceModel{{ID: "1234"}},
-				new:  []vmDiskResourceModel{{ID: "1234"}, {ID: "2345"}},
+				orig: []vmDiskResourceModel{{ID: "1234", AttachmentType: "data", Mode: "read-write"}},
+				new: []vmDiskResourceModel{
+					{ID: "1234", AttachmentType: "data", Mode: "read-write"},
+					{ID: "2345", AttachmentType: "data", Mode: "read-only"},
+				},
 			},
-			wantDisksAdded:   []string{"2345"},
+			wantDisksAdded:   []swagger.DiskAttachment{{DiskId: "2345", AttachmentType: "data", Mode: "read-only"}},
 			wantDisksRemoved: nil,
 		},
 		{
 			name: "disk removed",
 			args: args{
-				orig: []vmDiskResourceModel{{ID: "1234"}, {ID: "2345"}},
-				new:  []vmDiskResourceModel{{ID: "2345"}},
+				orig: []vmDiskResourceModel{
+					{ID: "1234", AttachmentType: "data", Mode: "read-only"},
+					{ID: "2345", AttachmentType: "data", Mode: "read-only"},
+				},
+				new: []vmDiskResourceModel{{ID: "2345", AttachmentType: "data", Mode: "read-only"}},
 			},
 			wantDisksAdded:   nil,
 			wantDisksRemoved: []string{"1234"},
@@ -49,7 +57,7 @@ func Test_getDisksDiff(t *testing.T) {
 				orig: []vmDiskResourceModel{{ID: "1234"}},
 				new:  []vmDiskResourceModel{{ID: "2345"}},
 			},
-			wantDisksAdded:   []string{"2345"},
+			wantDisksAdded:   []swagger.DiskAttachment{{DiskId: "2345"}},
 			wantDisksRemoved: []string{"1234"},
 		},
 	}
