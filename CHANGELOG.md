@@ -1,0 +1,157 @@
+## 0.5.10 (February 14, 2024)
+
+ENHANCEMENTS:
+
+* Add support for project deletion.
+
+## 0.5.9 (February 7, 2024)
+
+ENHANCEMENTS:
+
+* Adds documentation on the resources and datasources supported by the Crusoe Cloud provider.
+* Adds a Makefile rule (`make docs`) to autogenerate documentation based on the provider schemas using the `tfplugindocs` library.
+
+## 0.5.8 (February 6, 2024)
+
+ENHANCEMENTS:
+
+* Automate tagging and releasing a new version of the Terraform provider upon merging of new changes.
+
+## 0.5.7 (February 5, 2024)
+
+ENHANCEMENTS:
+
+* Update Crusoe Cloud API version to ensure FQDN values are not populated from the API.
+
+## 0.5.6 (February 5, 2024)
+
+BUG FIXES:
+
+* If a VM has no disks attached, explicitly set the list of attachments to nil.
+
+ENHANCEMENTS:
+
+* Add support for migrating startup and shutdown scripts from older versions to newer versions.
+
+## 0.5.5 (February 2, 2024)
+
+ENHANCEMENTS:
+
+* Add support for migrating the `tfstate` from older versions of the VM resource to newer versions of the schema with breaking changes.
+
+## 0.5.4 (January 19, 2024)
+
+ENHANCEMENTS:
+
+* Add linting to the pipeline when merging new changes.
+
+## 0.5.3 (January 8, 2024)
+
+NEW FEATURES:
+
+* Support for non-default VPC networks and subnets through new resources and datasources.
+* VMs can now optionally be created in a non-default subnet.
+  * This is done by specifying a subnet as an object in the network_interfaces 
+  * `network_interfaces = { subnet = <subnet_id> }`
+* Adds support for egress firewall rules.
+
+## 0.5.2 (December 7, 2023)
+
+BUG FIXES:
+
+* Explicitly set the `host_channel_adapters` field to be null for non-IB enabled VMs.
+
+## 0.5.1 (December 6, 2023)
+
+BUG FIXES:
+
+* Fixes an issue with Terraform reporting unexpected host_channel_adapters.
+
+## 0.5.0 (December 5, 2023)
+
+NEW FEATURES:
+
+* Adds support for projects through the projects resource and datasource.
+* Changes the version of the Crusoe Cloud API used from `v1alpha4` to `v1alpha5`.
+* Adds support for specifying a disk `attachment_type` and `mode` when attaching a disk to a VM.
+
+UPGRADE NOTES:
+
+* Infiniband partitions are no longer specified using the `ib_partition_id` and instead as an object under the `host_channel_adapters` attribute.
+  * ```host_channel_adapters = { ib_partition_id = <ib_partition_id> }```
+* A project ID must be specified when creating resources. This can be specified in two ways:
+  * Using the `project_id` top-level attribute of the resource of the resource being created. The project_id can be stored as a local variable, as suggested in the new `project-variable` example.
+  * Having a `default_project` specified in the `~/.crusoe/config` file (for example, `default_project=my_cool_project_name`)
+
+## 0.4.2 (October 24, 2023)
+
+ENHANCEMENTS:
+
+* Support updating firewall rules using the firewall rules resource.
+
+## 0.4.1 (October 10, 2023)
+
+ENHANCEMENTS:
+
+* Errors from the Crusoe Cloud API are now unpacked to provide more informative error messages.
+
+## 0.4.0 (September 20, 2023)
+
+NEW FEATURES:
+
+* Add support for static public IPs.
+
+ENHANCEMENTS:
+
+* Requires specifying `location` when creating a VM resource (previously optional).
+
+UPGRADE NOTES:
+
+* The location of the VM should be specified in the `.tf` file.
+
+## 0.3.3 (August 24, 2023)
+
+BUG FIXES:
+
+* Skip validation in the SSH key and Regex validators if the value is still unknown (which is the case for variables before evaluation).
+
+## 0.3.2 (August 22, 2023)
+
+ENHANCEMENTS:
+
+* Adds support for hot-attaching a disk to a VM.
+* Does not require VMs to be in the stopped state when attaching disks.
+
+## 0.3.1 (August 18, 2023)
+
+NEW FEATURES:
+
+* Adds support for specifying an image when creating a VM.
+* Allow specifying an `image` as a top-level attribute for the VM resource which creates the VM with the specified curated image.
+
+## 0.3.0 (August 7, 2023)
+
+NEW FEATURES:
+
+* Add support for Infiniband (IB) enabled VMs.
+* Adds the IB Networks and Partitions datasources which can be used fetch existing network and partitions a user's Crusoe Cloud account.
+* Adds the IB Partition datasource which can be used to create new partitions in an existing IB network.
+* Allow specifying an `ib_partition_id` as a top-level attribute for the VM resource which creates the IB VM in that partition.
+
+## 0.2.2 (June 15, 2023)
+
+ENHANCEMENTS:
+
+* Add support for `"*"` as a shorthand for specifying all ports for firewall rule sources and destinations.
+
+## 0.2.1 (May 27, 2023)
+
+BUG FIXES:
+
+* Ignore null and unknown values in the storage size validator.
+
+## 0.2.0 (May 27, 2023)
+
+NEW FEATURES:
+
+* Initial release!
