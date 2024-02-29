@@ -130,7 +130,7 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	projectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch VPC Subnets",
+		resp.Diagnostics.AddError("Failed to fetch Instance Templates",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
 		return
@@ -138,7 +138,7 @@ func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.
 
 	dataResp, httpResp, err := ds.client.InstanceTemplatesApi.ListInstanceTemplates(ctx, projectID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to Fetch VPC Subnets", "Could not fetch VPC Subnet data at this time.")
+		resp.Diagnostics.AddError("Failed to Fetch Instance Templates", "Could not fetch Instance Template data at this time.")
 
 		return
 	}
