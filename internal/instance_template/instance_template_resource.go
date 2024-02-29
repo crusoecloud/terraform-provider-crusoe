@@ -112,7 +112,7 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 			},
 			"image": schema.StringAttribute{
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
@@ -137,6 +137,10 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 						"size": schema.StringAttribute{
 							Required:   true,
 							Validators: []validator.String{validators.StorageSizeValidator{}},
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),    // cannot be updated in place
+								stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
+							},
 						},
 						"type": schema.StringAttribute{
 							Optional: true,
