@@ -283,7 +283,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	plan.ProjectID = types.StringValue(projectID)
 	plan.Type = types.StringValue(instance.Type_)
 	plan.Location = types.StringValue(instance.Location)
-	plan.Image = types.StringValue(instanceTemplateResp.Image)
+	plan.Image = types.StringValue(instanceTemplateResp.ImageName)
 	plan.SSHKey = types.StringValue(instanceTemplateResp.SshPublicKey)
 	plan.StartupScript = types.StringValue(instanceTemplateResp.StartupScript)
 	plan.ShutdownScript = types.StringValue(instanceTemplateResp.ShutdownScript)
@@ -308,8 +308,8 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 			})
 		}
 
-		diskAttachmentsList, diags := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
-		resp.Diagnostics.Append(diags...)
+		diskAttachmentsList, diskDiags := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
+		resp.Diagnostics.Append(diskDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}

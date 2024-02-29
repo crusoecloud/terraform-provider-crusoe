@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -16,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
@@ -199,11 +199,11 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		Name:           plan.Name.ValueString(),
 		Type_:          plan.Type.ValueString(),
 		Location:       plan.Location.ValueString(),
-		Image:          plan.Image.ValueString(),
+		ImageName:      plan.Image.ValueString(),
 		SshPublicKey:   plan.SSHKey.ValueString(),
 		StartupScript:  plan.StartupScript.ValueString(),
 		ShutdownScript: plan.ShutdownScript.ValueString(),
-		Subnet:         plan.Subnet.ValueString(),
+		SubnetId:       plan.Subnet.ValueString(),
 		IbPartitionId:  plan.IBPartition.ValueString(),
 		Disks:          diskTemplates,
 	}, projectID)
@@ -265,11 +265,11 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	state.Name = types.StringValue(instanceTemplate.Name)
 	state.Location = types.StringValue(instanceTemplate.Location)
 	state.Type = types.StringValue(instanceTemplate.Type_)
-	state.Image = types.StringValue(instanceTemplate.Image)
+	state.Image = types.StringValue(instanceTemplate.ImageName)
 	state.SSHKey = types.StringValue(instanceTemplate.SshPublicKey)
 	state.StartupScript = types.StringValue(instanceTemplate.StartupScript)
 	state.ShutdownScript = types.StringValue(instanceTemplate.ShutdownScript)
-	state.Subnet = types.StringValue(instanceTemplate.Subnet)
+	state.Subnet = types.StringValue(instanceTemplate.SubnetId)
 	state.IBPartition = types.StringValue(instanceTemplate.IbPartitionId)
 	state.ProjectID = types.StringValue(instanceTemplate.ProjectId)
 

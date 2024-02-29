@@ -29,12 +29,12 @@ type instanceTemplatesModel struct {
 	Name           string `tfsdk:"name"`
 	ProjectID      string `tfsdk:"project_id"`
 	Type           string `tfsdk:"type"`
-	SSHKey         string
+	SSHKey         string `tfsdk:"ssh_key"`
 	Location       string `tfsdk:"location"`
-	Image          string
+	ImageName      string `tfsdk:"image_name"`
 	StartupScript  string `tfsdk:"startup_script"`
 	ShutdownScript string `tfsdk:"shutdown_script"`
-	Subnet         string `tfsdk:"subnet"`
+	SubnetId       string `tfsdk:"subnet_id"`
 	IBPartition    string `tfsdk:"ib_partition"`
 	Disks          []diskModel
 }
@@ -162,10 +162,10 @@ func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.
 			Type:           dataResp.Items[i].Type_,
 			SSHKey:         dataResp.Items[i].SshPublicKey,
 			Location:       dataResp.Items[i].Location,
-			Image:          dataResp.Items[i].Image,
+			ImageName:      dataResp.Items[i].ImageName,
 			StartupScript:  dataResp.Items[i].StartupScript,
 			ShutdownScript: dataResp.Items[i].ShutdownScript,
-			Subnet:         dataResp.Items[i].Subnet,
+			SubnetId:       dataResp.Items[i].SubnetId,
 			IBPartition:    dataResp.Items[i].IbPartitionId,
 			ProjectID:      dataResp.Items[i].ProjectId,
 			Disks:          disks,
