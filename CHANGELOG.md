@@ -3,6 +3,7 @@
 ENHANCEMENTS:
 
 * Add support for importing firewall rules and IB partitions.
+* Provide notification when a new version of the Terraform provider is available.
 
 ## 0.5.10 (February 14, 2024)
 
