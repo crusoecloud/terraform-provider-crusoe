@@ -3,6 +3,7 @@ package firewall_rule
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -115,6 +116,10 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 	}}
 }
 
+func (r *firewallRuleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan firewallRuleResourceModel
@@ -186,7 +191,23 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	rule, httpResp, err := r.client.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// have project ID stored. So we will try to get a fallback project to pass to the API.
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to read firewall rule",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	rule, httpResp, err := r.client.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		// fw rule has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
