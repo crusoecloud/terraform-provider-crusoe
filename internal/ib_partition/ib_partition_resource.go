@@ -133,7 +133,23 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	partition, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// have project ID stored. So we will try to get a fallback project to pass to the API.
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to read IB partition",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	partition, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		if err.Error() == notFoundMessage {
 			// partition has most likely been deleted out of band, so we update Terraform state to match

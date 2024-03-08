@@ -1,3 +1,9 @@
+## 0.5.11 (March 8, 2024)
+
+ENHANCEMENTS:
+
+* Add support for importing firewall rules and IB partitions.
+
 ## 0.5.10 (February 14, 2024)
 
 ENHANCEMENTS:
