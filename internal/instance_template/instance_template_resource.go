@@ -24,26 +24,27 @@ type instanceTemplateResource struct {
 }
 
 type instanceTemplateResourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	ProjectID      types.String `tfsdk:"project_id"`
-	Name           types.String `tfsdk:"name"`
-	Type           types.String `tfsdk:"type"`
-	SSHKey         types.String `tfsdk:"ssh_key"`
-	Location       types.String `tfsdk:"location"`
-	Image          types.String `tfsdk:"image"`
-	StartupScript  types.String `tfsdk:"startup_script"`
-	ShutdownScript types.String `tfsdk:"shutdown_script"`
-	Subnet         types.String `tfsdk:"subnet"`
-	IBPartition    types.String `tfsdk:"ib_partition"`
-	DiskTemplates  types.List   `tfsdk:"disk_templates"`
+	ID                  types.String `tfsdk:"id"`
+	ProjectID           types.String `tfsdk:"project_id"`
+	Name                types.String `tfsdk:"name"`
+	Type                types.String `tfsdk:"type"`
+	SSHKey              types.String `tfsdk:"ssh_key"`
+	Location            types.String `tfsdk:"location"`
+	Image               types.String `tfsdk:"image"`
+	StartupScript       types.String `tfsdk:"startup_script"`
+	ShutdownScript      types.String `tfsdk:"shutdown_script"`
+	Subnet              types.String `tfsdk:"subnet"`
+	IBPartition         types.String `tfsdk:"ib_partition"`
+	PublicIpAddressType types.String `tfsdk:"public_ip_address_type"`
+	DisksToCreate       types.List   `tfsdk:"disks_to_create"`
 }
 
-type diskTemplateResourceModel struct {
+type diskToCreateResourceModel struct {
 	Size types.String `tfsdk:"size"`
 	Type types.String `tfsdk:"type"`
 }
 
-var diskTemplateSchema = types.ObjectType{
+var diskToCreateSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"size": types.StringType,
 		"type": types.StringType,
@@ -184,32 +185,33 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		projectID = plan.ProjectID.ValueString()
 	}
 
-	tDisks := make([]diskTemplateResourceModel, 0, len(plan.DiskTemplates.Elements()))
-	diags = plan.DiskTemplates.ElementsAs(ctx, &tDisks, true)
+	tDisks := make([]diskToCreateResourceModel, 0, len(plan.DisksToCreate.Elements()))
+	diags = plan.DisksToCreate.ElementsAs(ctx, &tDisks, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	diskTemplates := make([]swagger.DiskTemplate, 0, len(tDisks))
+	diskToCreates := make([]swagger.DiskTemplate, 0, len(tDisks))
 	for _, disk := range tDisks {
-		diskTemplates = append(diskTemplates, swagger.DiskTemplate{
+		diskToCreates = append(diskToCreates, swagger.DiskTemplate{
 			Size:  disk.Size.ValueString(),
 			Type_: disk.Type.ValueString(),
 		})
 	}
 
 	dataResp, httpResp, err := r.client.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
-		Name:           plan.Name.ValueString(),
-		Type_:          plan.Type.ValueString(),
-		Location:       plan.Location.ValueString(),
-		ImageName:      plan.Image.ValueString(),
-		SshPublicKey:   plan.SSHKey.ValueString(),
-		StartupScript:  plan.StartupScript.ValueString(),
-		ShutdownScript: plan.ShutdownScript.ValueString(),
-		SubnetId:       plan.Subnet.ValueString(),
-		IbPartitionId:  plan.IBPartition.ValueString(),
-		Disks:          diskTemplates,
+		TemplateName:        plan.Name.ValueString(),
+		Type_:               plan.Type.ValueString(),
+		Location:            plan.Location.ValueString(),
+		ImageName:           plan.Image.ValueString(),
+		SshPublicKey:        plan.SSHKey.ValueString(),
+		StartupScript:       plan.StartupScript.ValueString(),
+		ShutdownScript:      plan.ShutdownScript.ValueString(),
+		SubnetId:            plan.Subnet.ValueString(),
+		IbPartitionId:       plan.IBPartition.ValueString(),
+		Disks:               diskToCreates,
+		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",
@@ -251,19 +253,19 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	disks := make([]diskTemplateResourceModel, 0, len(instanceTemplate.Disks))
+	disks := make([]diskToCreateResourceModel, 0, len(instanceTemplate.Disks))
 	for i := range instanceTemplate.Disks {
 		disk := instanceTemplate.Disks[i]
-		disks = append(disks, diskTemplateResourceModel{
+		disks = append(disks, diskToCreateResourceModel{
 			Size: types.StringValue(disk.Size),
 			Type: types.StringValue(disk.Type_),
 		})
 	}
 	if len(disks) > 0 {
-		tDisks, _ := types.ListValueFrom(context.Background(), diskTemplateSchema, disks)
-		state.DiskTemplates = tDisks
+		tDisks, _ := types.ListValueFrom(context.Background(), diskToCreateSchema, disks)
+		state.DisksToCreate = tDisks
 	} else {
-		state.DiskTemplates = types.ListNull(diskTemplateSchema)
+		state.DisksToCreate = types.ListNull(diskToCreateSchema)
 	}
 
 	state.Name = types.StringValue(instanceTemplate.Name)
