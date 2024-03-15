@@ -1,3 +1,9 @@
+## 0.5.12 (March 15, 2024)
+
+BUG FIXES:
+
+* Fixes an issue with the version update warning (`.Version` field in Goreleaser omits the character `v`).
+
 ## 0.5.11 (March 8, 2024)
 
 ENHANCEMENTS:
