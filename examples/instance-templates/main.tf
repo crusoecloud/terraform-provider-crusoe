@@ -1,13 +1,26 @@
+terraform {
+  required_providers {
+    crusoe = {
+      source = "registry.terraform.io/crusoecloud/crusoe"
+    }
+  }
+}
+
+locals {
+  my_ssh_key = file("~/.ssh/id_ed25519.pub")
+}
+
 // new template
 resource "crusoe_instance_template" "my_template" {
   name = "my-new-template"
   type = "a40.1x"
   location = "us-northcentral1-a"
+  subnet = "bd247b17-fd13-44ba-8aa8-703852b6f326"
 
   # specify the base image
   image = "ubuntu20.04:latest"
 
-  disks_to_crate = [
+  disks = [
       // disk to create for each VM
       {
         size = "10GiB"
@@ -15,7 +28,7 @@ resource "crusoe_instance_template" "my_template" {
       }
     ]
 
-  ssh_key = local.my_ssh_key
+  ssh_key = local.ssh_key
 
 }
 
