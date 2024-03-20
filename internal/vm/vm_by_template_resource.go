@@ -50,7 +50,7 @@ func (r *vmByTemplateResource) Configure(ctx context.Context, req resource.Confi
 }
 
 func (r *vmByTemplateResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_compute_instance"
+	resp.TypeName = req.ProviderTypeName + "_compute_instance_by_template"
 }
 
 func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
