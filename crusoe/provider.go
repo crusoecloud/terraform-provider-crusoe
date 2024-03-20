@@ -66,6 +66,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		vm.NewVMResource,
+		vm.NewVMByTemplateResource,
 		disk.NewDiskResource,
 		firewall_rule.NewFirewallRuleResource,
 		ib_partition.NewIBPartitionResource,

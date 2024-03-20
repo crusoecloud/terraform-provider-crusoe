@@ -30,7 +30,7 @@ type vmByTemplateResourceModel struct {
 	InstanceTemplateID types.String `tfsdk:"instance_template"`
 }
 
-func NewvmByTemplateResource() resource.Resource {
+func NewVMByTemplateResource() resource.Resource {
 	return &vmByTemplateResource{}
 }
 
@@ -81,16 +81,13 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"type": schema.StringAttribute{
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.String{
-					// TODO: re-enable once instance types are stabilized
-					// validators.RegexValidator{RegexPattern: "^a40\\.(1|2|4|8)x|a100\\.(1|2|4|8)x|a100\\.(1|2|4|8)x|a100-80gb\\.(1|2|4|8)x$"},
-				},
 			},
 			"ssh_key": schema.StringAttribute{
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.String{validators.SSHKeyValidator{}},
 			},
 			"location": schema.StringAttribute{
 				Optional:      true,
@@ -99,18 +96,22 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"image": schema.StringAttribute{
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"shutdown_script": schema.StringAttribute{
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"disks": schema.ListNestedAttribute{
 				Optional: true,
+				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -127,6 +128,7 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"fqdn": schema.StringAttribute{
+				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
@@ -191,6 +193,7 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
 				Optional:      true,
+				Computed:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
