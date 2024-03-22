@@ -28,7 +28,7 @@ resource "crusoe_instance_template" "my_template" {
       }
     ]
 
-  ssh_key = local.ssh_key
+  ssh_key = local.my_ssh_key
 
 }
 

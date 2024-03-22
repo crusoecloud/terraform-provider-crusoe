@@ -23,6 +23,7 @@ description: |-
 ### Optional
 
 - `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
+- `fqdn` (String)
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `image` (String)
 - `location` (String)
@@ -36,7 +37,6 @@ description: |-
 
 ### Read-Only
 
-- `fqdn` (String)
 - `id` (String) The ID of this resource.
 
 <a id="nestedatt--disks"></a>
