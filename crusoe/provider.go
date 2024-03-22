@@ -120,8 +120,8 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		resp.Diagnostics.AddAttributeWarning(
 			path.Root("default_project"),
 			"Missing Crusoe Default Project",
-			"The provider did not find a default project specified in the configuration file and will attempt to infer the project to use if not specified. "+
-				"Set the value in ~/.crusoe/config. "+
+			"The provider did not find a default project specified in the configuration file and will attempt to infer the project to use when not specified. "+
+				"Set default_project in ~/.crusoe/config. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
