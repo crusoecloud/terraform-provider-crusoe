@@ -15,6 +15,7 @@ resource "crusoe_instance_template" "my_template" {
   name = "my-new-template"
   type = "a40.1x"
   location = "us-northcentral1-a"
+  // this can be obtained via the `crusoe networking vpc-subnets list` CLI command
   subnet = "bd247b17-fd13-44ba-8aa8-703852b6f326"
 
   # specify the base image
