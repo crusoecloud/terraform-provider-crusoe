@@ -10,7 +10,7 @@ locals {
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
-# list IB networks
+# list instance templates
 data "crusoe_instance_templates" "my_templates" {}
 output "crusoe_templates" {
   value = data.crusoe_instance_templates.my_templates
