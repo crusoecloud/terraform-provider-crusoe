@@ -25,18 +25,19 @@ type diskModel struct {
 }
 
 type instanceTemplatesModel struct {
-	ID             string `tfsdk:"id"`
-	Name           string `tfsdk:"name"`
-	ProjectID      string `tfsdk:"project_id"`
-	Type           string `tfsdk:"type"`
-	SSHKey         string `tfsdk:"ssh_key"`
-	Location       string `tfsdk:"location"`
-	ImageName      string `tfsdk:"image_name"`
-	StartupScript  string `tfsdk:"startup_script"`
-	ShutdownScript string `tfsdk:"shutdown_script"`
-	SubnetId       string `tfsdk:"subnet_id"`
-	IBPartition    string `tfsdk:"ib_partition"`
-	Disks          []diskModel
+	ID                  string      `tfsdk:"id"`
+	Name                string      `tfsdk:"name"`
+	ProjectID           string      `tfsdk:"project_id"`
+	Type                string      `tfsdk:"type"`
+	SSHKey              string      `tfsdk:"ssh_key"`
+	Location            string      `tfsdk:"location"`
+	ImageName           string      `tfsdk:"image"`
+	StartupScript       string      `tfsdk:"startup_script"`
+	ShutdownScript      string      `tfsdk:"shutdown_script"`
+	PublicIPAddressType string      `tfsdk:"public_ip_address_type"`
+	SubnetId            string      `tfsdk:"subnet"`
+	IBPartition         string      `tfsdk:"ib_partition"`
+	Disks               []diskModel `tfsdk:"disks"`
 }
 
 func NewInstanceTemplatesDataSource() datasource.DataSource {
@@ -104,6 +105,9 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 						Required: true,
 					},
 					"ib_partition": schema.StringAttribute{
+						Optional: true,
+					},
+					"public_ip_address_type": schema.StringAttribute{
 						Optional: true,
 					},
 					"disks": schema.ListNestedAttribute{

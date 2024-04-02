@@ -36,7 +36,7 @@ type instanceTemplateResourceModel struct {
 	Subnet              types.String `tfsdk:"subnet"`
 	IBPartition         types.String `tfsdk:"ib_partition"`
 	PublicIpAddressType types.String `tfsdk:"public_ip_address_type"`
-	DisksToCreate       types.List   `tfsdk:"disks_to_create"`
+	DisksToCreate       types.List   `tfsdk:"disks"`
 }
 
 type diskToCreateResourceModel struct {
@@ -131,6 +131,10 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
+			"public_ip_address_type": schema.StringAttribute{
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
 			"disks": schema.ListNestedAttribute{
 				Optional: true,
 				NestedObject: schema.NestedAttributeObject{
@@ -139,16 +143,14 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 							Required:   true,
 							Validators: []validator.String{validators.StorageSizeValidator{}},
 							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.RequiresReplace(),    // cannot be updated in place
-								stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
+								stringplanmodifier.RequiresReplace(), // cannot be updated in place
 							},
 						},
 						"type": schema.StringAttribute{
 							Optional: true,
 							Computed: true,
 							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.RequiresReplace(),    // cannot be updated in place
-								stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
+								stringplanmodifier.RequiresReplace(), // cannot be updated in place
 							},
 						},
 					},
@@ -192,9 +194,9 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	diskToCreates := make([]swagger.DiskTemplate, 0, len(tDisks))
+	disksToCreate := make([]swagger.DiskTemplate, 0, len(tDisks))
 	for _, disk := range tDisks {
-		diskToCreates = append(diskToCreates, swagger.DiskTemplate{
+		disksToCreate = append(disksToCreate, swagger.DiskTemplate{
 			Size:  disk.Size.ValueString(),
 			Type_: disk.Type.ValueString(),
 		})
@@ -210,7 +212,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		ShutdownScript:      plan.ShutdownScript.ValueString(),
 		SubnetId:            plan.Subnet.ValueString(),
 		IbPartitionId:       plan.IBPartition.ValueString(),
-		Disks:               diskToCreates,
+		Disks:               disksToCreate,
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
 	}, projectID)
 	if err != nil {
@@ -222,7 +224,20 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Id)
-	plan.ProjectID = types.StringValue(projectID)
+	plan.ProjectID = types.StringValue(dataResp.ProjectId)
+
+	disksToCreateResource := make([]diskToCreateResourceModel, 0, len(dataResp.Disks))
+	for _, diskToCreate := range disksToCreate {
+		disksToCreateResource = append(disksToCreateResource, diskToCreateResourceModel{
+			Size: types.StringValue(diskToCreate.Size),
+			Type: types.StringValue(diskToCreate.Type_),
+		})
+	}
+	if len(disksToCreateResource) > 0 {
+		plan.DisksToCreate, _ = types.ListValueFrom(ctx, diskToCreateSchema, disksToCreateResource)
+	} else {
+		plan.DisksToCreate = types.ListNull(diskToCreateSchema)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -237,7 +252,7 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	instanceTemplate, httpResp, err := r.client.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	instanceTemplate, httpResp, err := r.client.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get instance template",
 			fmt.Sprintf("Fetching Crusoe instance templates failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -278,6 +293,7 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	state.Subnet = types.StringValue(instanceTemplate.SubnetId)
 	state.IBPartition = types.StringValue(instanceTemplate.IbPartitionId)
 	state.ProjectID = types.StringValue(instanceTemplate.ProjectId)
+	state.ID = types.StringValue(instanceTemplate.Id)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

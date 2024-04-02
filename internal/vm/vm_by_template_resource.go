@@ -25,9 +25,21 @@ type vmByTemplateResource struct {
 }
 
 type vmByTemplateResourceModel struct {
-	vmResourceModel
-	NamePrefix         types.String `tfsdk:"name_prefix"`
-	InstanceTemplateID types.String `tfsdk:"instance_template"`
+	NamePrefix          types.String `tfsdk:"name_prefix"`
+	InstanceTemplateID  types.String `tfsdk:"instance_template"`
+	ID                  types.String `tfsdk:"id"`
+	ProjectID           types.String `tfsdk:"project_id"`
+	Name                types.String `tfsdk:"name"`
+	Type                types.String `tfsdk:"type"`
+	SSHKey              types.String `tfsdk:"ssh_key"`
+	Location            types.String `tfsdk:"location"`
+	Image               types.String `tfsdk:"image"`
+	StartupScript       types.String `tfsdk:"startup_script"`
+	ShutdownScript      types.String `tfsdk:"shutdown_script"`
+	FQDN                types.String `tfsdk:"fqdn"`
+	Disks               types.List   `tfsdk:"disks"`
+	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
+	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 }
 
 func NewVMByTemplateResource() resource.Resource {
@@ -72,27 +84,27 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			"name": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"ssh_key": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"location": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"image": schema.StringAttribute{
 				Optional:      true,
@@ -102,16 +114,17 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"shutdown_script": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"disks": schema.ListNestedAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -242,7 +255,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 
 		return
 	}
-	instanceTemplateResp, httpResp, err := r.client.InstanceTemplatesApi.GetInstanceTemplate(ctx, projectID, instanceTemplateID)
+	instanceTemplateResp, httpResp, err := r.client.InstanceTemplatesApi.GetInstanceTemplate(ctx, instanceTemplateID, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error fetching the instance template: %s", common.UnpackAPIError(err)))
@@ -282,6 +295,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	instance := instancesList[0]
 
 	plan.ID = types.StringValue(instance.Id)
+	plan.Name = types.StringValue(instance.Name)
 	plan.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.ProjectID = types.StringValue(projectID)
 	plan.Type = types.StringValue(instance.Type_)
@@ -357,7 +371,21 @@ func (r *vmByTemplateResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	vmToTerraformResourceModel(instance, &state.vmResourceModel)
+	vmToTerraformResourceModel(instance, &vmResourceModel{
+		ID:                  state.ID,
+		ProjectID:           state.ProjectID,
+		Name:                state.Name,
+		Type:                state.Type,
+		SSHKey:              state.SSHKey,
+		Location:            state.Location,
+		Image:               state.Image,
+		StartupScript:       state.StartupScript,
+		ShutdownScript:      state.ShutdownScript,
+		FQDN:                state.FQDN,
+		Disks:               state.Disks,
+		NetworkInterfaces:   state.NetworkInterfaces,
+		HostChannelAdapters: state.HostChannelAdapters,
+	})
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
