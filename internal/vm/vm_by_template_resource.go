@@ -82,7 +82,6 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
@@ -92,37 +91,30 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"ssh_key": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"location": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"image": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"shutdown_script": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"disks": schema.ListNestedAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
@@ -141,13 +133,11 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"fqdn": schema.StringAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{
 				Computed:      true,
-				Optional:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -205,7 +195,6 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
-				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
