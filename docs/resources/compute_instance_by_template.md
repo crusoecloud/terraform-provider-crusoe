@@ -22,22 +22,22 @@ description: |-
 
 ### Optional
 
+- `project_id` (String)
+
+### Read-Only
+
 - `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
 - `fqdn` (String)
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
+- `id` (String) The ID of this resource.
 - `image` (String)
 - `location` (String)
 - `name` (String)
 - `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
-- `project_id` (String)
 - `shutdown_script` (String)
 - `ssh_key` (String)
 - `startup_script` (String)
 - `type` (String)
-
-### Read-Only
-
-- `id` (String) The ID of this resource.
 
 <a id="nestedatt--disks"></a>
 ### Nested Schema for `disks`
