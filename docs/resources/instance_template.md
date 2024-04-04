@@ -17,6 +17,7 @@ description: |-
 
 ### Required
 
+- `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
 - `name` (String)
 - `ssh_key` (String)
 - `subnet` (String)
@@ -24,7 +25,6 @@ description: |-
 
 ### Optional
 
-- `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
 - `ib_partition` (String)
 - `image` (String)
 - `location` (String)

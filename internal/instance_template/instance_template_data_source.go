@@ -94,6 +94,7 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 					},
 					"image": schema.StringAttribute{
 						Optional: true,
+						Computed: true,
 					},
 					"startup_script": schema.StringAttribute{
 						Optional: true,
@@ -109,6 +110,7 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 					},
 					"public_ip_address_type": schema.StringAttribute{
 						Optional: true,
+						Computed: true,
 					},
 					"disks": schema.ListNestedAttribute{
 						Optional: true,
