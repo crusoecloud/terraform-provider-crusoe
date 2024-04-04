@@ -107,13 +107,12 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Validators:    []validator.String{validators.SSHKeyValidator{}},
 			},
 			"location": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
+				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"image": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
@@ -132,11 +131,11 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"public_ip_address_type": schema.StringAttribute{
-				Optional:      true,
+				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"disks": schema.ListNestedAttribute{
-				Optional: true,
+				Required: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"size": schema.StringAttribute{
@@ -225,6 +224,9 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 
 	plan.ID = types.StringValue(dataResp.Id)
 	plan.ProjectID = types.StringValue(dataResp.ProjectId)
+	plan.PublicIpAddressType = types.StringValue(dataResp.PublicIpAddressType)
+	plan.Location = types.StringValue(dataResp.Location)
+	plan.Image = types.StringValue(dataResp.ImageName)
 
 	disksToCreateResource := make([]diskToCreateResourceModel, 0, len(dataResp.Disks))
 	for _, diskToCreate := range disksToCreate {
@@ -239,7 +241,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		plan.DisksToCreate = types.ListNull(diskToCreateSchema)
 	}
 
-	diags = resp.State.Set(ctx, plan)
+	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -288,12 +290,26 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	state.Type = types.StringValue(instanceTemplate.Type_)
 	state.Image = types.StringValue(instanceTemplate.ImageName)
 	state.SSHKey = types.StringValue(instanceTemplate.SshPublicKey)
-	state.StartupScript = types.StringValue(instanceTemplate.StartupScript)
-	state.ShutdownScript = types.StringValue(instanceTemplate.ShutdownScript)
 	state.Subnet = types.StringValue(instanceTemplate.SubnetId)
-	state.IBPartition = types.StringValue(instanceTemplate.IbPartitionId)
 	state.ProjectID = types.StringValue(instanceTemplate.ProjectId)
+	state.PublicIpAddressType = types.StringValue(instanceTemplate.PublicIpAddressType)
 	state.ID = types.StringValue(instanceTemplate.Id)
+
+	if instanceTemplate.IbPartitionId != "" {
+		state.IBPartition = types.StringValue(instanceTemplate.IbPartitionId)
+	} else {
+		state.IBPartition = types.StringNull()
+	}
+	if instanceTemplate.StartupScript != "" {
+		state.StartupScript = types.StringValue(instanceTemplate.StartupScript)
+	} else {
+		state.StartupScript = types.StringNull()
+	}
+	if instanceTemplate.ShutdownScript != "" {
+		state.ShutdownScript = types.StringValue(instanceTemplate.ShutdownScript)
+	} else {
+		state.ShutdownScript = types.StringNull()
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

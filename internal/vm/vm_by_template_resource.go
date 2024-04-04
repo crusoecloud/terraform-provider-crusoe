@@ -360,21 +360,9 @@ func (r *vmByTemplateResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	vmToTerraformResourceModel(instance, &vmResourceModel{
-		ID:                  state.ID,
-		ProjectID:           state.ProjectID,
-		Name:                state.Name,
-		Type:                state.Type,
-		SSHKey:              state.SSHKey,
-		Location:            state.Location,
-		Image:               state.Image,
-		StartupScript:       state.StartupScript,
-		ShutdownScript:      state.ShutdownScript,
-		FQDN:                state.FQDN,
-		Disks:               state.Disks,
-		NetworkInterfaces:   state.NetworkInterfaces,
-		HostChannelAdapters: state.HostChannelAdapters,
-	})
+	var vmState vmResourceModel
+	vmToTerraformResourceModel(instance, &vmState)
+	resp.State.Set(ctx, &vmState)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
