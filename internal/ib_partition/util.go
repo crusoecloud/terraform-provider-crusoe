@@ -13,8 +13,8 @@ func findIbPartition(ctx context.Context, client *swagger.APIClient, ibPartition
 	args := common.FindResourceArgs[swagger.IbPartition]{
 		ResourceID:  ibPartitionID,
 		GetResource: client.IBPartitionsApi.GetIBPartition,
-		IsResource: func(disk swagger.IbPartition, id string) bool {
-			return disk.Id == id
+		IsResource: func(ibPartition swagger.IbPartition, id string) bool {
+			return ibPartition.Id == id
 		},
 	}
 
