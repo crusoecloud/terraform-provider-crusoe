@@ -2,9 +2,11 @@ package disk
 
 import (
 	"context"
+
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 func findDisk(ctx context.Context, client *swagger.APIClient, diskID string) (*swagger.DiskV1Alpha5, string, error) {
@@ -17,7 +19,6 @@ func findDisk(ctx context.Context, client *swagger.APIClient, diskID string) (*s
 	}
 
 	return common.FindResource[swagger.DiskV1Alpha5](ctx, client, args)
-
 }
 
 func diskToTerraformResourceModel(disk *swagger.DiskV1Alpha5, state *diskResourceModel) {

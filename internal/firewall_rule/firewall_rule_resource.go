@@ -115,7 +115,8 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				// TODO: add validator
 			},
-		}}
+		},
+	}
 }
 
 func (r *firewallRuleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -221,7 +222,7 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	state.ProjectID =  types.StringValue(projectID)
+	state.ProjectID = types.StringValue(projectID)
 	firewallRuleToTerraformResourceModel(&rule, &state)
 
 	diags = resp.State.Set(ctx, &state)

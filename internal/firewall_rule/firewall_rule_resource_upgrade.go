@@ -12,7 +12,7 @@ import (
 // firewallRuleResourceModelV0 is the minimal set of attributes that we will need from a prior state to
 // rebuild a firewall rule's state because these fields are not returned by the API.
 type firewallRuleResourceModelV0 struct {
-	ID             types.String `tfsdk:"id"`
+	ID types.String `tfsdk:"id"`
 }
 
 func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
@@ -53,10 +53,8 @@ func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.
 				}
 
 				var state firewallRuleResourceModel
-				state.ProjectID =  types.StringValue(projectID)
+				state.ProjectID = types.StringValue(projectID)
 				firewallRuleToTerraformResourceModel(firewallRule, &state)
-
-
 				resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 				if resp.Diagnostics.HasError() {
 					resp.Diagnostics.AddError("Failed to migrate firewall rule to current version",

@@ -358,7 +358,7 @@ type FindResourceArgs[T any] struct {
 	GetResource func(ctx context.Context, projectId string, resourceID string) (
 		T, *http.Response, error)
 	// A function which checks that the resource is the resource being found
-	IsResource func(T, string) (bool)
+	IsResource func(T, string) bool
 }
 
 func FindResource[T any](ctx context.Context, client *swagger.APIClient, args FindResourceArgs[T]) (*T, string, error) {
@@ -371,7 +371,7 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 	defer projectHttpResp.Body.Close()
 
 	if err != nil {
-		return nil, "",fmt.Errorf("failed to query for projects: %w", err)
+		return nil, "", fmt.Errorf("failed to query for projects: %w", err)
 	}
 
 	for _, project := range projectsResp.Items {
@@ -379,8 +379,8 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 		if getResourceErr != nil {
 			continue
 		}
-		if args.IsResource(resource, args.ResourceID){
-			return &resource,project.Id, nil
+		if args.IsResource(resource, args.ResourceID) {
+			return &resource, project.Id, nil
 		}
 		getResourceHttpResp.Body.Close()
 	}

@@ -2,9 +2,11 @@ package ib_partition
 
 import (
 	"context"
+
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 func findIbPartition(ctx context.Context, client *swagger.APIClient, ibPartitionID string) (*swagger.IbPartition, string, error) {
@@ -17,7 +19,6 @@ func findIbPartition(ctx context.Context, client *swagger.APIClient, ibPartition
 	}
 
 	return common.FindResource[swagger.IbPartition](ctx, client, args)
-
 }
 
 func ibPartitionToTerraformResourceModel(ibPartition *swagger.IbPartition, state *ibPartitionResourceModel) {
