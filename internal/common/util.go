@@ -361,7 +361,9 @@ type FindResourceArgs[T any] struct {
 	IsResource func(T, string) bool
 }
 
-func FindResource[T any](ctx context.Context, client *swagger.APIClient, args FindResourceArgs[T]) (*T, string, error) {
+func FindResource[T any](ctx context.Context, client *swagger.APIClient, args FindResourceArgs[T]) (
+	resource *T, projectID string, err error,
+) {
 	opts := &swagger.ProjectsApiListProjectsOpts{
 		OrgId: optional.EmptyString(),
 	}
