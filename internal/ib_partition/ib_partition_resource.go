@@ -54,6 +54,7 @@ func (r *ibPartitionResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
