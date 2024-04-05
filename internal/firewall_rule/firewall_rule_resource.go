@@ -229,6 +229,7 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 	state.SourcePorts = types.StringValue(strings.Join(rule.SourcePorts, ","))
 	state.Destination = types.StringValue(cidrListToString(rule.Destinations))
 	state.DestinationPorts = types.StringValue(strings.Join(rule.DestinationPorts, ","))
+	state.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
