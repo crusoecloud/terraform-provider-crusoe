@@ -165,9 +165,8 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 	defer httpResp.Body.Close()
 
-	state.ID = types.StringValue(partition.Id)
-	state.Name = types.StringValue(partition.Name)
-	state.IBNetworkID = types.StringValue(partition.IbNetworkId)
+	state.ProjectID = types.StringValue(projectID)
+	ibPartitionToTerraformResourceModel(&partition, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
