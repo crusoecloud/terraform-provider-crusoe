@@ -179,9 +179,12 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"subnet": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+							Computed: true,
+							Optional: true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+								stringplanmodifier.RequiresReplace(),
+							}, // cannot be updated in place
 						},
 						"interface_type": schema.StringAttribute{
 							Computed:      true,
