@@ -97,7 +97,7 @@ func (ds *vpcNetworksDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	projectID := ""
 
-	if config.ProjectID != nil{
+	if config.ProjectID != nil {
 		projectID = *config.ProjectID
 	} else {
 		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
@@ -109,8 +109,6 @@ func (ds *vpcNetworksDataSource) Read(ctx context.Context, req datasource.ReadRe
 		}
 		projectID = fallbackProjectID
 	}
-
-
 
 	dataResp, httpResp, err := ds.client.VPCNetworksApi.ListVPCNetworks(ctx, projectID)
 	if err != nil {

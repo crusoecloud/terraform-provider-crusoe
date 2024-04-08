@@ -93,7 +93,7 @@ func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 	projectID := ""
-	if config.ProjectID != nil{
+	if config.ProjectID != nil {
 		projectID = *config.ProjectID
 	} else {
 		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
