@@ -16,6 +16,10 @@ type vpcNetworksDataSource struct {
 	client *swagger.APIClient
 }
 
+type vpcNetworksDataSourceFilter struct {
+	ProjectID *string `tfsdk:"project_id"`
+}
+
 type vpcNetworksDataSourceModel struct {
 	VPCNetworks []vpcNetworksModel `tfsdk:"vpc_networks"`
 }
@@ -84,13 +88,29 @@ func (ds *vpcNetworksDataSource) Schema(ctx context.Context, request datasource.
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *vpcNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	projectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch VPC Networks",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
+	var config vpcNetworksDataSourceFilter
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	projectID := ""
+
+	if config.ProjectID != nil{
+		projectID = *config.ProjectID
+	} else {
+		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to fetch VPC Networks",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = fallbackProjectID
+	}
+
+
 
 	dataResp, httpResp, err := ds.client.VPCNetworksApi.ListVPCNetworks(ctx, projectID)
 	if err != nil {
@@ -111,6 +131,6 @@ func (ds *vpcNetworksDataSource) Read(ctx context.Context, req datasource.ReadRe
 		})
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
