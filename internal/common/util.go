@@ -350,3 +350,42 @@ func FormatUpdateMessage(currentVersion, latestVersion string) string {
 
 	return msg
 }
+
+// FindResourceArgs are used to generalize the pattern of iterating through projects to find a resource.
+type FindResourceArgs[T any] struct {
+	ResourceID string
+	// A function which performs the API operation
+	GetResource func(ctx context.Context, projectId string, resourceID string) (
+		T, *http.Response, error)
+	// A function which checks that the resource is the resource being found
+	IsResource func(T, string) bool
+}
+
+func FindResource[T any](ctx context.Context, client *swagger.APIClient, args FindResourceArgs[T]) (
+	resource *T, projectID string, err error,
+) {
+	opts := &swagger.ProjectsApiListProjectsOpts{
+		OrgId: optional.EmptyString(),
+	}
+
+	projectsResp, projectHttpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
+
+	defer projectHttpResp.Body.Close()
+
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to query for projects: %w", err)
+	}
+
+	for _, project := range projectsResp.Items {
+		resource, getResourceHttpResp, getResourceErr := args.GetResource(ctx, project.Id, args.ResourceID)
+		if getResourceErr != nil {
+			continue
+		}
+		if args.IsResource(resource, args.ResourceID) {
+			return &resource, project.Id, nil
+		}
+		getResourceHttpResp.Body.Close()
+	}
+
+	return nil, "", errors.New("failed to find resource")
+}

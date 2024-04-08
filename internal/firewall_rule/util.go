@@ -1,10 +1,14 @@
 package firewall_rule
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 var whitespaceRegex = regexp.MustCompile(`\s*`)
@@ -38,4 +42,29 @@ func stringToSlice(s, delimiter string) []string {
 	elems := strings.Split(s, delimiter)
 
 	return elems
+}
+
+func findFirewallRule(ctx context.Context, client *swagger.APIClient, firewallRuleID string) (*swagger.VpcFirewallRule, string, error) {
+	args := common.FindResourceArgs[swagger.VpcFirewallRule]{
+		ResourceID:  firewallRuleID,
+		GetResource: client.VPCFirewallRulesApi.GetVPCFirewallRule,
+		IsResource: func(rule swagger.VpcFirewallRule, id string) bool {
+			return rule.Id == id
+		},
+	}
+
+	return common.FindResource[swagger.VpcFirewallRule](ctx, client, args)
+}
+
+func firewallRuleToTerraformResourceModel(rule *swagger.VpcFirewallRule, state *firewallRuleResourceModel) {
+	state.ID = types.StringValue(rule.Id)
+	state.Name = types.StringValue(rule.Name)
+	state.Network = types.StringValue(rule.VpcNetworkId)
+	state.Action = types.StringValue(rule.Action)
+	state.Direction = types.StringValue(rule.Direction)
+	state.Protocols = types.StringValue(strings.Join(rule.Protocols, ","))
+	state.Source = types.StringValue(cidrListToString(rule.Sources))
+	state.SourcePorts = types.StringValue(strings.Join(rule.SourcePorts, ","))
+	state.Destination = types.StringValue(cidrListToString(rule.Destinations))
+	state.DestinationPorts = types.StringValue(strings.Join(rule.DestinationPorts, ","))
 }

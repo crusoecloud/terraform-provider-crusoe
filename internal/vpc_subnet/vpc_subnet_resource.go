@@ -57,6 +57,7 @@ func (r *vpcSubnetResource) Metadata(ctx context.Context, req resource.MetadataR
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -172,10 +173,7 @@ func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	state.Name = types.StringValue(vpcSubnet.Name)
-	state.CIDR = types.StringValue(vpcSubnet.Cidr)
-	state.Location = types.StringValue(vpcSubnet.Location)
-	state.Network = types.StringValue(vpcSubnet.VpcNetworkId)
+	vpcSubnetToTerraformResourceModel(&vpcSubnet, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

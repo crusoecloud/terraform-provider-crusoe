@@ -54,6 +54,7 @@ func (r *ibPartitionResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -165,9 +166,8 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 	defer httpResp.Body.Close()
 
-	state.ID = types.StringValue(partition.Id)
-	state.Name = types.StringValue(partition.Name)
-	state.IBNetworkID = types.StringValue(partition.IbNetworkId)
+	state.ProjectID = types.StringValue(projectID)
+	ibPartitionToTerraformResourceModel(&partition, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

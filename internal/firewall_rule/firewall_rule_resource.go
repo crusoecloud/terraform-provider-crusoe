@@ -60,60 +60,66 @@ func (r *firewallRuleResource) Metadata(ctx context.Context, req resource.Metada
 }
 
 func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"id": schema.StringAttribute{
-			Computed:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+	resp.Schema = schema.Schema{
+		Version: 1,
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
+			"name": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
+			"project_id": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"network": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"action": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^allow$"}}, // TODO: support deny once supported by API
+			},
+			"direction": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(ingress|egress)"}},
+			},
+			"protocols": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				// TODO: add validator
+			},
+			"source": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				// TODO: add validator
+			},
+			"source_ports": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				// TODO: add validator
+			},
+			"destination": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				// TODO: add validator
+			},
+			"destination_ports": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				// TODO: add validator
+			},
 		},
-		"name": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-		},
-		"project_id": schema.StringAttribute{
-			Optional:      true,
-			Computed:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-		},
-		"network": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-		},
-		"action": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^allow$"}}, // TODO: support deny once supported by API
-		},
-		"direction": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(ingress|egress)"}},
-		},
-		"protocols": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-			// TODO: add validator
-		},
-		"source": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-			// TODO: add validator
-		},
-		"source_ports": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-			// TODO: add validator
-		},
-		"destination": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-			// TODO: add validator
-		},
-		"destination_ports": schema.StringAttribute{
-			Required:      true,
-			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-			// TODO: add validator
-		},
-	}}
+	}
 }
 
 func (r *firewallRuleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -219,16 +225,8 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	state.ID = types.StringValue(rule.Id)
-	state.Name = types.StringValue(rule.Name)
-	state.Network = types.StringValue(rule.VpcNetworkId)
-	state.Action = types.StringValue(rule.Action)
-	state.Direction = types.StringValue(rule.Direction)
-	state.Protocols = types.StringValue(strings.Join(rule.Protocols, ","))
-	state.Source = types.StringValue(cidrListToString(rule.Sources))
-	state.SourcePorts = types.StringValue(strings.Join(rule.SourcePorts, ","))
-	state.Destination = types.StringValue(cidrListToString(rule.Destinations))
-	state.DestinationPorts = types.StringValue(strings.Join(rule.DestinationPorts, ","))
+	state.ProjectID = types.StringValue(projectID)
+	firewallRuleToTerraformResourceModel(&rule, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

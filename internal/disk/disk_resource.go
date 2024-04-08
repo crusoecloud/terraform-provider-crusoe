@@ -63,6 +63,7 @@ func (r *diskResource) Metadata(ctx context.Context, req resource.MetadataReques
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
