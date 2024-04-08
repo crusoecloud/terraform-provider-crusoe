@@ -15,11 +15,8 @@ type vpcSubnetsDataSource struct {
 	client *swagger.APIClient
 }
 
-type vpcSubnetsDataSourceFilter struct {
-	ProjectID *string `tfsdk:"project_id"`
-}
-
 type vpcSubnetsDataSourceModel struct {
+	ProjectID  *string           `tfsdk:"project_id"`
 	VPCSubnets []vpcSubnetsModel `tfsdk:"vpc_subnets"`
 }
 
@@ -81,12 +78,15 @@ func (ds *vpcSubnetsDataSource) Schema(ctx context.Context, request datasource.S
 				},
 			},
 		},
+		"project_id": schema.StringAttribute{
+			Optional: true,
+		},
 	}}
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config vpcSubnetsDataSourceFilter
+	var config vpcSubnetsDataSourceModel
 	diags := req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
