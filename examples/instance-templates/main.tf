@@ -43,4 +43,5 @@ resource "crusoe_instance_template" "my_template" {
 resource "crusoe_compute_instance_by_template" "my_vm" {
   name_prefix = "my-new-vm"
   instance_template = crusoe_instance_template.my_template.id
+  count = 3
 }
