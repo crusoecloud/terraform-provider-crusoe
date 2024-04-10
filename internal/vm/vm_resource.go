@@ -360,6 +360,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		if resp.Diagnostics.HasError() {
 			return
 		}
+
 		plan.Disks = disks
 	}
 
