@@ -12,7 +12,7 @@ ENHANCEMENTS:
 
 BUG FIXES:
 
-* Fixes an issue with the version update warning (`.Version` field in Goreleaser omits the character `v`).
+* Fixes an issue with the version update warning.
 
 ## 0.5.11 (March 8, 2024)
 
