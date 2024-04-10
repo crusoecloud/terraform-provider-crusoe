@@ -1,3 +1,13 @@
+## 0.5.13 (April 9, 2024)
+
+NEW FEATURES:
+
+* Support for instance templates and creating VMs with an instance template.
+
+ENHANCEMENTS:
+* Support state upgrades for disks, VPC networks, VPC subnets, IB partitions and Firewall Rules.
+* Update the warning message for setting a default project.
+
 ## 0.5.12 (March 15, 2024)
 
 BUG FIXES:
