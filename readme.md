@@ -47,7 +47,6 @@ For more usage examples, including storage disks, startup scripts, and firewall 
 ## Development
 
 To develop the Terraform provider, you'll need a recent version of [golang](https://go.dev/doc/install) installed.
-At the moment, the project is pinned to go1.18, but newer versions will likely work for development.  
 
 Add the following to your `~/.terraformrc`
 

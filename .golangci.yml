@@ -38,7 +38,6 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
     - durationcheck
     - errcheck
     - errname
@@ -60,7 +59,6 @@ linters:
     - misspell
     - nlreturn
     - staticcheck
-    - structcheck
     - typecheck
     - unused
     - whitespace

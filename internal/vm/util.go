@@ -3,7 +3,6 @@ package vm
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -195,10 +194,6 @@ func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAtta
 		})
 	}
 
-	sort.Slice(attachments, func(i, j int) bool {
-		return attachments[i].ID < attachments[j].ID
-	})
-
 	diskAttachmentsList, diags = types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
 
 	return diskAttachmentsList, diags
@@ -253,9 +248,7 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 			})
 		}
 	}
-	sort.Slice(disks, func(i, j int) bool {
-		return disks[i].ID < disks[j].ID
-	})
+
 	if len(disks) > 0 {
 		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
 		state.Disks = tDisks
