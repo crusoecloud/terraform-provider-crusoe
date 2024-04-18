@@ -2,6 +2,10 @@ include:
   - project: 'crusoeenergy/tools'
     file: '/templates/go.gitlab-ci.yml'
 
+
+variables:
+  CI_IMAGE: registry.gitlab.com/crusoeenergy/tools/go-ci-1.21
+
 test_and_lint:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "release"'
