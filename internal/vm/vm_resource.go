@@ -401,7 +401,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	vmToTerraformResourceModel(instance, &state)
+	vmUpdateTerraformState(instance, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
