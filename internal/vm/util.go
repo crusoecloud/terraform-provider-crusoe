@@ -274,8 +274,7 @@ func vmUpdateTerraformState(instance *swagger.InstanceV1Alpha5, state *vmResourc
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
 
-
-	remoteDisksMap := make (map[string]vmDiskResourceModel)
+	remoteDisksMap := make(map[string]vmDiskResourceModel)
 	for i := range instance.Disks {
 		disk := instance.Disks[i]
 		if disk.AttachmentType != DiskOS {
@@ -293,7 +292,7 @@ func vmUpdateTerraformState(instance *swagger.InstanceV1Alpha5, state *vmResourc
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for j := range stateDisks {
 		currDisk := stateDisks[j]
-		newDisk, ok :=remoteDisksMap[currDisk.ID]
+		newDisk, ok := remoteDisksMap[currDisk.ID]
 		// old disk is no longer attached
 		if !ok {
 			continue
