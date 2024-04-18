@@ -227,6 +227,7 @@ func findInstance(ctx context.Context, client *swagger.APIClient, instanceID str
 	return nil, errProjectNotFound
 }
 
+// use for empty state pointer
 func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
@@ -247,6 +248,64 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 				Mode:           disk.Mode,
 			})
 		}
+	}
+
+	if len(disks) > 0 {
+		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
+		state.Disks = tDisks
+	} else {
+		state.Disks = types.ListNull(vmDiskAttachmentSchema)
+	}
+
+	if len(instance.HostChannelAdapters) > 0 {
+		state.HostChannelAdapters = vmHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
+	} else {
+		state.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
+	}
+}
+
+func vmUpdateTerraformState(instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
+	state.ID = types.StringValue(instance.Id)
+	state.Name = types.StringValue(instance.Name)
+	state.Type = types.StringValue(instance.Type_)
+	state.ProjectID = types.StringValue(instance.ProjectId)
+	state.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+	state.Location = types.StringValue(instance.Location)
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	state.NetworkInterfaces = networkInterfaces
+
+
+	remoteDisksMap := make (map[string]vmDiskResourceModel)
+	for i := range instance.Disks {
+		disk := instance.Disks[i]
+		if disk.AttachmentType != DiskOS {
+			remoteDisksMap[disk.Id] = vmDiskResourceModel{
+				ID:             disk.Id,
+				AttachmentType: disk.AttachmentType,
+				Mode:           disk.Mode,
+			}
+		}
+	}
+
+	var stateDisks []vmDiskResourceModel
+	state.Disks.ElementsAs(context.Background(), &stateDisks, false)
+
+	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
+	for j := range stateDisks {
+		currDisk := stateDisks[j]
+		newDisk, ok :=remoteDisksMap[currDisk.ID]
+		// old disk is no longer attached
+		if !ok {
+			continue
+		} else {
+			// append the disk to be returned
+			disks = append(disks, newDisk)
+			delete(remoteDisksMap, newDisk.ID)
+		}
+	}
+
+	for _, remainingDisk := range remoteDisksMap {
+		disks = append(disks, remainingDisk)
 	}
 
 	if len(disks) > 0 {
