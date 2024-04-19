@@ -18,7 +18,7 @@ BUG FIXES:
 
 NEW FEATURES:
 
-* Support for instance templates and creating VMs with an instance template.
+* Support for instance templates and creating VMs with an instance template.  Please contact [support](mailto:support@crusoecloud.com) to enable this feature for your organization.
 
 ENHANCEMENTS:
 * Support state upgrades for disks, VPC networks, VPC subnets, IB partitions and Firewall Rules.
