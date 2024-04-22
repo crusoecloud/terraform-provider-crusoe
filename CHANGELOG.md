@@ -1,8 +1,34 @@
+## 0.5.15 (April 18, 2024)
+
+ENHANCEMENTS:
+
+* Upgraded go version to 1.21.
+
+BUG FIXES:
+
+* Fixes a separate issue with ordering of disks introduced in v0.5.14.
+
+## 0.5.14 (April 15, 2024)
+
+BUG FIXES:
+
+* Fixes ordering of disks attached to VMs.
+
+## 0.5.13 (April 9, 2024)
+
+NEW FEATURES:
+
+* Support for instance templates and creating VMs with an instance template.  Please contact [support](mailto:support@crusoecloud.com) to enable this feature for your organization.
+
+ENHANCEMENTS:
+* Support state upgrades for disks, VPC networks, VPC subnets, IB partitions and Firewall Rules.
+* Update the warning message for setting a default project.
+
 ## 0.5.12 (March 15, 2024)
 
 BUG FIXES:
 
-* Fixes an issue with the version update warning (`.Version` field in Goreleaser omits the character `v`).
+* Fixes an issue with the version update warning.
 
 ## 0.5.11 (March 8, 2024)
 
