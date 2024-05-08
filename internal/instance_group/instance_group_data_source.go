@@ -3,6 +3,7 @@ package instance_group
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -66,13 +67,14 @@ func (ds *instanceGroupsDataSource) Schema(ctx context.Context, request datasour
 					"name": schema.StringAttribute{
 						Required: true,
 					},
-					"cidr": schema.StringAttribute{
+					"instance_template": schema.StringAttribute{
 						Required: true,
 					},
-					"location": schema.StringAttribute{
+					"running_instance_count": schema.Int64Attribute{
 						Computed: true,
 					},
-					"network": schema.StringAttribute{
+					"instances": schema.ListAttribute{
+						ElementType: types.StringType,
 						Computed: true,
 					},
 				},

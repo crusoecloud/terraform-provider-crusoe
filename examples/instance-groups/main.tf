@@ -10,10 +10,10 @@ locals {
   my_ssh_key = file("~/.ssh/id_rsa.pub")
 }
 
-# list instance templates
-data "crusoe_instance_templates" "my_templates" {}
-output "crusoe_templates" {
-  value = data.crusoe_instance_templates.my_templates
+# list instance groups
+data "crusoe_compute_instance_groups" "my_groups" {}
+output "crusoe_groups" {
+  value = data.crusoe_compute_instance_groups.my_groups
 }
 
 // new template
