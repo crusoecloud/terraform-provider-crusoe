@@ -28,11 +28,11 @@ description: |-
 
 Required:
 
-- `cidr` (String)
+- `instance_template` (String)
 - `name` (String)
 
 Read-Only:
 
 - `id` (String)
-- `location` (String)
-- `network` (String)
+- `instances` (List of String)
+- `running_instance_count` (Number)
