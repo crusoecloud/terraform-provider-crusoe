@@ -134,21 +134,26 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 }
 
 // vmNetworkInterfacesToTerraformResourceModel creates a slice of Terraform-compatible network
-// interface resource instances from Crusoe API network interfaces.
-func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) (networkInterfacesList types.List, warning string) {
-	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
+// interface resource instances from Crusoe API network interfaces. If a plan is provided, we want to ensure that
+// the ordering of interfaces in the plan is maintained.
+func vmNetworkInterfacesToTerraformResourceModel(ctx context.Context,
+	networkInterfaces []swagger.NetworkInterface, plan *vmResourceModel,
+) (networkInterfacesList types.List, warning diag.Diagnostics) {
+	subnetIDToNetworkInterface := make(map[string]vmNetworkInterfaceResourceModel)
+
 	for _, networkInterface := range networkInterfaces {
 		var publicIP swagger.PublicIpv4Address
 		var privateIP swagger.PrivateIpv4Address
 		if len(networkInterface.Ips) == 0 {
-			warning = "At least one network interface is missing IP addresses. Please reach out to support@crusoecloud.com" +
-				" and let us know."
+			warning.AddWarning("Unexpected state when unmarshaling network interfaces for Instance",
+				"At least one network interface is missing IP addresses. Please reach out to "+
+					"support@crusoecloud.com and let us know.")
 		} else {
 			publicIP = *networkInterface.Ips[0].PublicIpv4
 			privateIP = *networkInterface.Ips[0].PrivateIpv4
 		}
 
-		interfaces = append(interfaces, vmNetworkInterfaceResourceModel{
+		subnetIDToNetworkInterface[networkInterface.Subnet] = vmNetworkInterfaceResourceModel{
 			ID:            types.StringValue(networkInterface.Id),
 			Name:          types.StringValue(networkInterface.Name),
 			Network:       types.StringValue(networkInterface.Network),
@@ -163,10 +168,30 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 				Address: types.StringValue(publicIP.Address),
 				Type:    types.StringValue(publicIP.Type_),
 			},
-		})
+		}
 	}
 
-	values, _ := types.ListValueFrom(context.Background(), vmNetworkInterfaceSchema, interfaces)
+	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
+	if plan != nil {
+		diags := plan.NetworkInterfaces.ElementsAs(ctx, &interfaces, true)
+		warning.Append(diags...)
+		for i := range interfaces {
+			currInterface, ok := subnetIDToNetworkInterface[interfaces[i].Subnet.ValueString()]
+			if ok {
+				interfaces[i] = currInterface
+			} else {
+				warning.AddWarning("Unexpected state when unmarshaling network interfaces for Instance",
+					"At least one network interface was not successfully created for the instance.")
+			}
+		}
+	} else {
+		for key := range subnetIDToNetworkInterface {
+			interfaces = append(interfaces, subnetIDToNetworkInterface[key])
+		}
+	}
+
+	values, diags := types.ListValueFrom(context.Background(), vmNetworkInterfaceSchema, interfaces)
+	warning.Append(diags...)
 
 	return values, warning
 }
@@ -228,14 +253,14 @@ func findInstance(ctx context.Context, client *swagger.APIClient, instanceID str
 }
 
 // use for empty state pointer
-func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
+func vmToTerraformResourceModel(ctx context.Context, instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.Type_)
 	state.ProjectID = types.StringValue(instance.ProjectId)
 	state.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	state.Location = types.StringValue(instance.Location)
-	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(ctx, instance.NetworkInterfaces, state)
 	state.NetworkInterfaces = networkInterfaces
 
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
@@ -264,14 +289,14 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	}
 }
 
-func vmUpdateTerraformState(instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
+func vmUpdateTerraformState(ctx context.Context, instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.Type_)
 	state.ProjectID = types.StringValue(instance.ProjectId)
 	state.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	state.Location = types.StringValue(instance.Location)
-	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(ctx, instance.NetworkInterfaces, state)
 	state.NetworkInterfaces = networkInterfaces
 
 	remoteDisksMap := make(map[string]vmDiskResourceModel)
