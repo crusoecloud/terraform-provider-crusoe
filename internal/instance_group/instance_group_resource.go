@@ -294,7 +294,7 @@ func (r *instanceGroupResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	httpResp, err := r.client.InstanceGroupsApi.DeleteInstanceGroup(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	httpResp, err := r.client.InstanceGroupsApi.DeleteInstanceGroup(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete Instance Group",
 			fmt.Sprintf("There was an error deleting the Instance Group: %s", common.UnpackAPIError(err)))
