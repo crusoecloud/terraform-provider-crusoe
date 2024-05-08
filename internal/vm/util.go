@@ -171,7 +171,7 @@ func vmNetworkInterfacesToTerraformResourceModel(ctx context.Context,
 		}
 	}
 
-	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
+	interfaces := make([]vmNetworkInterfaceResourceModel, 0)
 	if plan != nil {
 		diags := plan.NetworkInterfaces.ElementsAs(ctx, &interfaces, true)
 		warning.Append(diags...)
