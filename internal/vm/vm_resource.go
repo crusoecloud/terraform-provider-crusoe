@@ -283,21 +283,21 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	// public static IPs
-	var newNetworkInterfaces []swagger.NetworkInterface
+	newNetworkInterfaces := make([]swagger.NetworkInterface, 0)
 	if !plan.NetworkInterfaces.IsUnknown() && !plan.NetworkInterfaces.IsNull() {
 		tNetworkInterfaces := make([]vmNetworkInterfaceResourceModel, 0, len(plan.NetworkInterfaces.Elements()))
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
 
 		for _, networkInterface := range tNetworkInterfaces {
-			newNetworkInterfaces = []swagger.NetworkInterface{{
+			newNetworkInterfaces = append(newNetworkInterfaces, swagger.NetworkInterface{
 				Subnet: networkInterface.Subnet.ValueString(),
 				Ips: []swagger.IpAddresses{{
 					PublicIpv4: &swagger.PublicIpv4Address{
 						Type_: networkInterface.PublicIpv4.Type.ValueString(),
 					},
 				}},
-			}}
+			})
 		}
 	}
 
@@ -352,7 +352,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	plan.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.ProjectID = types.StringValue(projectID)
 
-	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(ctx, instance.NetworkInterfaces, &plan)
+	resp.Diagnostics.Append(networkDiags...)
 	plan.NetworkInterfaces = networkInterfaces
 	if len(diskIds) > 0 {
 		disks, diag := vmDiskAttachmentToTerraformResourceModel(diskIds)
@@ -401,7 +402,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	vmUpdateTerraformState(instance, &state)
+	vmUpdateTerraformState(ctx, instance, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

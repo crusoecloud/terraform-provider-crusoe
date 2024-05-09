@@ -294,7 +294,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	plan.StartupScript = types.StringValue(instanceTemplateResp.StartupScript)
 	plan.ShutdownScript = types.StringValue(instanceTemplateResp.ShutdownScript)
 
-	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
+	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(ctx, instance.NetworkInterfaces, nil)
 	plan.NetworkInterfaces = networkInterfaces
 
 	hostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(instance.HostChannelAdapters))
@@ -361,7 +361,7 @@ func (r *vmByTemplateResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	var vmState vmResourceModel
-	vmToTerraformResourceModel(instance, &vmState)
+	vmToTerraformResourceModel(ctx, instance, &vmState)
 	resp.State.Set(ctx, &vmState)
 
 	diags = resp.State.Set(ctx, &state)
