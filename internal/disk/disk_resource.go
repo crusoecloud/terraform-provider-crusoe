@@ -3,6 +3,8 @@ package disk
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -19,6 +21,7 @@ import (
 
 const (
 	defaultDiskType = "persistent-ssd"
+	gibInTib        = 1024
 )
 
 type diskResource struct {
@@ -163,6 +166,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	plan.Type = types.StringValue(disk.Type_)
 	plan.Location = types.StringValue(disk.Location)
 	plan.SerialNumber = types.StringValue(disk.SerialNumber)
+	plan.Size = types.StringValue(formatSize(disk.Size))
 	plan.ProjectID = types.StringValue(projectID)
 
 	diags = resp.State.Set(ctx, plan)
@@ -219,7 +223,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	state.Name = types.StringValue(disk.Name)
 	state.Type = types.StringValue(disk.Type_)
-	state.Size = types.StringValue(disk.Size)
+	state.Size = types.StringValue(formatSize(disk.Size))
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
 
 	diags = resp.State.Set(ctx, &state)
@@ -250,7 +254,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error starting a resize operation: %s.\n\n"+
-				"Make sure the disk still exists, you are englarging the disk,"+
+				"Make sure the disk still exists, you are enlarging the disk,"+
 				" and if the disk is attached to a VM, the VM is powered off.", common.UnpackAPIError(err)))
 
 		return
@@ -261,7 +265,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
-				"Make sure the disk still exists, you are englarging the disk,"+
+				"Make sure the disk still exists, you are enlarging the disk,"+
 				" and if the disk is attached to a VM, the VM is powered off.", common.UnpackAPIError(err)))
 
 		return
@@ -296,4 +300,19 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 		return
 	}
+}
+
+func formatSize(sizeStr string) string {
+	sizeStr = strings.ToLower(sizeStr)
+	if strings.HasSuffix(sizeStr, "gib") {
+		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err != nil &&
+			size >= gibInTib && size%gibInTib == 0 {
+
+			return strconv.Itoa(size/gibInTib) + "TiB"
+		}
+
+		return sizeStr
+	}
+
+	return sizeStr
 }
