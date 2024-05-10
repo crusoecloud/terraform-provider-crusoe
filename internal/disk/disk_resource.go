@@ -21,6 +21,7 @@ import (
 
 const (
 	defaultDiskType = "persistent-ssd"
+	gibInTib        = 1024
 )
 
 type diskResource struct {
@@ -304,11 +305,14 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 func formatSize(sizeStr string) string {
 	sizeStr = strings.ToLower(sizeStr)
 	if strings.HasSuffix(sizeStr, "gib") {
-		size, _ := strconv.Atoi(sizeStr[:len(sizeStr)-3])
-		if size >= 1024 && size%1024 == 0 {
-			return strconv.Itoa(size/1024) + "TiB"
+		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err != nil &&
+			size >= gibInTib && size%gibInTib == 0 {
+
+			return strconv.Itoa(size/gibInTib) + "TiB"
 		}
+
 		return sizeStr
 	}
+
 	return sizeStr
 }
