@@ -175,13 +175,21 @@ func vmNetworkInterfacesToTerraformResourceModel(ctx context.Context,
 	if plan != nil {
 		diags := plan.NetworkInterfaces.ElementsAs(ctx, &interfaces, true)
 		warning.Append(diags...)
-		for i := range interfaces {
-			currInterface, ok := subnetIDToNetworkInterface[interfaces[i].Subnet.ValueString()]
-			if ok {
-				interfaces[i] = currInterface
-			} else {
-				warning.AddWarning("Unexpected state when unmarshaling network interfaces for Instance",
-					"At least one network interface was not successfully created for the instance.")
+		if len(interfaces) == 0 {
+			// no interfaces were specified when creating the VM, use API response as source of truth
+			for subnetID := range subnetIDToNetworkInterface{
+				interfaces = append(interfaces, subnetIDToNetworkInterface[subnetID])
+			}
+		} else {
+			// interfaces were specified when creating the VM
+			for i := range interfaces {
+				currInterface, ok := subnetIDToNetworkInterface[interfaces[i].Subnet.ValueString()]
+				if ok {
+					interfaces[i] = currInterface
+				} else {
+					warning.AddWarning("Unexpected state when unmarshaling network interfaces for Instance",
+						"At least one network interface was not successfully created for the instance.")
+				}
 			}
 		}
 	} else {
