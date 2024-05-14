@@ -177,7 +177,7 @@ func vmNetworkInterfacesToTerraformResourceModel(ctx context.Context,
 		warning.Append(diags...)
 		if len(interfaces) == 0 {
 			// no interfaces were specified when creating the VM, use API response as source of truth
-			for subnetID := range subnetIDToNetworkInterface{
+			for subnetID := range subnetIDToNetworkInterface {
 				interfaces = append(interfaces, subnetIDToNetworkInterface[subnetID])
 			}
 		} else {
