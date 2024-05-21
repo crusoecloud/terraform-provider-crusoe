@@ -1,0 +1,506 @@
+package load_balancer
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+)
+
+type loadBalancerResource struct {
+	client *swagger.APIClient
+}
+
+type loadBalancerResourceModel struct {
+	ID                types.String                     `tfsdk:"id"`
+	ProjectID         types.String                     `tfsdk:"project_id"`
+	Name              types.String                     `tfsdk:"name"`
+	NetworkInterfaces types.List                       `tfsdk:"network_interfaces"`
+	Destinations      types.List                       `tfsdk:"destinations"`
+	Location          types.String                     `tfsdk:"location"`
+	Protocols         types.List                       `tfsdk:"protocols"`
+	Algorithm         types.String                     `tfsdk:"algorithm"`
+	Type              types.String                     `tfsdk:"type"`
+	IPs               types.List                       `tfsdk:"ips"`
+	HealthCheck       *healthCheckOptionsResourceModel `tfsdk:"health_check"`
+}
+
+type loadBalancerNetworkTargetModel struct {
+	Cidr       types.String `tfsdk:"cidr"`
+	ResourceID types.String `tfsdk:"resource_id"`
+}
+
+type loadBalancerNetworkInterfaceModel struct {
+	NetworkID types.String `tfsdk:"network_id"`
+	SubnetID  types.String `tfsdk:"subnet_id"`
+}
+
+type healthCheckOptionsResourceModel struct {
+	Timeout      types.String `tfsdk:"timeout"`
+	Port         types.String `tfsdk:"port"`
+	Interval     types.String `tfsdk:"interval"`
+	SuccessCount types.String `tfsdk:"success_count"`
+	FailureCount types.String `tfsdk:"failure_count"`
+}
+
+var loadBalancerIPsSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"private_ipv4": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"address": types.StringType,
+			},
+		},
+		"public_ipv4": types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"id":      types.StringType,
+				"address": types.StringType,
+				"type":    types.StringType,
+			},
+		},
+	},
+}
+
+func NewLoadBalancerResource() resource.Resource {
+	return &loadBalancerResource{}
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *loadBalancerResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*swagger.APIClient)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
+
+		return
+	}
+
+	r.client = client
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *loadBalancerResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_load_balancer"
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Version: 1,
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
+			"project_id": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(), // cannot be updated in place
+				},
+			},
+			"name": schema.StringAttribute{
+				Required: true,
+			},
+			"network_interfaces": schema.ListNestedAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				NestedObject: schema.NestedAttributeObject{
+					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+					Attributes: map[string]schema.Attribute{
+						"network_id": schema.StringAttribute{
+							Computed:      true,
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+						"subnet_id": schema.StringAttribute{
+							Computed:      true,
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+					},
+				},
+			},
+			"destinations": schema.ListNestedAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				NestedObject: schema.NestedAttributeObject{
+					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+					Attributes: map[string]schema.Attribute{
+						"cidr": schema.StringAttribute{
+							Computed:      true,
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+						"resource_id": schema.StringAttribute{
+							Computed:      true,
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+					},
+				},
+			},
+			"location": schema.StringAttribute{
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
+			"protocols": schema.ListAttribute{
+				ElementType:   types.StringType,
+				Optional:      true,
+				Required:      true,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
+			"algorithm": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
+			"type": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
+			"ips": schema.ListNestedAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				NestedObject: schema.NestedAttributeObject{
+					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+					Attributes: map[string]schema.Attribute{
+						"public_ipv4": schema.SingleNestedAttribute{
+							Computed: true,
+							Optional: true,
+							Attributes: map[string]schema.Attribute{
+								"id": schema.StringAttribute{
+									Computed:      true,
+									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+								},
+								"address": schema.StringAttribute{
+									Computed:      true,
+									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+								},
+								"type": schema.StringAttribute{
+									Computed: true,
+									Optional: true,
+								},
+							},
+							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+						"private_ipv4": schema.SingleNestedAttribute{
+							Computed: true,
+							Attributes: map[string]schema.Attribute{
+								"address": schema.StringAttribute{
+									Computed: true,
+								},
+							},
+							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+						},
+					},
+				},
+			},
+			"health_check": schema.SingleNestedAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Attributes: map[string]schema.Attribute{
+					"timeout": schema.StringAttribute{
+						Computed:      true,
+						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+					},
+					"port": schema.StringAttribute{
+						Computed:      true,
+						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+					},
+					"interval": schema.StringAttribute{
+						Computed:      true,
+						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+					},
+					"success_count": schema.StringAttribute{
+						Computed:      true,
+						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+					},
+					"failure_count": schema.StringAttribute{
+						Computed:      true,
+						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+					},
+				},
+			},
+		},
+	}
+}
+
+func (r *loadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan loadBalancerResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	tNetworkInterfaces := make([]loadBalancerNetworkInterfaceModel, 0, len(plan.NetworkInterfaces.Elements()))
+	diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	networkInterfaces := make([]swagger.LoadBalancerNetworkInterface, 0, len(tNetworkInterfaces))
+	for _, n := range tNetworkInterfaces {
+		networkInterfaces = append(networkInterfaces, swagger.LoadBalancerNetworkInterface{
+			NetworkId: n.NetworkID.ValueString(),
+			SubnetId:  n.NetworkID.ValueString(),
+		})
+	}
+
+	tDestinations := make([]loadBalancerNetworkTargetModel, 0, len(plan.Destinations.Elements()))
+	diags = plan.Destinations.ElementsAs(ctx, &tDestinations, true)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	destinations := make([]swagger.NetworkTarget, 0, len(tDestinations))
+	for _, d := range tDestinations {
+		destinations = append(destinations, swagger.NetworkTarget{
+			Cidr:       d.Cidr.ValueString(),
+			ResourceId: d.ResourceID.ValueString(),
+		})
+	}
+
+	healthCheck := swagger.HealthCheckOptions{
+		FailureCount: plan.HealthCheck.FailureCount.ValueString(),
+		Interval:     plan.HealthCheck.Interval.ValueString(),
+		Port:         plan.HealthCheck.Port.ValueString(),
+		SuccessCount: plan.HealthCheck.SuccessCount.ValueString(),
+		Timeout:      plan.HealthCheck.Timeout.ValueString(),
+	}
+
+	protocols := make([]string, 0, len(plan.Protocols.Elements()))
+	diags = plan.Protocols.ElementsAs(ctx, &protocols, true)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectID := ""
+	if plan.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to create load balancer",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = plan.ProjectID.ValueString()
+	}
+
+	dataResp, httpResp, err := r.client.LoadBalancersApi.CreateLoadBalancer(ctx, swagger.LoadBalancersPostRequest{
+		Algorithm:         plan.Algorithm.ValueString(),
+		Destinations:      destinations,
+		HealthCheck:       &healthCheck,
+		Location:          plan.Location.ValueString(),
+		Name:              plan.Name.ValueString(),
+		NetworkInterfaces: networkInterfaces,
+		Protocols:         protocols,
+		Type_:             plan.Type.ValueString(),
+	}, projectID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create load balancer",
+			fmt.Sprintf("There was an error starting a create load balancer operation (%s): %s", projectID, common.UnpackAPIError(err)))
+
+		return
+	}
+	defer httpResp.Body.Close()
+
+	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](
+		ctx, dataResp.Operation, projectID, r.client.LoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create load balancer",
+			fmt.Sprintf("There was an error creating a load balancer: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	plan.ID = types.StringValue(loadBalancer.Id)
+	ips, _ := types.ListValueFrom(context.Background(), loadBalancerIPsSchema, loadBalancer.Ips)
+	plan.IPs = ips
+	plan.ProjectID = types.StringValue(projectID)
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state loadBalancerResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to read firewall rule",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	loadBalancer, httpResp, err := r.client.LoadBalancersApi.GetLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get load balancer",
+			fmt.Sprintf("Fetching load balancer failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
+
+		return
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode == http.StatusNotFound {
+		// Load balancer has most likely been deleted out of band, so we update Terraform state to match
+		resp.State.RemoveResource(ctx)
+
+		return
+	}
+
+	state.ProjectID = types.StringValue(projectID)
+	loadBalancerUpdateTerraformState(ctx, &loadBalancer, &state)
+
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var state loadBalancerResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var plan loadBalancerResourceModel
+	diags = req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	patchReq := swagger.LoadBalancersPatchRequestV1Alpha5{}
+	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
+		patchReq.Name = plan.Name.ValueString()
+	}
+
+	if !plan.Destinations.IsNull() && !plan.Destinations.IsUnknown() {
+		tDestinations := make([]loadBalancerNetworkTargetModel, 0, len(plan.Destinations.Elements()))
+		diags = plan.Destinations.ElementsAs(ctx, &tDestinations, true)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		destinations := make([]swagger.NetworkTarget, 0, len(tDestinations))
+		for _, d := range tDestinations {
+			destinations = append(destinations, swagger.NetworkTarget{
+				Cidr:       d.Cidr.ValueString(),
+				ResourceId: d.ResourceID.ValueString(),
+			})
+		}
+		patchReq.Destinations = destinations
+	}
+
+	if !plan.HealthCheck.Timeout.IsNull() && !plan.HealthCheck.Timeout.IsUnknown() {
+		patchReq.HealthCheck.Timeout = plan.HealthCheck.Timeout.ValueString()
+	}
+	if !plan.HealthCheck.Port.IsNull() && !plan.HealthCheck.Port.IsUnknown() {
+		patchReq.HealthCheck.Port = plan.HealthCheck.Port.ValueString()
+	}
+	if !plan.HealthCheck.Interval.IsNull() && !plan.HealthCheck.Interval.IsUnknown() {
+		patchReq.HealthCheck.Interval = plan.HealthCheck.Interval.ValueString()
+	}
+	if !plan.HealthCheck.SuccessCount.IsNull() && !plan.HealthCheck.SuccessCount.IsUnknown() {
+		patchReq.HealthCheck.SuccessCount = plan.HealthCheck.SuccessCount.ValueString()
+	}
+	if !plan.HealthCheck.FailureCount.IsNull() && !plan.HealthCheck.FailureCount.IsUnknown() {
+		patchReq.HealthCheck.FailureCount = plan.HealthCheck.FailureCount.ValueString()
+	}
+
+	dataResp, httpResp, err := r.client.LoadBalancersApi.PatchLoadBalancer(ctx,
+		patchReq,
+		plan.ProjectID.ValueString(),
+		plan.ID.ValueString(),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update load balancer",
+			fmt.Sprintf("There was an error starting an update load balancer operation: %s.\n\n", common.UnpackAPIError(err)))
+
+		return
+	}
+	defer httpResp.Body.Close()
+
+	_, _, err = common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+		return r.client.LoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update load balancer",
+			fmt.Sprintf("There was an error updating the load balancer: %s.\n\n", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state loadBalancerResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	dataResp, httpResp, err := r.client.LoadBalancersApi.DeleteLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete load balancer",
+			fmt.Sprintf("There was an error starting a delete load balancer operation: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+	defer httpResp.Body.Close()
+
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+		return r.client.LoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to delete load balancer",
+			fmt.Sprintf("There was an error deleting a load balancer: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+}
