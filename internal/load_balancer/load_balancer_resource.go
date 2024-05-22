@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -27,17 +26,17 @@ type loadBalancerResource struct {
 }
 
 type loadBalancerResourceModel struct {
-	ID                types.String                     `tfsdk:"id"`
-	ProjectID         types.String                     `tfsdk:"project_id"`
-	Name              types.String                     `tfsdk:"name"`
-	NetworkInterfaces types.List                       `tfsdk:"network_interfaces"`
-	Destinations      types.List                       `tfsdk:"destinations"`
-	Location          types.String                     `tfsdk:"location"`
-	Protocols         types.List                       `tfsdk:"protocols"`
-	Algorithm         types.String                     `tfsdk:"algorithm"`
-	Type              types.String                     `tfsdk:"type"`
-	IPs               types.List                       `tfsdk:"ips"`
-	HealthCheck       types.Object                 `tfsdk:"health_check"`
+	ID                types.String `tfsdk:"id"`
+	ProjectID         types.String `tfsdk:"project_id"`
+	Name              types.String `tfsdk:"name"`
+	NetworkInterfaces types.List   `tfsdk:"network_interfaces"`
+	Destinations      types.List   `tfsdk:"destinations"`
+	Location          types.String `tfsdk:"location"`
+	Protocols         types.List   `tfsdk:"protocols"`
+	Algorithm         types.String `tfsdk:"algorithm"`
+	Type              types.String `tfsdk:"type"`
+	IPs               types.List   `tfsdk:"ips"`
+	HealthCheck       types.Object `tfsdk:"health_check"`
 }
 
 type loadBalancerNetworkTargetModel struct {
@@ -67,23 +66,6 @@ type healthCheckOptionsResourceModel struct {
 	Interval     types.String `tfsdk:"interval"`
 	SuccessCount types.String `tfsdk:"success_count"`
 	FailureCount types.String `tfsdk:"failure_count"`
-}
-
-var loadBalancerIPsSchema = types.ObjectType{
-	AttrTypes: map[string]attr.Type{
-		"private_ipv4": types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"address": types.StringType,
-			},
-		},
-		"public_ipv4": types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"id":      types.StringType,
-				"address": types.StringType,
-				"type":    types.StringType,
-			},
-		},
-	},
 }
 
 func NewLoadBalancerResource() resource.Resource {
@@ -132,7 +114,7 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required: true,
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Required: true,
+				Required:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -159,7 +141,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 						"cidr": schema.StringAttribute{
 							Computed:      true,
 							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},      // maintain across updates
+							Validators:    []validator.String{validators.RegexValidator{RegexPattern: "/32$"}}, // load balancers only support the /32 mask
 						},
 						"resource_id": schema.StringAttribute{
 							Computed:      true,
@@ -180,7 +163,7 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"algorithm": schema.StringAttribute{
 				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},             // cannot be updated in place
 				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^random$"}}, // we currently only support random
 			},
 			"type": schema.StringAttribute{
@@ -269,8 +252,8 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 
 	postReq := swagger.LoadBalancersPostRequest{
 		Algorithm: plan.Algorithm.ValueString(),
-		Location: plan.Location.ValueString(),
-		Name: plan.Name.ValueString(),
+		Location:  plan.Location.ValueString(),
+		Name:      plan.Name.ValueString(),
 	}
 
 	// network interfaces
@@ -312,7 +295,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	if !plan.HealthCheck.IsNull() && !plan.HealthCheck.IsUnknown() {
 		plan.HealthCheck.As(ctx, healthCheck, basetypes.ObjectAsOptions{})
 		postReq.HealthCheck = &healthCheck
-	} 
+	}
 
 	// protocols
 	protocols := make([]string, 0, len(plan.Protocols.Elements()))
@@ -363,7 +346,6 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	plan.Type = types.StringValue(loadBalancer.Type_)
 	plan.NetworkInterfaces, _ = loadBalancerNetworkInterfacesToTerraformResourceModel(loadBalancer.NetworkInterfaces)
 	plan.HealthCheck, _ = types.ObjectValueFrom(ctx, loadBalancerHealthCheckSchema.AttrTypes, loadBalancerHealthCheckToTerraformResourceModel(loadBalancer.HealthCheck))
-	
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

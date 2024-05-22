@@ -36,11 +36,11 @@ var loadBalancerIPAddressSchema = types.ObjectType{
 
 var loadBalancerHealthCheckSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"timeout": types.StringType,
-		"port":  types.StringType,
-		"interval":  types.StringType,
-		"success_count":  types.StringType,
-		"failure_count":  types.StringType,
+		"timeout":       types.StringType,
+		"port":          types.StringType,
+		"interval":      types.StringType,
+		"success_count": types.StringType,
+		"failure_count": types.StringType,
 	},
 }
 

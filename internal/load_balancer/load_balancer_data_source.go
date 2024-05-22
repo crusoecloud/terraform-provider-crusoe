@@ -97,7 +97,7 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 						Computed: true,
 					},
 					"name": schema.StringAttribute{
-						Required: true,
+						Computed: true,
 					},
 					"network_interfaces": schema.ListNestedAttribute{
 						Computed: true,
