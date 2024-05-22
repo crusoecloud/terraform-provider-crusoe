@@ -13,10 +13,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
 type loadBalancerResource struct {
@@ -135,11 +138,13 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"network_id": schema.StringAttribute{
-							Required: true,
+							Computed:      true,
+							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"subnet_id": schema.StringAttribute{
-							Required: true,
+							Computed:      true,
+							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
@@ -174,9 +179,9 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"algorithm": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
+				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^random$"}}, // we currently only support random
 			},
 			"type": schema.StringAttribute{
 				Optional:      true,
@@ -262,6 +267,13 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	postReq := swagger.LoadBalancersPostRequest{
+		Algorithm: plan.Algorithm.ValueString(),
+		Location: plan.Location.ValueString(),
+		Name: plan.Name.ValueString(),
+	}
+
+	// network interfaces
 	tNetworkInterfaces := make([]loadBalancerNetworkInterfaceModel, 0, len(plan.NetworkInterfaces.Elements()))
 	diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 	resp.Diagnostics.Append(diags...)
@@ -273,10 +285,12 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	for _, n := range tNetworkInterfaces {
 		networkInterfaces = append(networkInterfaces, swagger.LoadBalancerNetworkInterface{
 			NetworkId: n.NetworkID.ValueString(),
-			SubnetId:  n.NetworkID.ValueString(),
+			// SubnetId:  n.NetworkID.ValueString(),
 		})
 	}
+	postReq.NetworkInterfaces = networkInterfaces
 
+	// destinations
 	tDestinations := make([]loadBalancerNetworkTargetModel, 0, len(plan.Destinations.Elements()))
 	diags = plan.Destinations.ElementsAs(ctx, &tDestinations, true)
 	resp.Diagnostics.Append(diags...)
@@ -291,32 +305,25 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 			ResourceId: d.ResourceID.ValueString(),
 		})
 	}
+	postReq.Destinations = destinations
 
-	healthCheckAttributesMap := plan.HealthCheck.Attributes()
+	// health check
+	var healthCheck swagger.HealthCheckOptions
+	if !plan.HealthCheck.IsNull() && !plan.HealthCheck.IsUnknown() {
+		plan.HealthCheck.As(ctx, healthCheck, basetypes.ObjectAsOptions{})
+		postReq.HealthCheck = &healthCheck
+	} 
 
-	// healthCheck := swagger.HealthCheckOptions{
-	// 	FailureCount: plan.HealthCheck.FailureCount.ValueString(),
-	// 	Interval:     plan.HealthCheck.Interval.ValueString(),
-	// 	Port:         plan.HealthCheck.Port.ValueString(),
-	// 	SuccessCount: plan.HealthCheck.SuccessCount.ValueString(),
-	// 	Timeout:      plan.HealthCheck.Timeout.ValueString(),
-	// }
-
-	healthCheck := swagger.HealthCheckOptions{
-		FailureCount: healthCheckAttributesMap["failure_count"].String(),
-		Interval:     healthCheckAttributesMap["interval"].String(),
-		Port:         healthCheckAttributesMap["port"].String(),
-		SuccessCount: healthCheckAttributesMap["success_count"].String(),
-		Timeout:      healthCheckAttributesMap["timeout"].String(),
-	}
-
+	// protocols
 	protocols := make([]string, 0, len(plan.Protocols.Elements()))
 	diags = plan.Protocols.ElementsAs(ctx, &protocols, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	postReq.Protocols = protocols
 
+	// project id
 	projectID := ""
 	if plan.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
@@ -331,15 +338,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		projectID = plan.ProjectID.ValueString()
 	}
 
-	dataResp, httpResp, err := r.client.LoadBalancersApi.CreateLoadBalancer(ctx, swagger.LoadBalancersPostRequest{
-		Algorithm:         plan.Algorithm.ValueString(),
-		Destinations:      destinations,
-		HealthCheck:       &healthCheck,
-		Location:          plan.Location.ValueString(),
-		Name:              plan.Name.ValueString(),
-		NetworkInterfaces: networkInterfaces,
-		Protocols:         protocols,
-	}, projectID)
+	dataResp, httpResp, err := r.client.LoadBalancersApi.CreateLoadBalancer(ctx, postReq, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create load balancer",
 			fmt.Sprintf("There was an error starting a create load balancer operation (%s): %s", projectID, common.UnpackAPIError(err)))
@@ -358,9 +357,13 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	plan.ID = types.StringValue(loadBalancer.Id)
-	ips, _ := types.ListValueFrom(context.Background(), loadBalancerIPsSchema, loadBalancer.Ips)
+	ips, _ := loadBalancerIPsToTerraformResourceModel(loadBalancer.Ips)
 	plan.IPs = ips
 	plan.ProjectID = types.StringValue(projectID)
+	plan.Type = types.StringValue(loadBalancer.Type_)
+	plan.NetworkInterfaces, _ = loadBalancerNetworkInterfacesToTerraformResourceModel(loadBalancer.NetworkInterfaces)
+	plan.HealthCheck, _ = types.ObjectValueFrom(ctx, loadBalancerHealthCheckSchema.AttrTypes, loadBalancerHealthCheckToTerraformResourceModel(loadBalancer.HealthCheck))
+	
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -379,7 +382,7 @@ func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 	if state.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to read firewall rule",
+			resp.Diagnostics.AddError("Failed to read load balancer",
 				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
 			return
@@ -450,20 +453,22 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		patchReq.Destinations = destinations
 	}
 
-	if !plan.HealthCheck.Timeout.IsNull() && !plan.HealthCheck.Timeout.IsUnknown() {
-		patchReq.HealthCheck.Timeout = plan.HealthCheck.Timeout.ValueString()
+	healthCheckAttributesMap := plan.HealthCheck.Attributes()
+
+	if !healthCheckAttributesMap["timeout"].IsNull() && !healthCheckAttributesMap["timeout"].IsUnknown() {
+		patchReq.HealthCheck.Timeout = healthCheckAttributesMap["timeout"].String()
 	}
-	if !plan.HealthCheck.Port.IsNull() && !plan.HealthCheck.Port.IsUnknown() {
-		patchReq.HealthCheck.Port = plan.HealthCheck.Port.ValueString()
+	if !healthCheckAttributesMap["port"].IsNull() && !healthCheckAttributesMap["port"].IsUnknown() {
+		patchReq.HealthCheck.Port = healthCheckAttributesMap["port"].String()
 	}
-	if !plan.HealthCheck.Interval.IsNull() && !plan.HealthCheck.Interval.IsUnknown() {
-		patchReq.HealthCheck.Interval = plan.HealthCheck.Interval.ValueString()
+	if !healthCheckAttributesMap["interval"].IsNull() && !healthCheckAttributesMap["interval"].IsUnknown() {
+		patchReq.HealthCheck.Interval = healthCheckAttributesMap["interval"].String()
 	}
-	if !plan.HealthCheck.SuccessCount.IsNull() && !plan.HealthCheck.SuccessCount.IsUnknown() {
-		patchReq.HealthCheck.SuccessCount = plan.HealthCheck.SuccessCount.ValueString()
+	if !healthCheckAttributesMap["success_count"].IsNull() && !healthCheckAttributesMap["success_count"].IsUnknown() {
+		patchReq.HealthCheck.SuccessCount = healthCheckAttributesMap["success_count"].String()
 	}
-	if !plan.HealthCheck.FailureCount.IsNull() && !plan.HealthCheck.FailureCount.IsUnknown() {
-		patchReq.HealthCheck.FailureCount = plan.HealthCheck.FailureCount.ValueString()
+	if !healthCheckAttributesMap["failure_count"].IsNull() && !healthCheckAttributesMap["failure_count"].IsUnknown() {
+		patchReq.HealthCheck.FailureCount = healthCheckAttributesMap["failure_count"].String()
 	}
 
 	dataResp, httpResp, err := r.client.LoadBalancersApi.PatchLoadBalancer(ctx,
