@@ -34,7 +34,7 @@ type loadBalancerResourceModel struct {
 	Algorithm         types.String                     `tfsdk:"algorithm"`
 	Type              types.String                     `tfsdk:"type"`
 	IPs               types.List                       `tfsdk:"ips"`
-	HealthCheck       *healthCheckOptionsResourceModel `tfsdk:"health_check"`
+	HealthCheck       types.Object                 `tfsdk:"health_check"`
 }
 
 type loadBalancerNetworkTargetModel struct {
@@ -45,6 +45,17 @@ type loadBalancerNetworkTargetModel struct {
 type loadBalancerNetworkInterfaceModel struct {
 	NetworkID types.String `tfsdk:"network_id"`
 	SubnetID  types.String `tfsdk:"subnet_id"`
+}
+
+type loadBalancerIPAddressModel struct {
+	PrivateIPv4 types.Object                        `tfsdk:"private_ipv4"`
+	PublicIpv4  loadBalancerPublicIPv4ResourceModel `tfsdk:"public_ipv4"`
+}
+
+type loadBalancerPublicIPv4ResourceModel struct {
+	ID      types.String `tfsdk:"id"`
+	Address types.String `tfsdk:"address"`
+	Type    types.String `tfsdk:"type"`
 }
 
 type healthCheckOptionsResourceModel struct {
@@ -118,36 +129,36 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required: true,
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Optional:      true,
-				Computed:      true,
+				Required: true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"network_id": schema.StringAttribute{
-							Computed:      true,
+							Required: true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"subnet_id": schema.StringAttribute{
-							Computed:      true,
+							Required: true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
 			},
 			"destinations": schema.ListNestedAttribute{
-				Optional:      true,
-				Computed:      true,
+				Required:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"cidr": schema.StringAttribute{
 							Computed:      true,
+							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"resource_id": schema.StringAttribute{
 							Computed:      true,
+							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
@@ -159,7 +170,6 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"protocols": schema.ListAttribute{
 				ElementType:   types.StringType,
-				Optional:      true,
 				Required:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
@@ -181,7 +191,6 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 					Attributes: map[string]schema.Attribute{
 						"public_ipv4": schema.SingleNestedAttribute{
 							Computed: true,
-							Optional: true,
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
 									Computed:      true,
@@ -193,7 +202,6 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 								},
 								"type": schema.StringAttribute{
 									Computed: true,
-									Optional: true,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -284,12 +292,22 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		})
 	}
 
+	healthCheckAttributesMap := plan.HealthCheck.Attributes()
+
+	// healthCheck := swagger.HealthCheckOptions{
+	// 	FailureCount: plan.HealthCheck.FailureCount.ValueString(),
+	// 	Interval:     plan.HealthCheck.Interval.ValueString(),
+	// 	Port:         plan.HealthCheck.Port.ValueString(),
+	// 	SuccessCount: plan.HealthCheck.SuccessCount.ValueString(),
+	// 	Timeout:      plan.HealthCheck.Timeout.ValueString(),
+	// }
+
 	healthCheck := swagger.HealthCheckOptions{
-		FailureCount: plan.HealthCheck.FailureCount.ValueString(),
-		Interval:     plan.HealthCheck.Interval.ValueString(),
-		Port:         plan.HealthCheck.Port.ValueString(),
-		SuccessCount: plan.HealthCheck.SuccessCount.ValueString(),
-		Timeout:      plan.HealthCheck.Timeout.ValueString(),
+		FailureCount: healthCheckAttributesMap["failure_count"].String(),
+		Interval:     healthCheckAttributesMap["interval"].String(),
+		Port:         healthCheckAttributesMap["port"].String(),
+		SuccessCount: healthCheckAttributesMap["success_count"].String(),
+		Timeout:      healthCheckAttributesMap["timeout"].String(),
 	}
 
 	protocols := make([]string, 0, len(plan.Protocols.Elements()))
@@ -321,7 +339,6 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		Name:              plan.Name.ValueString(),
 		NetworkInterfaces: networkInterfaces,
 		Protocols:         protocols,
-		Type_:             plan.Type.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create load balancer",

@@ -17,16 +17,48 @@ type loadBalancerDataSource struct {
 }
 
 type loadBalancerDataSourceModel struct {
-	ProjectID      *string             `tfsdk:"project_id"`
-	LoadBalancers  []loadBalancerModel `tfsdk:"load_balancers"`
+	ProjectID     *string             `tfsdk:"project_id"`
+	LoadBalancers []loadBalancerModel `tfsdk:"load_balancers"`
+}
+
+type networkInterfaceModel struct {
+	NetworkID string `tfsdk:"network_id"`
+	SubnetID  string `tfsdk:"subnet_id"`
+}
+
+type destinationModel struct {
+	Cidr       string `tfsdk:"cidr"`
+	ResourceID string `tfsdk:"resource_id"`
+}
+
+type ipAddressesModel struct {
+	PrivateIPv4 lbIPv4 `tfsdk:"private_ipv4"`
+	PublicIpv4  lbIPv4 `tfsdk:"public_ipv4"`
+}
+
+type lbIPv4 struct {
+	Address string `tfsdk:"address"`
+}
+
+type healthCheckOptionsModel struct {
+	Timeout      string `tfsdk:"timeout"`
+	Port         string `tfsdk:"port"`
+	Interval     string `tfsdk:"interval"`
+	SuccessCount string `tfsdk:"success_count"`
+	FailureCount string `tfsdk:"failure_count"`
 }
 
 type loadBalancerModel struct {
-	ID                string     `tfsdk:"id"`
-	Name              string     `tfsdk:"name"`
-	NetworkInterfaces types.List `tfsdk:"network_interfaces"`
-	// RunningInstanceCount int64    `tfsdk:"running_instance_count"`
-	// Instances            []string `tfsdk:"instances"`
+	ID                string                   `tfsdk:"id"`
+	Name              string                   `tfsdk:"name"`
+	NetworkInterfaces []networkInterfaceModel  `tfsdk:"network_interfaces"`
+	Destinations      []destinationModel       `tfsdk:"destinations"`
+	Location          string                   `tfsdk:"location"`
+	Protocols         []string                 `tfsdk:"protocols"`
+	Algorithm         string                   `tfsdk:"algorithm"`
+	Type              string                   `tfsdk:"type"`
+	IPs               []ipAddressesModel       `tfsdk:"ips"`
+	HealthCheck       *healthCheckOptionsModel `tfsdk:"health_check"`
 }
 
 func NewLoadBalancerDataSource() datasource.DataSource {
@@ -51,7 +83,7 @@ func (ds *loadBalancerDataSource) Configure(_ context.Context, req datasource.Co
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *loadBalancerDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
-	response.TypeName = request.ProviderTypeName + "_load_balancers"
+	response.TypeName = request.ProviderTypeName + "_load_balancer"
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -114,13 +146,7 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 									Computed: true,
 									Optional: true,
 									Attributes: map[string]schema.Attribute{
-										"id": schema.StringAttribute{
-											Computed: true,
-										},
 										"address": schema.StringAttribute{
-											Computed: true,
-										},
-										"type": schema.StringAttribute{
 											Computed: true,
 										},
 									},
@@ -198,8 +224,22 @@ func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadR
 	var state loadBalancerDataSourceModel
 	for i := range dataResp.Items {
 		state.LoadBalancers = append(state.LoadBalancers, loadBalancerModel{
-			ID:   dataResp.Items[i].Id,
-			Name: dataResp.Items[i].Name,
+			ID:                dataResp.Items[i].Id,
+			Name:              dataResp.Items[i].Name,
+			NetworkInterfaces: loadBalancerNetworkInterfacesToTerraformDataModel(dataResp.Items[i].NetworkInterfaces),
+			Destinations:      loadBalancerDestinationsToTerraformDataModel(dataResp.Items[i].Destinations),
+			Location:          dataResp.Items[i].Location,
+			Protocols:         dataResp.Items[i].Protocols,
+			Algorithm:         dataResp.Items[i].Algorithm,
+			Type:              dataResp.Items[i].Type_,
+			IPs:               loadBalancerIPsToTerraformDataModel(dataResp.Items[i].Ips),
+			HealthCheck: &healthCheckOptionsModel{
+				Timeout:      dataResp.Items[i].HealthCheck.Timeout,
+				Port:         dataResp.Items[i].HealthCheck.Port,
+				Interval:     dataResp.Items[i].HealthCheck.Interval,
+				SuccessCount: dataResp.Items[i].HealthCheck.SuccessCount,
+				FailureCount: dataResp.Items[i].HealthCheck.FailureCount,
+			},
 		})
 	}
 
