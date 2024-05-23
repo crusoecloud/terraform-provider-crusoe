@@ -268,7 +268,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	for _, n := range tNetworkInterfaces {
 		networkInterfaces = append(networkInterfaces, swagger.LoadBalancerNetworkInterface{
 			NetworkId: n.NetworkID.ValueString(),
-			// SubnetId:  n.NetworkID.ValueString(),
+			SubnetId:  n.NetworkID.ValueString(),
 		})
 	}
 	postReq.NetworkInterfaces = networkInterfaces
