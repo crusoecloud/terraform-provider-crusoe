@@ -137,7 +137,7 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 // interface resource instances from Crusoe API network interfaces. If a plan is provided, we want to ensure that
 // the ordering of interfaces in the plan is maintained.
 func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) (networkInterfacesList types.List, warning diag.Diagnostics) {
-	interfaces := make([]vmNetworkInterfaceResourceModel, 0)
+	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
 	for _, networkInterface := range networkInterfaces {
 		var publicIP swagger.PublicIpv4Address
 		var privateIP swagger.PrivateIpv4Address
