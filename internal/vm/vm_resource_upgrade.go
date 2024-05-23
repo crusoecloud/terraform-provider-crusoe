@@ -69,7 +69,7 @@ func (r *vmResource) UpgradeState(context.Context) map[int64]resource.StateUpgra
 
 				var state vmResourceModel
 
-				vmToTerraformResourceModel(ctx, instance, &state)
+				vmToTerraformResourceModel(instance, &state)
 				state.SSHKey = priorStateData.SSHKey
 				state.Image = priorStateData.Image
 				state.StartupScript = priorStateData.StartupScript
