@@ -352,7 +352,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	plan.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.ProjectID = types.StringValue(projectID)
 
-	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(ctx, instance.NetworkInterfaces, &plan)
+	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	resp.Diagnostics.Append(networkDiags...)
 	plan.NetworkInterfaces = networkInterfaces
 	if len(diskIds) > 0 {
@@ -402,7 +402,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	vmUpdateTerraformState(ctx, instance, &state)
+	vmUpdateTerraformState(instance, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
