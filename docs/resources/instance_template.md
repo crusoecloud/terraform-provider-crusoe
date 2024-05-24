@@ -30,6 +30,7 @@ description: |-
 - `location` (String)
 - `project_id` (String)
 - `public_ip_address_type` (String)
+- `reservation_id` (String)
 - `shutdown_script` (String)
 - `startup_script` (String)
 
