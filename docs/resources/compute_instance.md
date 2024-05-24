@@ -29,6 +29,7 @@ description: |-
 - `location` (String)
 - `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
 - `project_id` (String)
+- `reservation_id` (String)
 - `shutdown_script` (String)
 - `startup_script` (String)
 
