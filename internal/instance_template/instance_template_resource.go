@@ -37,6 +37,7 @@ type instanceTemplateResourceModel struct {
 	IBPartition         types.String `tfsdk:"ib_partition"`
 	PublicIpAddressType types.String `tfsdk:"public_ip_address_type"`
 	DisksToCreate       types.List   `tfsdk:"disks"`
+	ReservationID       types.String `tfsdk:"reservation_id"`
 }
 
 type diskToCreateResourceModel struct {
@@ -158,6 +159,11 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 					},
 				},
 			},
+			"reservation_id": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+			},
 		},
 	}
 }
@@ -216,6 +222,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		IbPartitionId:       plan.IBPartition.ValueString(),
 		Disks:               disksToCreate,
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
+		ReservationId:       plan.ReservationID.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",

@@ -40,6 +40,7 @@ type vmByTemplateResourceModel struct {
 	Disks               types.List   `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
+	ReservationID       types.List   `tfsdk:"host_channel_adapters"`
 }
 
 func NewVMByTemplateResource() resource.Resource {

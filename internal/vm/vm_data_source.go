@@ -22,6 +22,7 @@ type vmDataSource struct {
 type vmDataSourceFilter struct {
 	ID                *string                       `tfsdk:"id"`
 	ProjectID         *string                       `tfsdk:"project_id"`
+	ReservationID     *string                       `tfsdk:"reservation_id"`
 	Name              *string                       `tfsdk:"name"`
 	Type              *string                       `tfsdk:"type"`
 	Disks             []vmDiskResourceModel         `tfsdk:"disks"`
@@ -130,6 +131,9 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 						},
 					},
 				},
+			},
+			"reservation_id": schema.StringAttribute{
+				Optional: true,
 			},
 		},
 	}
