@@ -8,6 +8,7 @@ require (
 	github.com/crusoecloud/client-go v0.1.48
 	github.com/hashicorp/terraform-plugin-docs v0.18.0
 	github.com/hashicorp/terraform-plugin-framework v1.3.5
+	github.com/hashicorp/terraform-plugin-framework-validators v0.12.0
 )
 
 require (
