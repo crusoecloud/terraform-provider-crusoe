@@ -70,7 +70,7 @@ func NewAPIClient(host, key, secret string) *swagger.APIClient {
 	cfg.UserAgent = fmt.Sprintf("CrusoeTerraform/%s", version)
 	cfg.BasePath = host
 	if cfg.HTTPClient == nil {
-		cfg.HTTPClient = http.DefaultClient
+		cfg.HTTPClient = buildRetryClient().StandardClient()
 	}
 
 	cfg.HTTPClient.Transport = NewAuthenticatingTransport(cfg.HTTPClient.Transport, key, secret)
