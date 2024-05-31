@@ -16,6 +16,7 @@ func buildRetryClient() *retryablehttp.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 2
 	retryClient.CheckRetry = HTTPRetryPolicy
+
 	return retryClient
 }
 
@@ -63,6 +64,7 @@ func HTTPRetryPolicy(ctx context.Context, resp *http.Response, err error) (bool,
 	}
 
 	if err != nil {
+		//nolint:errorlint // copied from go-retryablehttp
 		if v, ok := err.(*url.Error); ok {
 			// Don't retry if the error was due to too many redirects.
 			if redirectsErrorRe.MatchString(v.Error()) {
@@ -111,6 +113,8 @@ func HTTPRetryPolicy(ctx context.Context, resp *http.Response, err error) (bool,
 }
 
 func isCertError(err error) bool {
+	//nolint:errorlint // copied from go-retryablehttp
 	_, ok := err.(*tls.CertificateVerificationError)
+
 	return ok
 }
