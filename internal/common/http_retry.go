@@ -55,7 +55,7 @@ func HTTPRetryPolicy(ctx context.Context, resp *http.Response, err error) (bool,
 		return false, nil
 	}
 	if err != nil && strings.Contains(strings.ToUpper(err.Error()), "POST") {
-		return false, nil
+		return false, err
 	}
 
 	// do not retry on context.Canceled or context.DeadlineExceeded
