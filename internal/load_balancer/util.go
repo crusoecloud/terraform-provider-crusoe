@@ -17,6 +17,13 @@ var loadBalancerNetworkInterfaceSchema = types.ObjectType{
 	},
 }
 
+var loadBalancerNetworkTargetSchema = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"cidr":        types.StringType,
+		"resource_id": types.StringType,
+	},
+}
+
 var loadBalancerIPAddressSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"private_ipv4": types.ObjectType{
@@ -76,7 +83,7 @@ func loadBalancerIPsToTerraformDataModel(ips []swagger.IpAddresses,
 	for _, ip := range ips {
 		lbIPs = append(lbIPs, ipAddressesModel{
 			PrivateIPv4: lbIPv4{Address: ip.PrivateIpv4.Address},
-			PublicIpv4:  lbIPv4{Address: ip.PublicIpv4.Address},
+			PublicIPv4:  lbIPv4{Address: ip.PublicIpv4.Address},
 		})
 	}
 
@@ -96,6 +103,21 @@ func loadBalancerNetworkInterfacesToTerraformResourceModel(networkInterfaces []s
 	lbNetworkInterfaces, diags = types.ListValueFrom(context.Background(), loadBalancerNetworkInterfaceSchema, interfaces)
 
 	return lbNetworkInterfaces, diags
+}
+
+func loadBalancerDestinationsToTerraformResourceModel(networkTargets []swagger.NetworkTarget,
+) (destinations types.List, diags diag.Diagnostics) {
+	lbNetworkTargets := make([]loadBalancerNetworkTargetModel, 0, len(networkTargets))
+	for _, networkTarget := range networkTargets {
+		lbNetworkTargets = append(lbNetworkTargets, loadBalancerNetworkTargetModel{
+			Cidr:       types.StringValue(networkTarget.Cidr),
+			ResourceID: types.StringValue(networkTarget.ResourceId),
+		})
+	}
+
+	destinations, diags = types.ListValueFrom(context.Background(), loadBalancerNetworkTargetSchema, lbNetworkTargets)
+
+	return destinations, diags
 }
 
 func loadBalancerIPsToTerraformResourceModel(ips []swagger.IpAddresses,
@@ -139,8 +161,7 @@ func loadBalancerUpdateTerraformState(ctx context.Context, lb *swagger.LoadBalan
 	state.Location = types.StringValue(lb.Location)
 	state.Algorithm = types.StringValue(lb.Algorithm)
 	state.Type = types.StringValue(lb.Type_)
-	destinations, _ := types.ListValueFrom(context.Background(), types.StringType, lb.Destinations)
-	state.Destinations = destinations
+	state.Destinations, _ = loadBalancerDestinationsToTerraformResourceModel(lb.Destinations)
 	protocols, _ := types.ListValueFrom(context.Background(), types.StringType, lb.Protocols)
 	state.Protocols = protocols
 	networkInterfaces, _ := loadBalancerNetworkInterfacesToTerraformResourceModel(lb.NetworkInterfaces)

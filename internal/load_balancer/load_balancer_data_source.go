@@ -33,7 +33,7 @@ type destinationModel struct {
 
 type ipAddressesModel struct {
 	PrivateIPv4 lbIPv4 `tfsdk:"private_ipv4"`
-	PublicIpv4  lbIPv4 `tfsdk:"public_ipv4"`
+	PublicIPv4  lbIPv4 `tfsdk:"public_ipv4"`
 }
 
 type lbIPv4 struct {

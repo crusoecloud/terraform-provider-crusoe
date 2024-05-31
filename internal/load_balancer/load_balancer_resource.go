@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -141,8 +142,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 						"cidr": schema.StringAttribute{
 							Computed:      true,
 							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},      // maintain across updates
-							Validators:    []validator.String{validators.RegexValidator{RegexPattern: "/32$"}}, // load balancers only support the /32 mask
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},                                                   // maintain across updates
+							Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/32)?$"}}, // load balancers only support the /32 mask
 						},
 						"resource_id": schema.StringAttribute{
 							Computed:      true,
@@ -163,8 +164,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"algorithm": schema.StringAttribute{
 				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},             // cannot be updated in place
-				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^random$"}}, // we currently only support random
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:    []validator.String{stringvalidator.OneOf("random")},         // we currently only support random
 			},
 			"type": schema.StringAttribute{
 				Optional:      true,
@@ -268,7 +269,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	for _, n := range tNetworkInterfaces {
 		networkInterfaces = append(networkInterfaces, swagger.LoadBalancerNetworkInterface{
 			NetworkId: n.NetworkID.ValueString(),
-			SubnetId:  n.NetworkID.ValueString(),
+			SubnetId:  n.SubnetID.ValueString(),
 		})
 	}
 	postReq.NetworkInterfaces = networkInterfaces
@@ -346,6 +347,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	plan.Type = types.StringValue(loadBalancer.Type_)
 	plan.NetworkInterfaces, _ = loadBalancerNetworkInterfacesToTerraformResourceModel(loadBalancer.NetworkInterfaces)
 	plan.HealthCheck, _ = types.ObjectValueFrom(ctx, loadBalancerHealthCheckSchema.AttrTypes, loadBalancerHealthCheckToTerraformResourceModel(loadBalancer.HealthCheck))
+	plan.Destinations, _ = loadBalancerDestinationsToTerraformResourceModel(loadBalancer.Destinations)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
