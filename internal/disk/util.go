@@ -28,4 +28,5 @@ func diskToTerraformResourceModel(disk *swagger.DiskV1Alpha5, state *diskResourc
 	state.Type = types.StringValue(disk.Type_)
 	state.Size = types.StringValue(disk.Size)
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
+	state.BlockSize = types.Int64Value(disk.BlockSize)
 }
