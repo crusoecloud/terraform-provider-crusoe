@@ -31,5 +31,6 @@ Required:
 
 Read-Only:
 
+- `block_size` (Number)
 - `id` (String)
 - `serial_number` (String)
