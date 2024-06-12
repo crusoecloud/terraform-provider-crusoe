@@ -40,7 +40,7 @@ type vmByTemplateResourceModel struct {
 	Disks               types.List   `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
-	ReservationID       types.List   `tfsdk:"host_channel_adapters"`
+	ReservationID       types.String `tfsdk:"reservation_id"`
 }
 
 func NewVMByTemplateResource() resource.Resource {
@@ -209,6 +209,10 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 					},
 				},
 			},
+			"reservation_id": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
 		},
 	}
 }
@@ -224,6 +228,17 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	var reservationSpecification *swagger.ReservationSpecification
+	if plan.ReservationID.String() == "" {
+		// if the reservation ID is set to an empty string, we will create the VM on-demand
+		reservationSpecification = &swagger.ReservationSpecification{
+			SelectionStrategy: "on_demand",
+		}
+	} else if plan.ReservationID.ValueString() != "" {
+		reservationSpecification = &swagger.ReservationSpecification{
+			Id: plan.ReservationID.ValueString(),
+		}
 	}
 	projectID := ""
 	if plan.ProjectID.ValueString() == "" {
@@ -255,9 +270,10 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	defer httpResp.Body.Close()
 
 	dataResp, httpResp, err := r.client.VMsApi.BulkCreateInstance(ctx, swagger.BulkInstancePostRequestV1Alpha5{
-		NamePrefix:         plan.NamePrefix.ValueString(),
-		Count:              1,
-		InstanceTemplateId: instanceTemplateID,
+		NamePrefix:               plan.NamePrefix.ValueString(),
+		Count:                    1,
+		InstanceTemplateId:       instanceTemplateID,
+		ReservationSpecification: reservationSpecification,
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -290,6 +306,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	plan.ProjectID = types.StringValue(projectID)
 	plan.Type = types.StringValue(instance.Type_)
 	plan.Location = types.StringValue(instance.Location)
+	plan.ReservationID = types.StringValue(instance.ReservationId)
 	plan.Image = types.StringValue(instanceTemplateResp.ImageName)
 	plan.SSHKey = types.StringValue(instanceTemplateResp.SshPublicKey)
 	plan.StartupScript = types.StringValue(instanceTemplateResp.StartupScript)
@@ -514,6 +531,61 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		state.NetworkInterfaces = plan.NetworkInterfaces
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
+	}
+	// add a reservation ID
+	if plan.ReservationID.String() != "" && state.ReservationID.String() == "" {
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+			Action:        "RESERVE",
+			ReservationId: plan.ReservationID.String(),
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to add vm to reservation",
+				fmt.Sprintf("There was an error requesting add vm to reservation: %v", err))
+
+			return
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update reservation ID",
+				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		state.ReservationID = plan.ReservationID
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+	} else if plan.ReservationID.String() == "" && state.ReservationID.String() != "" {
+		// remove reservation ID
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+			Action: "UNRESERVE",
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to remove vm from reservation",
+				fmt.Sprintf("There was an error requesting remove vm from reservation: %v", err))
+
+			return
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update reservation ID",
+				fmt.Sprintf("There was an error unreserving the vm: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		state.ReservationID = plan.ReservationID
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+	} else if plan.ReservationID.String() != "" && state.ReservationID.String() != "" && plan.ReservationID.String() != state.ReservationID.String() {
+		resp.Diagnostics.AddError("Failed to update reservation ID",
+			"Reservation ID cannot be updated in-place. Please remove the reservation ID and re-add it.")
+
+		return
 	}
 }
 
