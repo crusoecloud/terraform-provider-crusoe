@@ -630,7 +630,6 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 
 		return
 	}
-
 }
 
 //nolint:gocritic // Implements Terraform defined interface
