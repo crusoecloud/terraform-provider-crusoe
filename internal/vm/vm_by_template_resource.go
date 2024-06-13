@@ -212,7 +212,7 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			"reservation_id": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. An empty string indicates that a reservation should not be used.",
+				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
 			},
 		},
 	}
