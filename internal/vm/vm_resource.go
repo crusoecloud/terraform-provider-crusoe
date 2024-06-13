@@ -240,6 +240,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Description:   "ID of the reservation to which the VM belongs. If not provided, the lowest-cost reservation will be used by default. An empty string indicates that a reservation should not be used.",
 			},
 		},
 	}
