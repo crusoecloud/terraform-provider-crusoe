@@ -259,7 +259,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 	var reservationSpecification *swagger.ReservationSpecification
-	if plan.ReservationID.ValueString() == "" {
+	if plan.ReservationID.IsNull() || plan.ReservationID.IsUnknown() {
 		// if the reservation ID is set to an empty string, we will create the VM on-demand
 		reservationSpecification = &swagger.ReservationSpecification{
 			SelectionStrategy: "on_demand",
@@ -601,7 +601,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		state.ReservationID = plan.ReservationID
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
-	} else if plan.ReservationID.ValueString() == "" && state.ReservationID.String() != "" {
+	} else if plan.ReservationID.ValueString() == "" && state.ReservationID.ValueString() != "" {
 		// remove reservation ID
 		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action: "UNRESERVE",
@@ -625,7 +625,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		state.ReservationID = plan.ReservationID
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
-	} else if plan.ReservationID.String() != "" && state.ReservationID.String() != "" && plan.ReservationID.String() != state.ReservationID.String() {
+	} else if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() != "" && plan.ReservationID.String() != state.ReservationID.String() {
 		resp.Diagnostics.AddError("Failed to update reservation ID",
 			"Reservation ID cannot be updated in-place. Please remove the reservation ID and re-add it.")
 
