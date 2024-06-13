@@ -533,7 +533,7 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.Append(diags...)
 	}
 	// add a reservation ID
-	if plan.ReservationID.String() != "" && state.ReservationID.String() == "" {
+	if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() == "" {
 		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action:        "RESERVE",
 			ReservationId: plan.ReservationID.String(),
@@ -557,7 +557,7 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		state.ReservationID = plan.ReservationID
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
-	} else if plan.ReservationID.String() == "" && state.ReservationID.String() != "" {
+	} else if plan.ReservationID.ValueString() == "" && state.ReservationID.String() != "" {
 		// remove reservation ID
 		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action: "UNRESERVE",

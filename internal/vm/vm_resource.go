@@ -259,7 +259,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 	var reservationSpecification *swagger.ReservationSpecification
-	if plan.ReservationID.String() == "" {
+	if plan.ReservationID.ValueString() == "" {
 		// if the reservation ID is set to an empty string, we will create the VM on-demand
 		reservationSpecification = &swagger.ReservationSpecification{
 			SelectionStrategy: "on_demand",
@@ -577,7 +577,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	// add a reservation ID
-	if plan.ReservationID.String() != "" && state.ReservationID.String() == "" {
+	if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() == "" {
 		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action:        "RESERVE",
 			ReservationId: plan.ReservationID.String(),
