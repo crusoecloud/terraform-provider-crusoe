@@ -34,6 +34,7 @@ description: |-
 - `location` (String)
 - `name` (String)
 - `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
+- `reservation_id` (String)
 - `shutdown_script` (String)
 - `ssh_key` (String)
 - `startup_script` (String)
