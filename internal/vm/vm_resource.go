@@ -626,8 +626,48 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
 	} else if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() != "" && plan.ReservationID.String() != state.ReservationID.String() {
-		resp.Diagnostics.AddError("Failed to update reservation ID",
-			"Reservation ID cannot be updated in-place. Please remove the reservation ID and re-add it.")
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+			Action: "UNRESERVE",
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to remove vm from reservation",
+				fmt.Sprintf("There was an error requesting remove vm from its current reservation: %v", err))
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update reservation ID",
+				fmt.Sprintf("There was an error unreserving the vm: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+		// update state to reflect the unreserved state
+		state.ReservationID = types.StringValue("")
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+
+		patchResp, httpResp, err = r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+			Action:        "RESERVE",
+			ReservationId: plan.ReservationID.String(),
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to add vm to reservation",
+				fmt.Sprintf("There was an error requesting add vm to new reservation: %v", err))
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update reservation ID",
+				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+		// update state to reflect the new reservation
+		state.ReservationID = plan.ReservationID
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
 
 		return
 	}
