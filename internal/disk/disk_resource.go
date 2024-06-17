@@ -323,7 +323,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 func formatSize(sizeStr string) string {
 	lowerSize := strings.ToLower(sizeStr)
 	if strings.HasSuffix(lowerSize, "gib") {
-		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err != nil &&
+		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil &&
 			size >= gibInTib && size%gibInTib == 0 {
 
 			return strconv.Itoa(size/gibInTib) + "TiB"
