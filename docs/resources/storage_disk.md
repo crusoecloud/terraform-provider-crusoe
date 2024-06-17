@@ -23,6 +23,7 @@ description: |-
 
 ### Optional
 
+- `block_size` (Number)
 - `project_id` (String)
 - `type` (String)
 

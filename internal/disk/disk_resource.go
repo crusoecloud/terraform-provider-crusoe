@@ -6,9 +6,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -20,8 +22,9 @@ import (
 )
 
 const (
-	defaultDiskType = "persistent-ssd"
-	gibInTib        = 1024
+	defaultDiskType  = "persistent-ssd"
+	gibInTib         = 1024
+	defaultBlockSize = 4096
 )
 
 type diskResource struct {
@@ -36,6 +39,7 @@ type diskResourceModel struct {
 	Type         types.String `tfsdk:"type"`
 	Size         types.String `tfsdk:"size"`
 	SerialNumber types.String `tfsdk:"serial_number"`
+	BlockSize    types.Int64  `tfsdk:"block_size"`
 }
 
 func NewDiskResource() resource.Resource {
@@ -63,7 +67,7 @@ func (r *diskResource) Metadata(ctx context.Context, req resource.MetadataReques
 	resp.TypeName = req.ProviderTypeName + "_storage_disk"
 }
 
-//nolint:gocritic // Implements Terraform defined interface
+//nolint:gocritic,gomnd // Implements Terraform defined interface
 func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version: 1,
@@ -104,6 +108,12 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
+			"block_size": schema.Int64Attribute{
+				Optional:      true,
+				Computed:      true,
+				Validators:    []validator.Int64{int64validator.OneOf(512, 4096)},        // we support either 512 or 4096 bits
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}, // cannot be updated in place
+			},
 		},
 	}
 }
@@ -140,11 +150,17 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		projectID = plan.ProjectID.ValueString()
 	}
 
+	blockSize := plan.BlockSize.ValueInt64()
+	if blockSize == 0 {
+		blockSize = defaultBlockSize
+	}
+
 	dataResp, httpResp, err := r.client.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1Alpha5{
-		Name:     plan.Name.ValueString(),
-		Location: plan.Location.ValueString(),
-		Type_:    diskType,
-		Size:     plan.Size.ValueString(),
+		Name:      plan.Name.ValueString(),
+		Location:  plan.Location.ValueString(),
+		Type_:     diskType,
+		Size:      plan.Size.ValueString(),
+		BlockSize: blockSize,
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
@@ -168,6 +184,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	plan.SerialNumber = types.StringValue(disk.SerialNumber)
 	plan.Size = types.StringValue(formatSize(disk.Size))
 	plan.ProjectID = types.StringValue(projectID)
+	plan.BlockSize = types.Int64Value(disk.BlockSize)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -225,6 +242,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	state.Type = types.StringValue(disk.Type_)
 	state.Size = types.StringValue(formatSize(disk.Size))
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
+	state.BlockSize = types.Int64Value(disk.BlockSize)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

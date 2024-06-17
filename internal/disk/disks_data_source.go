@@ -26,6 +26,7 @@ type diskModel struct {
 	Type         string `tfsdk:"type"`
 	Size         string `tfsdk:"size"`
 	SerialNumber string `tfsdk:"serial_number"`
+	BlockSize    int64  `tfsdk:"block_size"`
 }
 
 // TODO: let's also implement a singular DiskDataSource for fetching one disk with filtering
@@ -79,6 +80,9 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 					"serial_number": schema.StringAttribute{
 						Computed: true,
 					},
+					"block_size": schema.Int64Attribute{
+						Computed: true,
+					},
 				},
 			},
 		},
@@ -112,6 +116,7 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 			Type:         dataResp.Items[i].Type_,
 			Size:         dataResp.Items[i].Size,
 			SerialNumber: dataResp.Items[i].SerialNumber,
+			BlockSize:    dataResp.Items[i].BlockSize,
 		})
 	}
 
