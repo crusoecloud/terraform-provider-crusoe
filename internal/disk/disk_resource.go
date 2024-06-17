@@ -111,7 +111,7 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"block_size": schema.Int64Attribute{
 				Optional:      true,
 				Computed:      true,
-				Validators:    []validator.Int64{int64validator.OneOf(512, 4096)}, // we support either 512 or 4096 bits
+				Validators:    []validator.Int64{int64validator.OneOf(512, 4096)},        // we support either 512 or 4096 bits
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 		},
