@@ -88,107 +88,110 @@ func (ds *loadBalancerDataSource) Metadata(ctx context.Context, request datasour
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"load_balancers": schema.ListNestedAttribute{
-			Computed: true,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: map[string]schema.Attribute{
-					"id": schema.StringAttribute{
-						Computed: true,
-					},
-					"name": schema.StringAttribute{
-						Computed: true,
-					},
-					"network_interfaces": schema.ListNestedAttribute{
-						Computed: true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"network_id": schema.StringAttribute{
-									Computed: true,
-								},
-								"subnet_id": schema.StringAttribute{
-									Computed: true,
-								},
-							},
+	response.Schema = schema.Schema{
+		MarkdownDescription: "This feature is currently in development.",
+		Attributes: map[string]schema.Attribute{
+			"load_balancers": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Computed: true,
 						},
-					},
-					"destinations": schema.ListNestedAttribute{
-						Computed: true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"cidr": schema.StringAttribute{
-									Computed: true,
-								},
-								"resource_id": schema.StringAttribute{
-									Computed: true,
-								},
-							},
+						"name": schema.StringAttribute{
+							Computed: true,
 						},
-					},
-					"location": schema.StringAttribute{
-						Computed: true,
-					},
-					"protocols": schema.ListAttribute{
-						ElementType: types.StringType,
-						Computed:    true,
-					},
-					"algorithm": schema.StringAttribute{
-						Computed: true,
-					},
-					"type": schema.StringAttribute{
-						Computed: true,
-					},
-					"ips": schema.ListNestedAttribute{
-						Computed: true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"public_ipv4": schema.SingleNestedAttribute{
-									Computed: true,
-									Optional: true,
-									Attributes: map[string]schema.Attribute{
-										"address": schema.StringAttribute{
-											Computed: true,
-										},
+						"network_interfaces": schema.ListNestedAttribute{
+							Computed: true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"network_id": schema.StringAttribute{
+										Computed: true,
 									},
-								},
-								"private_ipv4": schema.SingleNestedAttribute{
-									Computed: true,
-									Attributes: map[string]schema.Attribute{
-										"address": schema.StringAttribute{
-											Computed: true,
-										},
+									"subnet_id": schema.StringAttribute{
+										Computed: true,
 									},
 								},
 							},
 						},
-					},
-					"health_check": schema.SingleNestedAttribute{
-						Computed: true,
-						Attributes: map[string]schema.Attribute{
-							"timeout": schema.StringAttribute{
-								Computed: true,
+						"destinations": schema.ListNestedAttribute{
+							Computed: true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"cidr": schema.StringAttribute{
+										Computed: true,
+									},
+									"resource_id": schema.StringAttribute{
+										Computed: true,
+									},
+								},
 							},
-							"port": schema.StringAttribute{
-								Computed: true,
+						},
+						"location": schema.StringAttribute{
+							Computed: true,
+						},
+						"protocols": schema.ListAttribute{
+							ElementType: types.StringType,
+							Computed:    true,
+						},
+						"algorithm": schema.StringAttribute{
+							Computed: true,
+						},
+						"type": schema.StringAttribute{
+							Computed: true,
+						},
+						"ips": schema.ListNestedAttribute{
+							Computed: true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"public_ipv4": schema.SingleNestedAttribute{
+										Computed: true,
+										Optional: true,
+										Attributes: map[string]schema.Attribute{
+											"address": schema.StringAttribute{
+												Computed: true,
+											},
+										},
+									},
+									"private_ipv4": schema.SingleNestedAttribute{
+										Computed: true,
+										Attributes: map[string]schema.Attribute{
+											"address": schema.StringAttribute{
+												Computed: true,
+											},
+										},
+									},
+								},
 							},
-							"interval": schema.StringAttribute{
-								Computed: true,
-							},
-							"success_count": schema.StringAttribute{
-								Computed: true,
-							},
-							"failure_count": schema.StringAttribute{
-								Computed: true,
+						},
+						"health_check": schema.SingleNestedAttribute{
+							Computed: true,
+							Attributes: map[string]schema.Attribute{
+								"timeout": schema.StringAttribute{
+									Computed: true,
+								},
+								"port": schema.StringAttribute{
+									Computed: true,
+								},
+								"interval": schema.StringAttribute{
+									Computed: true,
+								},
+								"success_count": schema.StringAttribute{
+									Computed: true,
+								},
+								"failure_count": schema.StringAttribute{
+									Computed: true,
+								},
 							},
 						},
 					},
 				},
 			},
+			"project_id": schema.StringAttribute{
+				Optional: true,
+			},
 		},
-		"project_id": schema.StringAttribute{
-			Optional: true,
-		},
-	}}
+	}
 }
 
 //nolint:gocritic // Implements Terraform defined interface
