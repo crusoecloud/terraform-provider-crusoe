@@ -62,7 +62,8 @@ func (r *instanceGroupResource) Metadata(ctx context.Context, req resource.Metad
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version: 0,
+		MarkdownDescription: "This feature is currently in development. Reach out to support@crusoecloud.com with any questions.",
+		Version:             0,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,

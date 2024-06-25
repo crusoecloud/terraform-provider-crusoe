@@ -89,7 +89,7 @@ func (ds *loadBalancerDataSource) Metadata(ctx context.Context, request datasour
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
-		MarkdownDescription: "This feature is currently in development.",
+		MarkdownDescription: "This feature is currently in development. Reach out to support@crusoecloud.com with any questions.",
 		Attributes: map[string]schema.Attribute{
 			"load_balancers": schema.ListNestedAttribute{
 				Computed: true,

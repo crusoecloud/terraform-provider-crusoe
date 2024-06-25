@@ -3,12 +3,12 @@
 page_title: "crusoe_load_balancer Data Source - terraform-provider-crusoe"
 subcategory: ""
 description: |-
-  This feature is currently in development.
+  This feature is currently in development. Reach out to support@crusoecloud.com with any questions.
 ---
 
 # crusoe_load_balancer (Data Source)
 
-This feature is currently in development.
+This feature is currently in development. Reach out to support@crusoecloud.com with any questions.
 
 
 
