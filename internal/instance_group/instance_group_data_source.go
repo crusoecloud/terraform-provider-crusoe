@@ -57,7 +57,7 @@ func (ds *instanceGroupsDataSource) Metadata(ctx context.Context, request dataso
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *instanceGroupsDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
-		MarkdownDescription: "This feature is currently in development. Reach out to support@crusoecloud.com with any questions.",
+		MarkdownDescription: common.DevelopmentMessage,
 		Attributes: map[string]schema.Attribute{
 			"instance_groups": schema.ListNestedAttribute{
 				Computed: true,
