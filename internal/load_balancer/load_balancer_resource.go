@@ -97,7 +97,8 @@ func (r *loadBalancerResource) Metadata(ctx context.Context, req resource.Metada
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version: 1,
+		MarkdownDescription: common.DevelopmentMessage,
+		Version:             1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,

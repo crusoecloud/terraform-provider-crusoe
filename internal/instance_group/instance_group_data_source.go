@@ -56,34 +56,37 @@ func (ds *instanceGroupsDataSource) Metadata(ctx context.Context, request dataso
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *instanceGroupsDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"instance_groups": schema.ListNestedAttribute{
-			Computed: true,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: map[string]schema.Attribute{
-					"id": schema.StringAttribute{
-						Computed: true,
-					},
-					"name": schema.StringAttribute{
-						Required: true,
-					},
-					"instance_template": schema.StringAttribute{
-						Required: true,
-					},
-					"running_instance_count": schema.Int64Attribute{
-						Computed: true,
-					},
-					"instances": schema.ListAttribute{
-						ElementType: types.StringType,
-						Computed:    true,
+	response.Schema = schema.Schema{
+		MarkdownDescription: common.DevelopmentMessage,
+		Attributes: map[string]schema.Attribute{
+			"instance_groups": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Computed: true,
+						},
+						"name": schema.StringAttribute{
+							Required: true,
+						},
+						"instance_template": schema.StringAttribute{
+							Required: true,
+						},
+						"running_instance_count": schema.Int64Attribute{
+							Computed: true,
+						},
+						"instances": schema.ListAttribute{
+							ElementType: types.StringType,
+							Computed:    true,
+						},
 					},
 				},
 			},
+			"project_id": schema.StringAttribute{
+				Optional: true,
+			},
 		},
-		"project_id": schema.StringAttribute{
-			Optional: true,
-		},
-	}}
+	}
 }
 
 //nolint:gocritic // Implements Terraform defined interface
