@@ -19,6 +19,11 @@ resource "crusoe_compute_instance" "my_vm" {
   # specify the base image
   image = "ubuntu20.04:latest"
 
+  # specify a reservation id to use, if applicable
+  # if left unset, the lowest cost reservation will be selected by default
+  # to create the VM without a reservation, specify an empty string
+  # reservation_id = "[insert-reservation-id]"
+
   disks = [
       // disk attached at startup
       {

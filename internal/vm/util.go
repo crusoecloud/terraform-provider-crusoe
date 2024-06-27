@@ -240,6 +240,7 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	state.Location = types.StringValue(instance.Location)
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
+	state.ReservationID = types.StringValue(instance.ReservationId)
 
 	disks := make([]vmDiskResourceModel, 0, len(instance.Disks))
 	for i := range instance.Disks {
@@ -276,6 +277,7 @@ func vmUpdateTerraformState(instance *swagger.InstanceV1Alpha5, state *vmResourc
 	state.Location = types.StringValue(instance.Location)
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
+	state.ReservationID = types.StringValue(instance.ReservationId)
 
 	remoteDisksMap := make(map[string]vmDiskResourceModel)
 	for i := range instance.Disks {
