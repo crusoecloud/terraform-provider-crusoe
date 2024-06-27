@@ -105,10 +105,10 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 							Computed: true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
-									"network_id": schema.StringAttribute{
+									"network": schema.StringAttribute{
 										Computed: true,
 									},
-									"subnet_id": schema.StringAttribute{
+									"subnet": schema.StringAttribute{
 										Computed: true,
 									},
 								},
