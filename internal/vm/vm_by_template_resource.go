@@ -232,13 +232,15 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	}
 	var reservationSpecification *swagger.ReservationSpecification
 	if plan.ReservationID.IsNull() || plan.ReservationID.IsUnknown() {
-		// if the reservation ID is set to an empty string, we will create the VM on-demand
-		reservationSpecification = &swagger.ReservationSpecification{
-			SelectionStrategy: "on_demand",
-		}
+		reservationSpecification = &swagger.ReservationSpecification{} // defaults to lowest-cost
 	} else if plan.ReservationID.ValueString() != "" {
 		reservationSpecification = &swagger.ReservationSpecification{
 			Id: plan.ReservationID.ValueString(),
+		}
+	} else {
+		// on-demand
+		reservationSpecification = &swagger.ReservationSpecification{
+			SelectionStrategy: "on_demand",
 		}
 	}
 	projectID := ""
