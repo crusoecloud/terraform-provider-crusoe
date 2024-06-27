@@ -95,9 +95,9 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Validators:    []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),    // cannot be updated in place
 					stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
@@ -112,13 +112,13 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"block_size": schema.Int64Attribute{
-				Optional:      true,
-				Computed:      true,
-				Validators:    []validator.Int64{int64validator.OneOf(512, 4096)},        // we support either 512 or 4096 bits
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.Int64{int64validator.OneOf(512, 4096)}, // we support either 512 or 4096 bits
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplaceIfConfigured(), // cannot be updated in place
 					int64planmodifier.UseStateForUnknown(),
-				}, 
+				},
 			},
 		},
 	}
