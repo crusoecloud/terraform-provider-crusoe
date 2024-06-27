@@ -49,8 +49,8 @@ Optional:
 
 Optional:
 
-- `network_id` (String)
-- `subnet_id` (String)
+- `network` (String)
+- `subnet` (String)
 
 
 <a id="nestedatt--health_check"></a>

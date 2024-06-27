@@ -46,8 +46,8 @@ type loadBalancerNetworkTargetModel struct {
 }
 
 type loadBalancerNetworkInterfaceModel struct {
-	NetworkID types.String `tfsdk:"network_id"`
-	SubnetID  types.String `tfsdk:"subnet_id"`
+	Network types.String `tfsdk:"network"`
+	Subnet  types.String `tfsdk:"subnet"`
 }
 
 type loadBalancerIPAddressModel struct {
@@ -121,12 +121,12 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
-						"network_id": schema.StringAttribute{
+						"network": schema.StringAttribute{
 							Computed:      true,
 							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
-						"subnet_id": schema.StringAttribute{
+						"subnet": schema.StringAttribute{
 							Computed:      true,
 							Optional:      true,
 							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -269,8 +269,8 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	networkInterfaces := make([]swagger.LoadBalancerNetworkInterface, 0, len(tNetworkInterfaces))
 	for _, n := range tNetworkInterfaces {
 		networkInterfaces = append(networkInterfaces, swagger.LoadBalancerNetworkInterface{
-			NetworkId: n.NetworkID.ValueString(),
-			SubnetId:  n.SubnetID.ValueString(),
+			Network: n.Network.ValueString(),
+			Subnet:  n.Subnet.ValueString(),
 		})
 	}
 	postReq.NetworkInterfaces = networkInterfaces

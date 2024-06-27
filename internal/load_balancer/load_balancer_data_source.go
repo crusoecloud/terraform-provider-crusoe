@@ -22,8 +22,8 @@ type loadBalancerDataSourceModel struct {
 }
 
 type networkInterfaceModel struct {
-	NetworkID string `tfsdk:"network_id"`
-	SubnetID  string `tfsdk:"subnet_id"`
+	Network string `tfsdk:"network"`
+	Subnet  string `tfsdk:"subnet"`
 }
 
 type destinationModel struct {

@@ -74,7 +74,7 @@ resource "crusoe_load_balancer" "my_load_balancer" {
   protocols    = ["tcp"]
   network_interfaces = [
     {
-        subnet_id = crusoe_vpc_subnet.my_lb_subnet.id
+        subnet = crusoe_vpc_subnet.my_lb_subnet.id
     }
   ]
 }
