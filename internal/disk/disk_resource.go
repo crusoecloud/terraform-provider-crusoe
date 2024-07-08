@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -22,7 +23,8 @@ import (
 )
 
 const (
-	defaultDiskType  = "persistent-ssd"
+	persistentSSD    = "persistent-ssd"
+	sharedVolume     = "shared-volume"
 	gibInTib         = 1024
 	defaultBlockSize = 4096
 )
@@ -93,8 +95,9 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),    // cannot be updated in place
 					stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
@@ -109,10 +112,13 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"block_size": schema.Int64Attribute{
-				Optional:      true,
-				Computed:      true,
-				Validators:    []validator.Int64{int64validator.OneOf(512, 4096)},        // we support either 512 or 4096 bits
-				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.Int64{int64validator.OneOf(512, 4096)}, // we support either 512 or 4096 bits
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplaceIfConfigured(), // cannot be updated in place
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -133,7 +139,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	diskType := plan.Type.ValueString()
 	if diskType == "" {
-		diskType = defaultDiskType
+		diskType = persistentSSD
 	}
 
 	projectID := ""
@@ -151,7 +157,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	blockSize := plan.BlockSize.ValueInt64()
-	if blockSize == 0 {
+	if blockSize == 0 && diskType == persistentSSD {
 		blockSize = defaultBlockSize
 	}
 
