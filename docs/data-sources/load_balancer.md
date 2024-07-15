@@ -93,5 +93,5 @@ Read-Only:
 
 Read-Only:
 
-- `network_id` (String)
-- `subnet_id` (String)
+- `network` (String)
+- `subnet` (String)

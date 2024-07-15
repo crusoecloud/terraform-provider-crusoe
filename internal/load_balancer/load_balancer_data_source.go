@@ -22,8 +22,8 @@ type loadBalancerDataSourceModel struct {
 }
 
 type networkInterfaceModel struct {
-	NetworkID string `tfsdk:"network_id"`
-	SubnetID  string `tfsdk:"subnet_id"`
+	Network string `tfsdk:"network"`
+	Subnet  string `tfsdk:"subnet"`
 }
 
 type destinationModel struct {
@@ -105,10 +105,10 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 							Computed: true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
-									"network_id": schema.StringAttribute{
+									"network": schema.StringAttribute{
 										Computed: true,
 									},
-									"subnet_id": schema.StringAttribute{
+									"subnet": schema.StringAttribute{
 										Computed: true,
 									},
 								},

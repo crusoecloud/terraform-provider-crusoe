@@ -12,8 +12,8 @@ import (
 
 var loadBalancerNetworkInterfaceSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"network_id": types.StringType,
-		"subnet_id":  types.StringType,
+		"network": types.StringType,
+		"subnet":  types.StringType,
 	},
 }
 
@@ -56,8 +56,8 @@ func loadBalancerNetworkInterfacesToTerraformDataModel(networkInterfaces []swagg
 	interfaces := make([]networkInterfaceModel, 0, len(networkInterfaces))
 	for _, networkInterface := range networkInterfaces {
 		interfaces = append(interfaces, networkInterfaceModel{
-			NetworkID: networkInterface.NetworkId,
-			SubnetID:  networkInterface.SubnetId,
+			Network: networkInterface.Network,
+			Subnet:  networkInterface.Subnet,
 		})
 	}
 
@@ -95,8 +95,8 @@ func loadBalancerNetworkInterfacesToTerraformResourceModel(networkInterfaces []s
 	interfaces := make([]loadBalancerNetworkInterfaceModel, 0, len(networkInterfaces))
 	for _, networkInterface := range networkInterfaces {
 		interfaces = append(interfaces, loadBalancerNetworkInterfaceModel{
-			NetworkID: types.StringValue(networkInterface.NetworkId),
-			SubnetID:  types.StringValue(networkInterface.SubnetId),
+			Network: types.StringValue(networkInterface.Network),
+			Subnet:  types.StringValue(networkInterface.Subnet),
 		})
 	}
 
