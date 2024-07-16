@@ -583,7 +583,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() == "" {
 		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action:        "RESERVE",
-			ReservationId: plan.ReservationID.String(),
+			ReservationId: plan.ReservationID.ValueString(),
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to add vm to reservation",
