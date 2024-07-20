@@ -1,3 +1,42 @@
+## 0.5.19 (July 19, 2024)
+
+ENHANCEMENTS:
+
+* Improved functionality when associating resources with a reservation ID.
+* Adds block size specification for disks.
+* Upgraded go version to 1.51.
+
+BUG FIXES:
+
+* Implements retry on HTTP errors to fix intermittent failures that occurred when polling for an operation result, causing the local TF state to be out of sync with the created resources.
+
+## 0.5.18 (May 28, 2024)
+
+NEW FEATURES:
+
+* Support associating VMs and instance templates with reservations.
+
+ENHANCEMENTS:
+
+* Upgraded go version to 1.48.
+
+BUG FIXES:
+
+* Handle multiple network interfaces with equal or unspecified subnets.
+
+## 0.5.17 (May 14, 2024)
+
+BUG FIXES:
+
+* Fixes an issue where networks interfaces were not saved if they not specified.
+
+## 0.5.16 (May 13, 2024)
+
+ENHANCEMENTS:
+
+* Support multiple network interfaces when creating a VM.
+* Upgraded go version to 1.47.
+
 ## 0.5.15 (April 18, 2024)
 
 ENHANCEMENTS:
