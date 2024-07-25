@@ -28,7 +28,7 @@ BUG FIXES:
 
 BUG FIXES:
 
-* Fixes an issue where networks interfaces were not saved if they not specified.
+* Fixes an issue where network interfaces were not saved if they were not specified.
 
 ## 0.5.16 (May 13, 2024)
 
