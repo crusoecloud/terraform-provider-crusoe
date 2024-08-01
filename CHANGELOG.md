@@ -4,7 +4,6 @@ ENHANCEMENTS:
 
 * Improved functionality when associating resources with a reservation ID.
 * Adds block size specification for disks.
-* Upgraded go version to 1.51.
 
 BUG FIXES:
 
@@ -15,10 +14,6 @@ BUG FIXES:
 NEW FEATURES:
 
 * Support associating VMs and instance templates with reservations.
-
-ENHANCEMENTS:
-
-* Upgraded go version to 1.48.
 
 BUG FIXES:
 
@@ -35,7 +30,6 @@ BUG FIXES:
 ENHANCEMENTS:
 
 * Support multiple network interfaces when creating a VM.
-* Upgraded go version to 1.47.
 
 ## 0.5.15 (April 18, 2024)
 
