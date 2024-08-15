@@ -327,7 +327,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 }
 
 // formatSize takes a format size to use as a pattern and converts the sizeStr to match it.
-func formatSize(format string, sizeStr string) string {
+func formatSize(format, sizeStr string) string {
 	lowerFormatSize := strings.ToLower(format)
 	lowerSize := strings.ToLower(sizeStr)
 	if strings.HasSuffix(lowerFormatSize, "tib") && strings.HasSuffix(lowerSize, "gib") {
