@@ -342,7 +342,6 @@ func formatSize(format, sizeStr string) string {
 
 	if strings.HasSuffix(lowerFormatSize, "gib") && strings.HasSuffix(lowerSize, "tib") {
 		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil {
-
 			return strconv.Itoa(size*gibInTib) + "GiB"
 		}
 
