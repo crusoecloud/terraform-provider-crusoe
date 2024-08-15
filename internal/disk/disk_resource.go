@@ -188,7 +188,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	plan.Type = types.StringValue(disk.Type_)
 	plan.Location = types.StringValue(disk.Location)
 	plan.SerialNumber = types.StringValue(disk.SerialNumber)
-	plan.Size = types.StringValue(formatSize(disk.Size))
+	plan.Size = types.StringValue(formatSize(plan.Size.ValueString(), disk.Size))
 	plan.ProjectID = types.StringValue(projectID)
 	plan.BlockSize = types.Int64Value(disk.BlockSize)
 
@@ -246,7 +246,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	state.Name = types.StringValue(disk.Name)
 	state.Type = types.StringValue(disk.Type_)
-	state.Size = types.StringValue(formatSize(disk.Size))
+	state.Size = types.StringValue(formatSize(state.Size.ValueString(), disk.Size))
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
 	state.BlockSize = types.Int64Value(disk.BlockSize)
 
@@ -326,13 +326,23 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 }
 
-func formatSize(sizeStr string) string {
+// formatSize takes a format size to use as a pattern and converts the sizeStr to match it.
+func formatSize(format, sizeStr string) string {
+	lowerFormatSize := strings.ToLower(format)
 	lowerSize := strings.ToLower(sizeStr)
-	if strings.HasSuffix(lowerSize, "gib") {
+	if strings.HasSuffix(lowerFormatSize, "tib") && strings.HasSuffix(lowerSize, "gib") {
 		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil &&
 			size >= gibInTib && size%gibInTib == 0 {
 
 			return strconv.Itoa(size/gibInTib) + "TiB"
+		}
+
+		return sizeStr
+	}
+
+	if strings.HasSuffix(lowerFormatSize, "gib") && strings.HasSuffix(lowerSize, "tib") {
+		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil {
+			return strconv.Itoa(size*gibInTib) + "GiB"
 		}
 
 		return sizeStr
