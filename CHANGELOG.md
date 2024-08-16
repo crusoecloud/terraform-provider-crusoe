@@ -1,3 +1,15 @@
+## 0.5.21 (August 16, 2024)
+
+BUG FIXES:
+
+* Fixes an issue with conversion of disk size from GiB to TiB.
+
+## 0.5.20 (August 13, 2024)
+
+ENHANCEMENTS:
+
+* Upgraded GoReleaser to V2.
+
 ## 0.5.19 (July 19, 2024)
 
 ENHANCEMENTS:
