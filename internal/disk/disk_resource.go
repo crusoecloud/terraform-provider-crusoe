@@ -23,10 +23,12 @@ import (
 )
 
 const (
-	persistentSSD    = "persistent-ssd"
-	sharedVolume     = "shared-volume"
-	gibInTib         = 1024
-	defaultBlockSize = 4096
+	persistentDiskTypeOld = "persistent-ssd"
+	persistentDiskType    = "persistent"
+	sharedDiskTypeOld     = "shared-volume"
+	sharedDiskType        = "shared"
+	gibInTib              = 1024
+	defaultBlockSize      = 4096
 )
 
 type diskResource struct {
@@ -97,7 +99,7 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"type": schema.StringAttribute{
 				Optional:   true,
 				Computed:   true,
-				Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
+				Validators: []validator.String{stringvalidator.OneOf(persistentDiskTypeOld, persistentDiskType, sharedDiskTypeOld, sharedDiskType)},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),    // cannot be updated in place
 					stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
@@ -139,7 +141,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	diskType := plan.Type.ValueString()
 	if diskType == "" {
-		diskType = persistentSSD
+		diskType = persistentDiskType
 	}
 
 	projectID := ""
@@ -157,7 +159,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	blockSize := plan.BlockSize.ValueInt64()
-	if blockSize == 0 && diskType == persistentSSD {
+	if blockSize == 0 && (diskType == persistentDiskTypeOld || diskType == persistentDiskType) {
 		blockSize = defaultBlockSize
 	}
 
