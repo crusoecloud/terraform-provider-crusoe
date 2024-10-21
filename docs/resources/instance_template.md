@@ -28,6 +28,7 @@ description: |-
 - `ib_partition` (String)
 - `image` (String)
 - `location` (String)
+- `placement_policy` (String)
 - `project_id` (String)
 - `public_ip_address_type` (String)
 - `reservation_id` (String)
