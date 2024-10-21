@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -37,7 +38,7 @@ type vmByTemplateResourceModel struct {
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
 	FQDN                types.String `tfsdk:"fqdn"`
-	Disks               types.List   `tfsdk:"disks"`
+	Disks               types.Set    `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
@@ -115,9 +116,9 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
-			"disks": schema.ListNestedAttribute{
+			"disks": schema.SetNestedAttribute{
 				Computed:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers: []planmodifier.Set{setplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -335,13 +336,13 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 			})
 		}
 
-		diskAttachmentsList, diskDiags := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
+		diskAttachmentsSet, diskDiags := types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
 		resp.Diagnostics.Append(diskDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 
-		plan.Disks = diskAttachmentsList
+		plan.Disks = diskAttachmentsSet
 	}
 
 	diags = resp.State.Set(ctx, plan)

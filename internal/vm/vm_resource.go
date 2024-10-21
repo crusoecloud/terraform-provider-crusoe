@@ -37,7 +37,7 @@ type vmResourceModel struct {
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
 	FQDN                types.String `tfsdk:"fqdn"`
-	Disks               types.List   `tfsdk:"disks"`
+	Disks               types.Set    `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
@@ -139,7 +139,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
-			"disks": schema.ListNestedAttribute{
+			"disks": schema.SetNestedAttribute{
 				Optional: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{

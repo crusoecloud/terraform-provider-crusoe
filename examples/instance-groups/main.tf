@@ -9,7 +9,7 @@ terraform {
 }
 
 locals {
-  my_ssh_key = file("~/.ssh/id_rsa.pub")
+  my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
 # list instance groups
@@ -20,11 +20,11 @@ output "crusoe_groups" {
 
 // new template
 resource "crusoe_instance_template" "my_template" {
-  name = "my-new-template"
+  name = "my-new-template1"
   type = "c1a.2x"
-  location = "us-east1-a"
+  location = "us-eaststaging1-a"
   // this can be obtained via the `crusoe networking vpc-subnets list` CLI command
-  subnet = "subnet-id"
+  subnet = "6568e5e0-c2ba-4a66-8b31-1a22d10ddb80"
 
   # specify the base image
   image = "ubuntu22.04:latest"
