@@ -23,6 +23,7 @@ resource "crusoe_instance_template" "my_template" {
   location = "us-northcentral1-a"
   // this can be obtained via the `crusoe networking vpc-subnets list` CLI command
   subnet = "bd247b17-fd13-44ba-8aa8-703852b6f326"
+  placement_policy = "spread"
 
   # specify the base image
   image = "ubuntu20.04:latest"
