@@ -187,7 +187,7 @@ func vmHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger
 	return values
 }
 
-func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsList types.Set, diags diag.Diagnostics) {
+func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsSet types.Set, diags diag.Diagnostics) {
 	attachments := make([]vmDiskResourceModel, 0, len(diskAttachments))
 	for _, diskAttachment := range diskAttachments {
 		attachments = append(attachments, vmDiskResourceModel{
@@ -197,9 +197,9 @@ func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAtta
 		})
 	}
 
-	diskAttachmentsList, diags = types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
+	diskAttachmentsSet, diags = types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
 
-	return diskAttachmentsList, diags
+	return diskAttachmentsSet, diags
 }
 
 func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1Alpha5, error) {

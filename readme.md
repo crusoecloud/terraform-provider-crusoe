@@ -7,7 +7,7 @@ This repo defines the official Terraform Provider for use with [Crusoe Cloud](ht
 
 To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.com/security/tokens and add the following to `~/.crusoe/config`:
 
-Note that Terraform does not read the `profile="env"` line at the top of the config file; it takes its environment directly from the `[default]` section. 
+Note that Terraform does not read the `profile="profile-name"` line at the top of the config file; it takes its environment directly from the `[default]` section. 
 
 ```toml
 [default]
