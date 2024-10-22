@@ -36,7 +36,7 @@ type instanceTemplateResourceModel struct {
 	Subnet              types.String `tfsdk:"subnet"`
 	IBPartition         types.String `tfsdk:"ib_partition"`
 	PublicIpAddressType types.String `tfsdk:"public_ip_address_type"`
-	DisksToCreate       types.List   `tfsdk:"disks"`
+	DisksToCreate       types.Set    `tfsdk:"disks"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
 }
 
@@ -138,7 +138,7 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
-			"disks": schema.ListNestedAttribute{
+			"disks": schema.SetNestedAttribute{
 				Required: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -246,9 +246,9 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		})
 	}
 	if len(disksToCreateResource) > 0 {
-		plan.DisksToCreate, _ = types.ListValueFrom(ctx, diskToCreateSchema, disksToCreateResource)
+		plan.DisksToCreate, _ = types.SetValueFrom(ctx, diskToCreateSchema, disksToCreateResource)
 	} else {
-		plan.DisksToCreate = types.ListNull(diskToCreateSchema)
+		plan.DisksToCreate = types.SetNull(diskToCreateSchema)
 	}
 
 	diags = resp.State.Set(ctx, &plan)
@@ -289,10 +289,10 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		})
 	}
 	if len(disks) > 0 {
-		tDisks, _ := types.ListValueFrom(context.Background(), diskToCreateSchema, disks)
+		tDisks, _ := types.SetValueFrom(context.Background(), diskToCreateSchema, disks)
 		state.DisksToCreate = tDisks
 	} else {
-		state.DisksToCreate = types.ListNull(diskToCreateSchema)
+		state.DisksToCreate = types.SetNull(diskToCreateSchema)
 	}
 
 	state.Name = types.StringValue(instanceTemplate.Name)

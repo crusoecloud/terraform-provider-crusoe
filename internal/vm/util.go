@@ -187,7 +187,7 @@ func vmHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger
 	return values
 }
 
-func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsList types.List, diags diag.Diagnostics) {
+func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAttachment) (diskAttachmentsSet types.Set, diags diag.Diagnostics) {
 	attachments := make([]vmDiskResourceModel, 0, len(diskAttachments))
 	for _, diskAttachment := range diskAttachments {
 		attachments = append(attachments, vmDiskResourceModel{
@@ -197,9 +197,9 @@ func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAtta
 		})
 	}
 
-	diskAttachmentsList, diags = types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
+	diskAttachmentsSet, diags = types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
 
-	return diskAttachmentsList, diags
+	return diskAttachmentsSet, diags
 }
 
 func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1Alpha5, error) {
@@ -255,10 +255,10 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	}
 
 	if len(disks) > 0 {
-		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
+		tDisks, _ := types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
 		state.Disks = tDisks
 	} else {
-		state.Disks = types.ListNull(vmDiskAttachmentSchema)
+		state.Disks = types.SetNull(vmDiskAttachmentSchema)
 	}
 
 	if len(instance.HostChannelAdapters) > 0 {
@@ -313,10 +313,10 @@ func vmUpdateTerraformState(instance *swagger.InstanceV1Alpha5, state *vmResourc
 	}
 
 	if len(disks) > 0 {
-		tDisks, _ := types.ListValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
+		tDisks, _ := types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, disks)
 		state.Disks = tDisks
 	} else {
-		state.Disks = types.ListNull(vmDiskAttachmentSchema)
+		state.Disks = types.SetNull(vmDiskAttachmentSchema)
 	}
 
 	if len(instance.HostChannelAdapters) > 0 {

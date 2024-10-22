@@ -7,6 +7,8 @@ This repo defines the official Terraform Provider for use with [Crusoe Cloud](ht
 
 To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.com/security/tokens and add the following to `~/.crusoe/config`:
 
+Note that Terraform does not read the `profile="profile-name"` line at the top of the config file; it takes its environment directly from the `[default]` section. 
+
 ```toml
 [default]
 access_key_id="MY_ACCESS_KEY"
@@ -54,7 +56,7 @@ Add the following to your `~/.terraformrc`
 provider_installation {
 
   dev_overrides {
-    "registry.terraform.io/crusoecloud/crusoe" = "/Users/{MY_USERNAME_HERE}/go/bin/"
+    "registry.terraform.io/crusoecloud/crusoe" = "$GOPATH/bin/"
   }
 
   # For all other providers, install them directly from their origin provider
@@ -65,6 +67,8 @@ provider_installation {
 ```
 
 Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples.
+
+Other common commands are: `terraform init` to initialize your working directory, and `terraform plan` to preview changes without applying them. 
 
 ## Versioning
 
