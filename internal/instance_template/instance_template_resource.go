@@ -337,7 +337,7 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	if instanceTemplate.PlacementPolicy != "" {
 		state.PlacementPolicy = types.StringValue(instanceTemplate.PlacementPolicy)
 	} else {
-		state.PlacementPolicy = types.StringValue("unspecified") // or null?
+		state.PlacementPolicy = types.StringValue("unspecified")
 	}
 
 	diags = resp.State.Set(ctx, &state)
