@@ -219,11 +219,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		})
 	}
 
-	placementPolicy := "unspecified"
-	inputPlacementPolicy := plan.PlacementPolicy.ValueString()
-	if strings.ToLower(inputPlacementPolicy) == "spread" {
-		placementPolicy = "spread"
-	}
+	placementPolicy := strings.ToLower(plan.PlacementPolicy.ValueString())
 
 	dataResp, httpResp, err := r.client.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
 		TemplateName:        plan.Name.ValueString(),
