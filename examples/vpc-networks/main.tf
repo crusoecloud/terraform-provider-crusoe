@@ -18,7 +18,7 @@ resource "crusoe_vpc_network" "my_vpc_network" {
 resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   name = "my-new-subnet"
   cidr = "10.0.0.0/16"
-  location = "us-eaststaging1-a"
+  location = "us-northcentral1-a"
   network = crusoe_vpc_network.my_vpc_network.id
 }
 
@@ -40,10 +40,10 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
 }
 
 // Create a VM in the new subnet
-resource "crusoe_compute_instance" "my_vm_test" {
-  name = "my-new-vm-test"
-  type = "c1a.2x"
-  location = "us-eaststaging1-a"
+resource "crusoe_compute_instance" "my_vm" {
+  name = "my-new-vm"
+  type = "a40.1x"
+  location = "us-northcentral1-a"
 
   # specify the base image
   image = "ubuntu20.04:latest"
