@@ -1,3 +1,8 @@
+## 0.5.22 (October 22, 2024)
+BUG FIXES:
+
+* Fixes representation of disks to be order-agnostic. 
+
 ## 0.5.21 (August 16, 2024)
 
 BUG FIXES:
