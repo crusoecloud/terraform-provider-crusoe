@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -17,6 +19,11 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
+)
+
+const (
+	spreadPlacementPolicy      = "spread"
+	unspecifiedPlacementPolicy = "unspecified"
 )
 
 type instanceTemplateResource struct {
@@ -38,6 +45,7 @@ type instanceTemplateResourceModel struct {
 	PublicIpAddressType types.String `tfsdk:"public_ip_address_type"`
 	DisksToCreate       types.Set    `tfsdk:"disks"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
+	PlacementPolicy     types.String `tfsdk:"placement_policy"`
 }
 
 type diskToCreateResourceModel struct {
@@ -164,6 +172,13 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
+			"placement_policy": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				Default:       stringdefault.StaticString("unspecified"),
+				Validators:    []validator.String{stringvalidator.OneOf(spreadPlacementPolicy, unspecifiedPlacementPolicy)},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+			},
 		},
 	}
 }
@@ -223,6 +238,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		Disks:               disksToCreate,
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
 		ReservationId:       plan.ReservationID.ValueString(),
+		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",
@@ -237,6 +253,8 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	plan.PublicIpAddressType = types.StringValue(dataResp.PublicIpAddressType)
 	plan.Location = types.StringValue(dataResp.Location)
 	plan.Image = types.StringValue(dataResp.ImageName)
+	plan.PlacementPolicy = types.StringValue(dataResp.PlacementPolicy)
+	plan.ReservationID = types.StringValue(dataResp.ReservationId)
 
 	disksToCreateResource := make([]diskToCreateResourceModel, 0, len(dataResp.Disks))
 	for _, diskToCreate := range disksToCreate {
@@ -319,6 +337,11 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		state.ShutdownScript = types.StringValue(instanceTemplate.ShutdownScript)
 	} else {
 		state.ShutdownScript = types.StringNull()
+	}
+	if instanceTemplate.PlacementPolicy != "" {
+		state.PlacementPolicy = types.StringValue(instanceTemplate.PlacementPolicy)
+	} else {
+		state.PlacementPolicy = types.StringValue("unspecified")
 	}
 
 	diags = resp.State.Set(ctx, &state)
