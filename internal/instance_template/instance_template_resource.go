@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -19,6 +19,11 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
+)
+
+const (
+	spreadPlacementPolicy      = "spread"
+	unspecifiedPlacementPolicy = "unspecified"
 )
 
 type instanceTemplateResource struct {
@@ -171,6 +176,7 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Optional:      true,
 				Computed:      true,
 				Default:       stringdefault.StaticString("unspecified"),
+				Validators:    []validator.String{stringvalidator.OneOf(spreadPlacementPolicy, unspecifiedPlacementPolicy)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 		},
@@ -219,8 +225,6 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		})
 	}
 
-	placementPolicy := strings.ToLower(plan.PlacementPolicy.ValueString())
-
 	dataResp, httpResp, err := r.client.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
 		TemplateName:        plan.Name.ValueString(),
 		Type_:               plan.Type.ValueString(),
@@ -234,7 +238,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		Disks:               disksToCreate,
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
 		ReservationId:       plan.ReservationID.ValueString(),
-		PlacementPolicy:     placementPolicy,
+		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",
@@ -249,7 +253,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	plan.PublicIpAddressType = types.StringValue(dataResp.PublicIpAddressType)
 	plan.Location = types.StringValue(dataResp.Location)
 	plan.Image = types.StringValue(dataResp.ImageName)
-	plan.PlacementPolicy = types.StringValue(placementPolicy)
+	plan.PlacementPolicy = types.StringValue(dataResp.PlacementPolicy)
 	plan.ReservationID = types.StringValue(dataResp.ReservationId)
 
 	disksToCreateResource := make([]diskToCreateResourceModel, 0, len(dataResp.Disks))

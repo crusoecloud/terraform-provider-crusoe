@@ -23,6 +23,8 @@ resource "crusoe_instance_template" "my_template" {
   location = "us-northcentral1-a"
   // this can be obtained via the `crusoe networking vpc-subnets list` CLI command
   subnet = "bd247b17-fd13-44ba-8aa8-703852b6f326"
+  // optional parameter to configure placement policy, only "spread" is currently supported
+  // defaults to "unspecified" if not provided
   placement_policy = "spread"
 
   # specify the base image
