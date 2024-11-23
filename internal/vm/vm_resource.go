@@ -424,7 +424,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	vmUpdateTerraformState(instance, &state)
+	vmToTerraformResourceModel(instance, &state)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -500,14 +500,12 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		}
 	}
 
-	// save intermediate results
-	if len(addedDisks) > 0 || len(removedDisks) > 0 {
-		state.Disks = plan.Disks
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	// save disk results
+	state.Disks = plan.Disks
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	// handle toggling static/dynamic public IPs
