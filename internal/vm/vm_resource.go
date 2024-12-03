@@ -25,7 +25,7 @@ var errProjectNotFound = errors.New("project for instance not found")
 
 const (
 	unspecifiedPolicy = "unspecified"
-	stopVMPolicy = "stop-vm"
+	stopVMPolicy      = "stop-vm"
 )
 
 type vmResource struct {
@@ -685,6 +685,37 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		resp.Diagnostics.Append(diags...)
 
 		return
+	}
+
+	// handle updating maintenance policy
+	if !plan.MaintenancePolicy.IsUnknown() {
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx,
+			swagger.InstancesPatchRequestV1Alpha5{
+				Action:            "UPDATE",
+				MaintenancePolicy: plan.MaintenancePolicy.ValueString(),
+			},
+			plan.ID.ValueString(),
+			plan.ProjectID.ValueString(),
+		)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance maintenance policy",
+				fmt.Sprintf("There was an error requesting to update the instance's maintenance policy: %v", err))
+
+			return
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance maintenance policy",
+				fmt.Sprintf("There was an error updating the instance's maintenance policy: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		state.MaintenancePolicy = plan.MaintenancePolicy
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
 	}
 }
 

@@ -18,6 +18,7 @@ description: |-
 ### Optional
 
 - `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
+- `maintenance_policy` (String)
 - `name` (String)
 - `project_id` (String)
 - `reservation_id` (String)
