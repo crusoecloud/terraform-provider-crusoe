@@ -229,8 +229,8 @@ func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateR
 			Name:       plan.Name.ValueString(),
 			TemplateId: plan.TemplateID.ValueString(),
 		},
-		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
+		plan.ProjectID.ValueString(),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update Instance Group",
