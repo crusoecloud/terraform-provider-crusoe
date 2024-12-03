@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -21,6 +22,11 @@ import (
 )
 
 var errProjectNotFound = errors.New("project for instance not found")
+
+const (
+	unspecifiedPolicy = "unspecified"
+	stopVMPolicy = "stop-vm"
+)
 
 type vmResource struct {
 	client *swagger.APIClient
@@ -41,6 +47,7 @@ type vmResourceModel struct {
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
+	MaintenancePolicy   types.String `tfsdk:"maintenance_policy"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -239,8 +246,14 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"reservation_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+			},
+			"maintenance_policy": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Validators:    []validator.String{stringvalidator.OneOf(unspecifiedPolicy, stopVMPolicy)},
 			},
 		},
 	}
@@ -351,6 +364,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Disks:                    diskIds,
 		HostChannelAdapters:      hostChannelAdapters,
 		ReservationSpecification: reservationSpecification,
+		MaintenancePolicy:        plan.MaintenancePolicy.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
