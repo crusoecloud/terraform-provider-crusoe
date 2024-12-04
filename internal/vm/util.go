@@ -241,6 +241,7 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
 	state.ReservationID = types.StringValue(instance.ReservationId)
+	state.MaintenancePolicy = types.StringValue(instance.MaintenancePolicy)
 
 	if len(instance.Disks) > 0 {
 		disks := make([]vmDiskResourceModel, 0, len(instance.Disks))

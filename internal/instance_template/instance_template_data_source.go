@@ -39,6 +39,7 @@ type instanceTemplatesModel struct {
 	IBPartition         string      `tfsdk:"ib_partition"`
 	Disks               []diskModel `tfsdk:"disks"`
 	PlacementPolicy     string      `tfsdk:"placement_policy"`
+	MaintenancePolicy   string      `tfsdk:"maintenance_policy"`
 }
 
 func NewInstanceTemplatesDataSource() datasource.DataSource {
@@ -131,6 +132,10 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 						Optional: true,
 						Computed: true,
 					},
+					"maintenance_policy": schema.StringAttribute{
+						Optional: true,
+						Computed: true,
+					},
 				},
 			},
 		},
@@ -168,19 +173,20 @@ func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.
 	var state instanceTemplatesDataSourceModel
 	for i := range dataResp.Items {
 		state.InstanceTemplates = append(state.InstanceTemplates, instanceTemplatesModel{
-			ID:              dataResp.Items[i].Id,
-			Name:            dataResp.Items[i].Name,
-			Type:            dataResp.Items[i].Type_,
-			SSHKey:          dataResp.Items[i].SshPublicKey,
-			Location:        dataResp.Items[i].Location,
-			ImageName:       dataResp.Items[i].ImageName,
-			StartupScript:   dataResp.Items[i].StartupScript,
-			ShutdownScript:  dataResp.Items[i].ShutdownScript,
-			SubnetId:        dataResp.Items[i].SubnetId,
-			IBPartition:     dataResp.Items[i].IbPartitionId,
-			ProjectID:       dataResp.Items[i].ProjectId,
-			Disks:           disks,
-			PlacementPolicy: dataResp.Items[i].PlacementPolicy,
+			ID:                dataResp.Items[i].Id,
+			Name:              dataResp.Items[i].Name,
+			Type:              dataResp.Items[i].Type_,
+			SSHKey:            dataResp.Items[i].SshPublicKey,
+			Location:          dataResp.Items[i].Location,
+			ImageName:         dataResp.Items[i].ImageName,
+			StartupScript:     dataResp.Items[i].StartupScript,
+			ShutdownScript:    dataResp.Items[i].ShutdownScript,
+			SubnetId:          dataResp.Items[i].SubnetId,
+			IBPartition:       dataResp.Items[i].IbPartitionId,
+			ProjectID:         dataResp.Items[i].ProjectId,
+			Disks:             disks,
+			PlacementPolicy:   dataResp.Items[i].PlacementPolicy,
+			MaintenancePolicy: dataResp.Items[i].MaintenancePolicy,
 		})
 	}
 

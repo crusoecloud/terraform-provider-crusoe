@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -21,6 +23,11 @@ import (
 )
 
 var errProjectNotFound = errors.New("project for instance not found")
+
+const (
+	unspecifiedPolicy = "unspecified"
+	stopVMPolicy      = "stop-vm"
+)
 
 type vmResource struct {
 	client *swagger.APIClient
@@ -41,6 +48,7 @@ type vmResourceModel struct {
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
+	MaintenancePolicy   types.String `tfsdk:"maintenance_policy"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -239,8 +247,15 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"reservation_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+			},
+			"maintenance_policy": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Default:       stringdefault.StaticString(unspecifiedPolicy),
+				Validators:    []validator.String{stringvalidator.OneOf(unspecifiedPolicy, stopVMPolicy)},
 			},
 		},
 	}
@@ -351,6 +366,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Disks:                    diskIds,
 		HostChannelAdapters:      hostChannelAdapters,
 		ReservationSpecification: reservationSpecification,
+		MaintenancePolicy:        plan.MaintenancePolicy.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -373,6 +389,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	plan.ReservationID = types.StringValue(instance.ReservationId)
 	plan.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.ProjectID = types.StringValue(projectID)
+	plan.MaintenancePolicy = types.StringValue(instance.MaintenancePolicy)
 
 	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	resp.Diagnostics.Append(networkDiags...)
@@ -671,6 +688,37 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		resp.Diagnostics.Append(diags...)
 
 		return
+	}
+
+	// handle updating maintenance policy
+	if !plan.MaintenancePolicy.IsUnknown() {
+		patchResp, httpResp, err := r.client.VMsApi.UpdateInstance(ctx,
+			swagger.InstancesPatchRequestV1Alpha5{
+				Action:            "UPDATE",
+				MaintenancePolicy: plan.MaintenancePolicy.ValueString(),
+			},
+			plan.ProjectID.ValueString(),
+			plan.ID.ValueString(),
+		)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance maintenance policy",
+				fmt.Sprintf("There was an error requesting to update the instance's maintenance policy: %v", err))
+
+			return
+		}
+		defer httpResp.Body.Close()
+
+		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update instance maintenance policy",
+				fmt.Sprintf("There was an error updating the instance's maintenance policy: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		state.MaintenancePolicy = plan.MaintenancePolicy
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
 	}
 }
 

@@ -27,6 +27,7 @@ type vmDataSourceFilter struct {
 	Type              *string                       `tfsdk:"type"`
 	Disks             []vmDiskResourceModel         `tfsdk:"disks"`
 	NetworkInterfaces []vmNetworkInterfaceDataModel `tfsdk:"network_interfaces"`
+	MaintenancePolicy *string                       `tfsdk:"maintenance_policy"`
 }
 
 type vmNetworkInterfaceDataModel struct {
@@ -135,6 +136,9 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 			"reservation_id": schema.StringAttribute{
 				Optional: true,
 			},
+			"maintenance_policy": schema.StringAttribute{
+				Optional: true,
+			},
 		},
 	}
 }
@@ -182,6 +186,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		state.ProjectID = &vm.ProjectId
 		state.Name = &vm.Name
 		state.Type = &vm.Type_
+		state.MaintenancePolicy = &vm.MaintenancePolicy
 		attachedDisks := make([]vmDiskResourceModel, 0, len(vm.Disks))
 		for _, disk := range vm.Disks {
 			attachedDisks = append(attachedDisks, vmDiskResourceModel{
