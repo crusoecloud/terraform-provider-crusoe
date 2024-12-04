@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -253,6 +254,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Default:       stringdefault.StaticString(unspecifiedPolicy),
 				Validators:    []validator.String{stringvalidator.OneOf(unspecifiedPolicy, stopVMPolicy)},
 			},
 		},
@@ -387,6 +389,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	plan.ReservationID = types.StringValue(instance.ReservationId)
 	plan.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.ProjectID = types.StringValue(projectID)
+	plan.MaintenancePolicy = types.StringValue(instance.MaintenancePolicy)
 
 	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	resp.Diagnostics.Append(networkDiags...)
@@ -694,8 +697,8 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 				Action:            "UPDATE",
 				MaintenancePolicy: plan.MaintenancePolicy.ValueString(),
 			},
-			plan.ID.ValueString(),
 			plan.ProjectID.ValueString(),
+			plan.ID.ValueString(),
 		)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance maintenance policy",
