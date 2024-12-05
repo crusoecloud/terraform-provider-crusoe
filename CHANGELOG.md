@@ -1,3 +1,14 @@
+## 0.5.23 (December 5, 2024)
+
+ENHANCEMENTS:
+
+* Adds placement policy for instance templates.
+* Adds maintenance policy for instances and instance templates.
+
+BUG FIXES:
+
+* Fixes an issue with creating a VM with disks set to an empty list.
+
 ## 0.5.22 (October 22, 2024)
 BUG FIXES:
 
