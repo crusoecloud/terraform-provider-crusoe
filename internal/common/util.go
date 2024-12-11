@@ -30,6 +30,8 @@ const (
 	colorReset         = "\033[0m"
 	metadataFile       = "/.crusoe/.metadata"
 	DevelopmentMessage = "This feature is currently in development. Reach out to support@crusoecloud.com with any questions."
+	two                = 2
+	internalErrorCode  = "internal_error"
 )
 
 var version string
@@ -207,12 +209,6 @@ func opResultToError(res interface{}) (expectedErr, unexpectedErr error) {
 	return fmt.Errorf("%s", resultError.Message), nil
 }
 
-// apiError models the error format returned by the Crusoe API go client.
-type apiError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
 // UnpackAPIError takes a swagger API error and safely attempts to extract any additional information
 // present in the response. The original error is returned unchanged if it cannot be unpacked.
 func UnpackAPIError(original error) error {
@@ -221,7 +217,7 @@ func UnpackAPIError(original error) error {
 		return original
 	}
 
-	var model apiError
+	var model swagger.ErrorBody
 	err := json.Unmarshal(apiErr.Body(), &model)
 	if err != nil {
 		return original
@@ -229,15 +225,18 @@ func UnpackAPIError(original error) error {
 
 	// some error messages are of the format "rpc code = ... desc = ..."
 	// in those cases, we extract the description and return it
-	const two = 2
+	errorMsg := model.Message
 	components := strings.Split(model.Message, " desc = ")
 	if len(components) == two {
-		//nolint:goerr113 // error is dynamic
-		return fmt.Errorf("%s", components[1])
+		errorMsg = components[1]
+	}
+
+	if model.Code == internalErrorCode && len(model.ErrorId) > 0 {
+		errorMsg = fmt.Sprintf("%s. Error ID: %s.", errorMsg, model.ErrorId)
 	}
 
 	//nolint:goerr113 // error is dynamic
-	return fmt.Errorf("%s", model.Message)
+	return fmt.Errorf("%s", errorMsg)
 }
 
 // GetUpdateMessageIfValid checks if the current terraform provider version is up-to-date with the latest release and
