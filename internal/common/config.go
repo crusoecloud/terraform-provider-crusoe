@@ -60,6 +60,7 @@ func GetConfig() (*Config, error) {
 	accessKey := os.Getenv("CRUSOE_ACCESS_KEY_ID")
 	secretKey := os.Getenv("CRUSOE_SECRET_KEY")
 	apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT")
+	defaultProject := os.Getenv("CRUSOE_DEFAULT_PROJECT")
 
 	if accessKey != "" {
 		config.AccessKeyID = accessKey
@@ -69,6 +70,9 @@ func GetConfig() (*Config, error) {
 	}
 	if apiEndpoint != "" {
 		config.ApiEndpoint = apiEndpoint
+	}
+	if defaultProject != "" {
+		config.DefaultProject = defaultProject
 	}
 
 	return &config, nil
