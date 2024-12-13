@@ -27,7 +27,6 @@ description: |-
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `image` (String)
 - `location` (String)
-- `maintenance_policy` (String)
 - `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
 - `project_id` (String)
 - `reservation_id` (String) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.

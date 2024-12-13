@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	spreadPlacementPolicy = "spread"
-	unspecifiedPolicy     = "unspecified"
-	stopVMPolicy          = "stop-vm"
+	spreadPlacementPolicy      = "spread"
+	unspecifiedPlacementPolicy = "unspecified"
 )
 
 type instanceTemplateResource struct {
@@ -47,7 +46,6 @@ type instanceTemplateResourceModel struct {
 	DisksToCreate       types.Set    `tfsdk:"disks"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
 	PlacementPolicy     types.String `tfsdk:"placement_policy"`
-	MaintenancePolicy   types.String `tfsdk:"maintenance_policy"`
 }
 
 type diskToCreateResourceModel struct {
@@ -177,15 +175,8 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 			"placement_policy": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				Default:       stringdefault.StaticString(unspecifiedPolicy),
-				Validators:    []validator.String{stringvalidator.OneOf(spreadPlacementPolicy, unspecifiedPolicy)},
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-			},
-			"maintenance_policy": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				Default:       stringdefault.StaticString(unspecifiedPolicy),
-				Validators:    []validator.String{stringvalidator.OneOf(unspecifiedPolicy, stopVMPolicy)},
+				Default:       stringdefault.StaticString("unspecified"),
+				Validators:    []validator.String{stringvalidator.OneOf(spreadPlacementPolicy, unspecifiedPlacementPolicy)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 		},
@@ -248,7 +239,6 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
 		ReservationId:       plan.ReservationID.ValueString(),
 		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
-		MaintenancePolicy:   plan.MaintenancePolicy.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",
@@ -265,7 +255,6 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	plan.Image = types.StringValue(dataResp.ImageName)
 	plan.PlacementPolicy = types.StringValue(dataResp.PlacementPolicy)
 	plan.ReservationID = types.StringValue(dataResp.ReservationId)
-	plan.MaintenancePolicy = types.StringValue(dataResp.MaintenancePolicy)
 
 	disksToCreateResource := make([]diskToCreateResourceModel, 0, len(dataResp.Disks))
 	for _, diskToCreate := range disksToCreate {
@@ -333,7 +322,6 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	state.ProjectID = types.StringValue(instanceTemplate.ProjectId)
 	state.PublicIpAddressType = types.StringValue(instanceTemplate.PublicIpAddressType)
 	state.ID = types.StringValue(instanceTemplate.Id)
-	state.MaintenancePolicy = types.StringValue(instanceTemplate.MaintenancePolicy)
 
 	if instanceTemplate.IbPartitionId != "" {
 		state.IBPartition = types.StringValue(instanceTemplate.IbPartitionId)
