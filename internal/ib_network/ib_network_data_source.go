@@ -21,7 +21,7 @@ type ibNetworksDataSourceModel struct {
 }
 
 type ibNetworkCapacityModel struct {
-	Quantity  int32  `tfsdk:"quantity"`
+	Quantity  int64  `tfsdk:"quantity"`
 	SliceType string `tfsdk:"slice_type"`
 }
 
@@ -71,6 +71,19 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 					"location": schema.StringAttribute{
 						Computed: true,
 					},
+					"capacities": schema.ListNestedAttribute{
+						Computed: true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"quantity": schema.Int64Attribute{
+									Computed: true,
+								},
+								"slice_type": schema.StringAttribute{
+									Computed: true,
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -100,7 +113,7 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 		capacities := make([]ibNetworkCapacityModel, 0, len(dataResp.Items[i].Capacities))
 		for _, c := range dataResp.Items[i].Capacities {
 			capacities = append(capacities, ibNetworkCapacityModel{
-				Quantity:  c.Quantity,
+				Quantity:  int64(c.Quantity),
 				SliceType: c.SliceType,
 			})
 		}
