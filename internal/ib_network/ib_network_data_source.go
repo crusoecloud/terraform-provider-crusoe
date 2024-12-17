@@ -20,10 +20,16 @@ type ibNetworksDataSourceModel struct {
 	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
 }
 
+type ibNetworkCapacityModel struct {
+	Quantity  int32  `tfsdk:"quantity"`
+	SliceType string `tfsdk:"slice_type"`
+}
+
 type ibNetworkModel struct {
-	ID       string `tfsdk:"id"`
-	Name     string `tfsdk:"name"`
-	Location string `tfsdk:"location"`
+	ID         string                   `tfsdk:"id"`
+	Name       string                   `tfsdk:"name"`
+	Location   string                   `tfsdk:"location"`
+	Capacities []ibNetworkCapacityModel `tfsdk:"capacities"`
 }
 
 func NewIBNetworkDataSource() datasource.DataSource {
@@ -91,10 +97,18 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 
 	var state ibNetworksDataSourceModel
 	for i := range dataResp.Items {
+		capacities := make([]ibNetworkCapacityModel, 0, len(dataResp.Items[i].Capacities))
+		for _, c := range dataResp.Items[i].Capacities {
+			capacities = append(capacities, ibNetworkCapacityModel{
+				Quantity:  c.Quantity,
+				SliceType: c.SliceType,
+			})
+		}
 		state.IBNetworks = append(state.IBNetworks, ibNetworkModel{
-			ID:       dataResp.Items[i].Id,
-			Name:     dataResp.Items[i].Name,
-			Location: dataResp.Items[i].Location,
+			ID:         dataResp.Items[i].Id,
+			Name:       dataResp.Items[i].Name,
+			Location:   dataResp.Items[i].Location,
+			Capacities: capacities,
 		})
 	}
 
