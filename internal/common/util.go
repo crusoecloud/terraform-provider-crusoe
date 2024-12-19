@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-	diag "github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
@@ -30,6 +32,7 @@ const (
 	colorReset         = "\033[0m"
 	metadataFile       = "/.crusoe/.metadata"
 	DevelopmentMessage = "This feature is currently in development. Reach out to support@crusoecloud.com with any questions."
+	onlyUserReadPerms  = 0o600
 	two                = 2
 	internalErrorCode  = "internal_error"
 )
@@ -61,6 +64,10 @@ var (
 	// fallback error presented to the user in unexpected situations
 	errMultipleProjects = errors.New("User has multiple projects. Please specify a project to be used.")
 	errUnexpected       = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
+
+	// error messages
+	errBadMapCast  = errors.New("failed to cast tf map value to string")
+	errBadListCast = errors.New("failed to cast tf list value to string")
 )
 
 type Metadata struct {
@@ -133,9 +140,9 @@ func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation,
 }
 
 // GetFallbackProject queries the API to get the list of projects belonging to the
-// logged in user. If there is one project belonging to the user, it returns that project
+// logged-in user. If there is one project belonging to the user, it returns that project
 // else it adds an error to the diagnostics and returns.
-func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diagg *diag.Diagnostics) (string, error) {
+func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diags *diag.Diagnostics) (string, error) {
 	config, err := GetConfig()
 	if err != nil {
 		return "", fmt.Errorf("failed to get config: %w", err)
@@ -149,19 +156,17 @@ func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diagg *d
 		opts.ProjectName = optional.NewString(config.DefaultProject)
 	}
 
-	dataResp, httpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
-
-	defer httpResp.Body.Close()
-
+	//nolint:bodyclose // Body is closed prior to ListProjects return
+	dataResp, _, err := client.ProjectsApi.ListProjects(ctx, opts)
 	if err != nil {
-		diagg.AddError("Failed to retrieve project ID",
+		diags.AddError("Failed to retrieve project ID",
 			"Failed to retrieve project ID for the authenticated user.")
 
 		return "", err
 	}
 
 	if len(dataResp.Items) != 1 {
-		diagg.AddError("Multiple projects found.",
+		diags.AddError("Multiple projects found.",
 			"Multiple projects found for the authenticated user. Unable to determine which project to use.")
 
 		return "", errMultipleProjects
@@ -170,13 +175,21 @@ func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diagg *d
 	projectID := dataResp.Items[0].Id
 
 	if config.DefaultProject == "" {
-		diagg.AddWarning("Default project not specified",
+		diags.AddWarning("Default project not specified",
 			fmt.Sprintf("A project_id was not specified in the configuration file. "+
 				"Please specify a project in the terraform file or set a 'default_project' in your configuration file. "+
 				"Falling back to project: %s.", dataResp.Items[0].Name))
 	}
 
 	return projectID, nil
+}
+
+func GetProjectIDOrFallback(ctx context.Context, client *swagger.APIClient, diags *diag.Diagnostics, projectID string) (string, error) {
+	if projectID != "" {
+		return projectID, nil
+	}
+
+	return GetFallbackProject(ctx, client, diags)
 }
 
 func parseOpResult[T any](opResult interface{}) (*T, error) {
@@ -291,7 +304,7 @@ func GetUpdateMessageIfValid(ctx context.Context) string {
 	if err != nil {
 		return ""
 	}
-	err = os.WriteFile(metadataFilePath, b, os.ModePerm)
+	err = os.WriteFile(metadataFilePath, b, onlyUserReadPerms)
 	if err != nil {
 		return ""
 	}
@@ -388,4 +401,70 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 	}
 
 	return nil, "", errors.New("failed to find resource")
+}
+
+func TFMapToStringMap(tfMap types.Map) (map[string]string, error) {
+	// Convert the Terraform map to a string map
+	stringMap := make(map[string]string)
+
+	for key, val := range tfMap.Elements() {
+		stringVal, ok := val.(types.String)
+		if !ok {
+			return nil, errBadMapCast
+		}
+		stringMap[key] = stringVal.ValueString()
+	}
+
+	return stringMap, nil
+}
+
+func TFListToStringSlice(tfList types.List) ([]string, error) {
+	// Convert the Terraform list to a string slice
+	stringSlice := make([]string, len(tfList.Elements()))
+
+	for i, val := range tfList.Elements() {
+		stringVal, ok := val.(types.String)
+		if !ok {
+			return nil, errBadListCast
+		}
+		stringSlice[i] = stringVal.ValueString()
+	}
+
+	return stringSlice, nil
+}
+
+func StringerSliceToTFList[T fmt.Stringer](s []T) (types.List, diag.Diagnostics) {
+	tfList := make([]attr.Value, len(s))
+	for i, val := range s {
+		tfList[i] = types.StringValue(val.String())
+	}
+
+	return types.ListValue(types.StringType, tfList)
+}
+
+func StringSliceToTFList(s []string) (types.List, diag.Diagnostics) {
+	tfList := make([]attr.Value, len(s))
+	for i, val := range s {
+		tfList[i] = types.StringValue(val)
+	}
+
+	return types.ListValue(types.StringType, tfList)
+}
+
+func StringerMapToTFMap[T fmt.Stringer](m map[string]T) (types.Map, diag.Diagnostics) {
+	tfMap := make(map[string]attr.Value)
+	for key, val := range m {
+		tfMap[key] = types.StringValue(val.String())
+	}
+
+	return types.MapValue(types.StringType, tfMap)
+}
+
+func StringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
+	tfMap := make(map[string]attr.Value)
+	for key, val := range m {
+		tfMap[key] = types.StringValue(val)
+	}
+
+	return types.MapValue(types.StringType, tfMap)
 }

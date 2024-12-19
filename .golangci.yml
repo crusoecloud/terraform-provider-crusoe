@@ -49,7 +49,6 @@ linters:
     - gocritic
     - gofmt
     - gofumpt
-    - gomnd
     - gosec
     - gosec
     - gosimple

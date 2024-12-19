@@ -1,0 +1,167 @@
+package kubernetes_cluster
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+)
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ datasource.DataSource = &kubernetesClusterDataSource{}
+)
+
+// NewKubernetesClusterDataSource is a helper function to simplify the provider implementation.
+func NewKubernetesClusterDataSource() datasource.DataSource {
+	return &kubernetesClusterDataSource{}
+}
+
+// kubernetesClusterDataSource is the data source implementation.
+type kubernetesClusterDataSource struct {
+	client *swagger.APIClient
+}
+
+type kubernetesClusterDataSourceModel struct {
+	ID                    types.String `tfsdk:"id"`
+	ProjectID             types.String `tfsdk:"project_id"`
+	Name                  types.String `tfsdk:"name"`
+	Version               types.String `tfsdk:"version"`
+	Configuration         types.String `tfsdk:"configuration"`
+	SubnetID              types.String `tfsdk:"subnet_id"`
+	ClusterCidr           types.String `tfsdk:"cluster_cidr"`
+	NodeCidrMaskSize      types.Int64  `tfsdk:"node_cidr_mask_size"`
+	ServiceClusterIpRange types.String `tfsdk:"service_cluster_ip_range"`
+	AddOns                types.List   `tfsdk:"add_ons"`
+	Location              types.String `tfsdk:"location"`
+	DNSName               types.String `tfsdk:"dns_name"`
+	NodePoolIds           types.List   `tfsdk:"nodepool_ids"`
+}
+
+func (d *kubernetesClusterDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*swagger.APIClient)
+	if !ok {
+		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
+
+		return
+	}
+
+	d.client = client
+}
+
+// Metadata returns the data source type name.
+func (d *kubernetesClusterDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_kubernetes_cluster"
+}
+
+// Schema defines the schema for the data source.
+func (d *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Required: true,
+			},
+			"project_id": schema.StringAttribute{
+				Optional: true,
+			},
+			"name": schema.StringAttribute{
+				Optional: true,
+			},
+			"version": schema.StringAttribute{
+				Optional: true,
+			},
+			"configuration": schema.StringAttribute{
+				Optional: true,
+			},
+			"subnet_id": schema.StringAttribute{
+				Optional: true,
+			},
+			"cluster_cidr": schema.StringAttribute{
+				Optional: true,
+			},
+			"node_cidr_mask_size": schema.Int64Attribute{
+				Optional: true,
+			},
+			"service_cluster_ip_range": schema.StringAttribute{
+				Optional: true,
+			},
+			"add_ons": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"location": schema.StringAttribute{
+				Optional: true,
+			},
+			"dns_name": schema.StringAttribute{
+				Computed: true,
+			},
+			"nodepool_ids": schema.ListAttribute{
+				ElementType: types.StringType,
+				Computed:    true,
+			},
+		},
+	}
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (d *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var config kubernetesClusterDataSourceModel
+
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var state kubernetesClusterDataSourceModel
+
+	diags = resp.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch project ID",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+		return
+	}
+
+	kubernetesCluster, _, err := d.client.KubernetesClustersApi.GetCluster(ctx, projectID, config.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read Kubernetes Cluster",
+			fmt.Sprintf("Error reading the Kubernetes Cluster: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	state.ID = types.StringValue(kubernetesCluster.Id)
+	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
+	state.Name = types.StringValue(kubernetesCluster.Name)
+	state.Version = types.StringValue(kubernetesCluster.Version)
+	state.Configuration = types.StringValue(kubernetesCluster.Configuration)
+	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
+	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
+	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
+	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
+	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
+	resp.Diagnostics.Append(diags...)
+	state.Location = types.StringValue(kubernetesCluster.Location)
+	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
+	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	resp.Diagnostics.Append(diags...)
+
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+}

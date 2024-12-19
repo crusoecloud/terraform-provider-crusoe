@@ -23,10 +23,11 @@ import (
 )
 
 const (
-	persistentSSD    = "persistent-ssd"
-	sharedVolume     = "shared-volume"
-	gibInTib         = 1024
-	defaultBlockSize = 4096
+	persistentSSD      = "persistent-ssd"
+	sharedVolume       = "shared-volume"
+	gibInTib           = 1024
+	alternateBlockSize = 512
+	defaultBlockSize   = 4096
 )
 
 type diskResource struct {
@@ -114,7 +115,7 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"block_size": schema.Int64Attribute{
 				Optional:   true,
 				Computed:   true,
-				Validators: []validator.Int64{int64validator.OneOf(512, 4096)}, // we support either 512 or 4096 bits
+				Validators: []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)}, // we support either 512 or 4096 bits
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplaceIfConfigured(), // cannot be updated in place
 					int64planmodifier.UseStateForUnknown(),

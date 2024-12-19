@@ -18,6 +18,8 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_partition"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/instance_group"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/instance_template"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes_cluster"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes_node_pool"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/load_balancer"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
@@ -63,6 +65,8 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		instance_template.NewInstanceTemplatesDataSource,
 		instance_group.NewInstanceGroupsDataSource,
 		load_balancer.NewLoadBalancerDataSource,
+		kubernetes_cluster.NewKubernetesClusterDataSource,
+		kubernetes_node_pool.NewKubernetesNodePoolDataSource,
 	}
 }
 
@@ -80,6 +84,8 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		instance_template.NewInstanceTemplateResource,
 		instance_group.NewInstanceGroupResource,
 		load_balancer.NewLoadBalancerResource,
+		kubernetes_cluster.NewKubernetesClusterResource,
+		kubernetes_node_pool.NewKubernetesNodePoolResource,
 	}
 }
 

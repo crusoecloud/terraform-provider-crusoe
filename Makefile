@@ -9,6 +9,10 @@ GOCOVER_VERSION = latest
 
 default: install
 
+.PHONY: build
+build:
+	@go build
+
 .PHONY: dev
 dev: build-deps test lint docs
 
