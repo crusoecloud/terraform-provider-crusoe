@@ -24,6 +24,15 @@ description: |-
 
 Read-Only:
 
+- `capacities` (Attributes List) (see [below for nested schema](#nestedatt--ib_networks--capacities))
 - `id` (String)
 - `location` (String)
 - `name` (String)
+
+<a id="nestedatt--ib_networks--capacities"></a>
+### Nested Schema for `ib_networks.capacities`
+
+Read-Only:
+
+- `quantity` (Number)
+- `slice_type` (String)
