@@ -34,7 +34,7 @@ resource "crusoe_compute_instance" "my_vm1" {
 
   name = "ib-vm-${count.index}"
   type = "a100-80gb-sxm-ib.8x" # IB enabled VM type
-  location = "us-east1-a" # IB currently only supported at us-east1-a
+  location = "us-east1-a"
   image = "ubuntu22.04-nvidia-sxm-docker:latest" # IB image
 
   ssh_key = local.my_ssh_key
@@ -45,18 +45,19 @@ resource "crusoe_compute_instance" "my_vm1" {
     }
   ]
   disks = [
-    // disk attached at startup
+    // at startup, attach one disk per VM
     {
-      id = crusoe_storage_disk.data_disk.id
+      id = crusoe_storage_disk.data_disk[count.index].id
       attachment_type = "data"
       mode = "read-only"
     }
   ]
 }
 
-# attached storage disk
+# create multiple storage disks
 resource "crusoe_storage_disk" "data_disk" {
-  name = "data-disk"
+  count = 8
+  name = "data-disk-${count.index}"
   size = "1TiB"
   location = "us-east1-a"
 }
