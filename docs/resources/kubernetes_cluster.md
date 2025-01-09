@@ -17,7 +17,7 @@ description: |-
 
 ### Required
 
-- `configuration` (String) The configuration of the Kubernetes cluster. Supports `standard` and `ha`.
+- `configuration` (String) The configuration of the Kubernetes cluster. Only `ha` is supported.
 - `location` (String)
 - `name` (String)
 - `version` (String)
