@@ -88,7 +88,7 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"configuration": schema.StringAttribute{
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				MarkdownDescription: "The configuration of the Kubernetes cluster. Supports `standard` and `ha`.",
+				MarkdownDescription: "The configuration of the Kubernetes cluster. Only `ha` is supported.",
 			},
 			"subnet_id": schema.StringAttribute{
 				Optional:      true,
