@@ -29,11 +29,11 @@ description: |-
 - `project_id` (String)
 - `requested_node_labels` (Map of String)
 - `subnet_id` (String)
+- `version` (String)
 
 ### Read-Only
 
 - `all_node_labels` (Map of String)
 - `id` (String) The ID of this resource.
-- `image_id` (String)
 - `instance_ids` (List of String)
 - `state` (String)

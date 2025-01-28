@@ -19,7 +19,6 @@ description: |-
 
 - `add_ons` (List of String)
 - `cluster_cidr` (String)
-- `configuration` (String)
 - `location` (String)
 - `name` (String)
 - `node_cidr_mask_size` (Number)
