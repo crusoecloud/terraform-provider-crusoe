@@ -244,7 +244,7 @@ func UnpackAPIError(original error) error {
 		errorMsg = components[1]
 	}
 
-	if model.Code == internalErrorCode && len(model.ErrorId) > 0 {
+	if model.Code == internalErrorCode && model.ErrorId != "" {
 		errorMsg = fmt.Sprintf("%s. Error ID: %s.", errorMsg, model.ErrorId)
 	}
 

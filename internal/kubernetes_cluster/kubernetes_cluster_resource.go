@@ -3,6 +3,7 @@ package kubernetes_cluster
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -159,6 +160,13 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	if plan.NodeCidrMaskSize.ValueInt64() > math.MaxInt32 {
+		resp.Diagnostics.AddError("Failed to create cluster", fmt.Sprintf("node_cidr_mask_size must be less than or equal to %d", math.MaxInt32))
+
+		return
+	}
+
+	//nolint:gosec // Sanity check for int64 --> int32 narrowing performed above
 	asyncOperation, _, err := r.client.KubernetesClustersApi.CreateCluster(ctx, swagger.KubernetesClusterPostRequest{
 		AddOns:                addOns,
 		ClusterCidr:           plan.ClusterCidr.ValueString(),
