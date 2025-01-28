@@ -33,7 +33,6 @@ type kubernetesClusterResourceModel struct {
 	ProjectID             types.String `tfsdk:"project_id"`
 	Name                  types.String `tfsdk:"name"`
 	Version               types.String `tfsdk:"version"`
-	Configuration         types.String `tfsdk:"configuration"`
 	SubnetID              types.String `tfsdk:"subnet_id"`
 	ClusterCidr           types.String `tfsdk:"cluster_cidr"`
 	NodeCidrMaskSize      types.Int64  `tfsdk:"node_cidr_mask_size"`
@@ -84,11 +83,6 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"version": schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-			},
-			"configuration": schema.StringAttribute{
-				Required:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				MarkdownDescription: "The configuration of the Kubernetes cluster. Only `ha` is supported.",
 			},
 			"subnet_id": schema.StringAttribute{
 				Optional:      true,
@@ -168,7 +162,6 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	asyncOperation, _, err := r.client.KubernetesClustersApi.CreateCluster(ctx, swagger.KubernetesClusterPostRequest{
 		AddOns:                addOns,
 		ClusterCidr:           plan.ClusterCidr.ValueString(),
-		Configuration:         plan.Configuration.ValueString(),
 		Location:              plan.Location.ValueString(),
 		Name:                  plan.Name.ValueString(),
 		NodeCidrMaskSize:      int32(plan.NodeCidrMaskSize.ValueInt64()),
@@ -195,7 +188,6 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
 	state.Name = types.StringValue(kubernetesCluster.Name)
 	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.Configuration = types.StringValue(kubernetesCluster.Configuration)
 	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
 	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
 	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
@@ -258,7 +250,6 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
 	state.Name = types.StringValue(kubernetesCluster.Name)
 	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.Configuration = types.StringValue(kubernetesCluster.Configuration)
 	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
 	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
 	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)

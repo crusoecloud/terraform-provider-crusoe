@@ -23,7 +23,7 @@ func NewKubernetesNodePoolDataSource() datasource.DataSource {
 type kubernetesNodePoolDataSourceModel struct {
 	ID            types.String `tfsdk:"id"`
 	ProjectID     types.String `tfsdk:"project_id"`
-	ImageID       types.String `tfsdk:"image_id"`
+	Version       types.String `tfsdk:"version"`
 	Type          types.String `tfsdk:"type"`
 	InstanceCount types.Int64  `tfsdk:"instance_count"`
 	ClusterID     types.String `tfsdk:"cluster_id"`
@@ -137,7 +137,7 @@ func (d *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource.
 
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(projectID)
-	state.ImageID = types.StringValue(kubernetesNodePool.ImageId)
+	state.Version = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
 	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)

@@ -32,7 +32,6 @@ type kubernetesClusterDataSourceModel struct {
 	ProjectID             types.String `tfsdk:"project_id"`
 	Name                  types.String `tfsdk:"name"`
 	Version               types.String `tfsdk:"version"`
-	Configuration         types.String `tfsdk:"configuration"`
 	SubnetID              types.String `tfsdk:"subnet_id"`
 	ClusterCidr           types.String `tfsdk:"cluster_cidr"`
 	NodeCidrMaskSize      types.Int64  `tfsdk:"node_cidr_mask_size"`
@@ -77,9 +76,6 @@ func (d *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sch
 				Optional: true,
 			},
 			"version": schema.StringAttribute{
-				Optional: true,
-			},
-			"configuration": schema.StringAttribute{
 				Optional: true,
 			},
 			"subnet_id": schema.StringAttribute{
@@ -150,7 +146,6 @@ func (d *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.R
 	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
 	state.Name = types.StringValue(kubernetesCluster.Name)
 	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.Configuration = types.StringValue(kubernetesCluster.Configuration)
 	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
 	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
 	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)

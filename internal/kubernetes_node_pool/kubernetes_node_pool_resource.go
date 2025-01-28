@@ -26,7 +26,7 @@ func NewKubernetesNodePoolResource() resource.Resource {
 type kubernetesNodePoolResourceModel struct {
 	ID                  types.String `tfsdk:"id"`
 	ProjectID           types.String `tfsdk:"project_id"`
-	ImageID             types.String `tfsdk:"image_id"`
+	Version             types.String `tfsdk:"version"`
 	Type                types.String `tfsdk:"type"`
 	InstanceCount       types.Int64  `tfsdk:"instance_count"`
 	ClusterID           types.String `tfsdk:"cluster_id"`
@@ -71,7 +71,8 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
-			"image_id": schema.StringAttribute{
+			"version": schema.StringAttribute{
+				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
@@ -159,14 +160,15 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.CreateNodePool(ctx, swagger.KubernetesNodePoolPostRequest{
-		ClusterId:     plan.ClusterID.ValueString(),
-		Count:         plan.InstanceCount.ValueInt64(),
-		IbPartitionId: plan.IBPartitionID.ValueString(),
-		Name:          plan.Name.ValueString(),
-		NodeLabels:    nodeLabels,
-		ProductName:   plan.Type.ValueString(),
-		SshPublicKey:  plan.SSHKey.ValueString(),
-		SubnetId:      plan.SubnetID.ValueString(),
+		ClusterId:       plan.ClusterID.ValueString(),
+		Count:           plan.InstanceCount.ValueInt64(),
+		IbPartitionId:   plan.IBPartitionID.ValueString(),
+		Name:            plan.Name.ValueString(),
+		NodeLabels:      nodeLabels,
+		NodePoolVersion: plan.Version.ValueString(),
+		ProductName:     plan.Type.ValueString(),
+		SshPublicKey:    plan.SSHKey.ValueString(),
+		SubnetId:        plan.SubnetID.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
@@ -187,7 +189,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
-	state.ImageID = types.StringValue(kubernetesNodePool.ImageId)
+	state.Version = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
@@ -250,7 +252,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
-	state.ImageID = types.StringValue(kubernetesNodePool.ImageId)
+	state.Version = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
