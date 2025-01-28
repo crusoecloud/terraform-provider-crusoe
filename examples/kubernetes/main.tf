@@ -7,7 +7,6 @@ terraform {
 }
 
 locals {
-  # Optional: Add your SSH public key to the created nodes to allow SSH access
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
   control_plane_version = "1.30.8-cmk.1"
   worker_version = "1.30.8-cmk.1"
@@ -33,7 +32,8 @@ resource "crusoe_kubernetes_cluster" "my_cluster" {
   # node_cidr_mask_size = "27"
   # service_cluster_ip_range = "192.168.2.0/24"
 
-  # Optional: Add additional add-ons - see docs for options
+  # Optional: Add additional add-ons
+  # See `crusoe kubernetes clusters create --help` for available add-ons
   # add_ons = local.add_ons
 }
 
@@ -44,6 +44,7 @@ resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
   # Optional: Set the desired CMK worker node version
   # version = local.worker_version
   type = local.worker_type
+  # Optional: Add your SSH public key to the created nodes to allow SSH access
   ssh_key = local.my_ssh_key
   # Optional: Kubernetes Node objects will be labeled with the following key:value pairs
   # requested_node_labels = {
