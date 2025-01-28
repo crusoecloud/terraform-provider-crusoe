@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -13,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
@@ -66,6 +70,7 @@ func (r *kubernetesClusterResource) Metadata(ctx context.Context, request resour
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	//nolint:gocritic // regex intentionally uses [0-9] to not match non ascii digits
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -84,6 +89,9 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"version": schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators: []validator.String{stringvalidator.RegexMatches(
+					regexp.MustCompile(`[0-9]+\.[0-9]+\.[0-9]+-cmk\.[0-9]+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
+				)},
 			},
 			"subnet_id": schema.StringAttribute{
 				Optional:      true,
@@ -99,6 +107,7 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown(), int64planmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:    []validator.Int64{int64validator.AtMost(math.MaxInt32)},
 			},
 			"service_cluster_ip_range": schema.StringAttribute{
 				Optional:      true,
@@ -160,13 +169,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	if plan.NodeCidrMaskSize.ValueInt64() > math.MaxInt32 {
-		resp.Diagnostics.AddError("Failed to create cluster", fmt.Sprintf("node_cidr_mask_size must be less than or equal to %d", math.MaxInt32))
-
-		return
-	}
-
-	//nolint:gosec // Sanity check for int64 --> int32 narrowing performed above
+	//nolint:gosec // Sanity check for int64 --> int32 narrowing performed at field level (see schema)
 	asyncOperation, _, err := r.client.KubernetesClustersApi.CreateCluster(ctx, swagger.KubernetesClusterPostRequest{
 		AddOns:                addOns,
 		ClusterCidr:           plan.ClusterCidr.ValueString(),

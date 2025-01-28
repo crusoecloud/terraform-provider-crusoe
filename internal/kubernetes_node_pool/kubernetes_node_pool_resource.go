@@ -3,12 +3,15 @@ package kubernetes_node_pool
 import (
 	"context"
 	"fmt"
+	"regexp"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
@@ -60,6 +63,7 @@ func (r *kubernetesNodePoolResource) Metadata(_ context.Context, req resource.Me
 }
 
 func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	//nolint:gocritic // regex intentionally uses [0-9] to not match non ascii digits
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -75,6 +79,9 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Validators: []validator.String{stringvalidator.RegexMatches(
+					regexp.MustCompile(`[0-9]+\.[0-9]+\.[0-9]+-cmk\.[0-9]+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
+				)},
 			},
 			"type": schema.StringAttribute{
 				Required:      true,
