@@ -42,10 +42,13 @@ resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
   cluster_id = crusoe_kubernetes_cluster.my_cluster.id
   instance_count = local.worker_count
   # Optional: Set the desired CMK worker node version
+  # If not specified, the default is the latest stable version compatible with the cluster
+  # List available node pool versions with "crusoe kubernetes versions list"
   # version = local.worker_version
   type = local.worker_type
   # Optional: Add your SSH public key to the created nodes to allow SSH access
   ssh_key = local.my_ssh_key
+
   # Optional: Kubernetes Node objects will be labeled with the following key:value pairs
   # requested_node_labels = {
   #   "labelkey" = "labelvalue"
