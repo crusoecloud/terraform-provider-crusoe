@@ -1,3 +1,19 @@
+## 0.5.25
+
+ENHANCEMENTS:
+
+* Adds CMK node pool version specification.
+
+BUG FIXES:
+
+* Removes deprecated CMK cluster configuration parameter.
+
+## 0.5.24 (January 9, 2025)
+
+ENHANCEMENTS:
+
+* Adds initial support for Crusoe Managed Kubernetes (CMK) clusters and node pools.
+
 ## 0.5.23 (December 5, 2024)
 
 ENHANCEMENTS:
