@@ -154,7 +154,21 @@ func (r *vpcNetworkResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	vpcNetwork, httpResp, err := r.client.VPCNetworksApi.GetVPCNetwork(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to get VPC Network",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	vpcNetwork, httpResp, err := r.client.VPCNetworksApi.GetVPCNetwork(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get VPC Network",
 			fmt.Sprintf("Fetching Crusoe VPC Networks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
