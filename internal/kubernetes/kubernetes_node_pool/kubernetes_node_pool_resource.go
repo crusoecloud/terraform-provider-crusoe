@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
@@ -16,6 +17,11 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+)
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ resource.Resource = &kubernetesNodePoolResource{}
 )
 
 type kubernetesNodePoolResource struct {
@@ -72,7 +78,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"project_id": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
 			},
 			"version": schema.StringAttribute{
 				Optional:      true,
@@ -88,7 +94,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			},
 			"instance_count": schema.Int64Attribute{
 				Required:      true,
-				PlanModifiers: []planmodifier.Int64{}, // TODO: implement update
+				PlanModifiers: []planmodifier.Int64{},
 			},
 			"cluster_id": schema.StringAttribute{
 				Required:      true,
@@ -145,17 +151,12 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 
 	var state kubernetesNodePoolResourceModel
 
-	projectID := plan.ProjectID.ValueString()
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch project ID",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
-	if projectID == "" {
-		fallbackProjectID, fallbackErr := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if fallbackErr != nil {
-			resp.Diagnostics.AddError("Failed to fetch Node Pools",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", fallbackErr))
-
-			return
-		}
-		projectID = fallbackProjectID
+		return
 	}
 
 	nodeLabels, err := common.TFMapToStringMap(plan.RequestedNodeLabels)
@@ -276,8 +277,77 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Updating node pool instance count is currently an imperative operation
-	panic("Updating nodepool instance count is not currently supported")
+	var plan kubernetesNodePoolResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var prevState kubernetesNodePoolResourceModel
+	diags = req.State.Get(ctx, &prevState)
+	resp.Diagnostics.Append(diags...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if plan.InstanceCount.ValueInt64() < prevState.InstanceCount.ValueInt64() {
+		resp.Diagnostics.AddAttributeWarning(path.Root("instance_count"), "Node pool instance count decreased", "Decreasing node pool instance count will not delete node pool VMs. Manual deletion is required.")
+	}
+
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, prevState.ProjectID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch project ID",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+		return
+	}
+
+	var state kubernetesNodePoolResourceModel
+
+	// Update node pool instance count
+	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.UpdateNodePool(ctx,
+		swagger.KubernetesNodePoolPatchRequest{
+			Count: plan.InstanceCount.ValueInt64(),
+		},
+		projectID,
+		state.ID.ValueString(),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update node pool",
+			fmt.Sprintf("Error starting an update node pool operation: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	// Wait for operation to complete
+	kubernetesNodePool, _, err := common.AwaitOperationAndResolve[swagger.KubernetesNodePool](ctx, asyncOperation.Operation, projectID, r.client.KubernetesNodePoolOperationsApi.GetKubernetesNodePoolsOperation)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update node pool",
+			fmt.Sprintf("Error updating a node pool: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	// Update state
+	state.ID = types.StringValue(kubernetesNodePool.Id)
+	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
+	state.State = types.StringValue(kubernetesNodePool.State)
+	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count) // For now, this is the only field that we expect to change
+	state.Version = types.StringValue(kubernetesNodePool.ImageId)
+	state.Type = types.StringValue(kubernetesNodePool.Type_)
+	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
+	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
+	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
+	resp.Diagnostics.Append(diags...)
+	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
+	resp.Diagnostics.Append(diags...)
+	state.SSHKey = plan.SSHKey
+	state.State = types.StringValue(kubernetesNodePool.State)
+	state.Name = types.StringValue(kubernetesNodePool.Name)
+
+	diags = resp.State.Set(ctx, state)
+	resp.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface

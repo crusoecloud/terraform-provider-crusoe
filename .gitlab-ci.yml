@@ -3,7 +3,7 @@ include:
     file: '/templates/go.gitlab-ci.yml'
 
 variables:
-  CI_IMAGE: registry.gitlab.com/crusoeenergy/tools/go-ci-1.21
+  CI_IMAGE: registry.gitlab.com/crusoeenergy/tools/go-ci-1.23
 
 test_and_lint:
   rules:

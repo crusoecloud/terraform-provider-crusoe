@@ -7,16 +7,17 @@ terraform {
 }
 
 locals {
-  my_ssh_key = file("~/.ssh/id_ed25519.pub")
-  control_plane_version = "1.30.8-cmk.1"
-  worker_version = "1.30.8-cmk.1"
+  my_ssh_public_key = file("~/.ssh/id_ed25519.pub")
+  control_plane_version = "1.30.8-cmk.23"
+  worker_version = "1.30.8-cmk.6"
   location = "us-east1-a"
   add_ons = [
+    "cluster_autoscaler",
     "nvidia_gpu_operator",
     "nvidia_network_operator",
     "crusoe_csi",
   ]
-  worker_count = 2
+  worker_count = 1
   worker_type = "c1a.4x"
 }
 
@@ -47,7 +48,7 @@ resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
   # version = local.worker_version
   type = local.worker_type
   # Optional: Add your SSH public key to the created nodes to allow SSH access
-  ssh_key = local.my_ssh_key
+  ssh_key = local.my_ssh_public_key
 
   # Optional: Kubernetes Node objects will be labeled with the following key:value pairs
   # requested_node_labels = {
@@ -55,10 +56,50 @@ resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
   # }
 }
 
+resource "crusoe_kubeconfig" "my_cluster_kubeconfig" {
+  cluster_id = crusoe_kubernetes_cluster.my_cluster.id
+}
+
+# # Optional: Use the kubeconfig with the Kubernetes provider
+# provider "kubernetes" {
+#     host = crusoe_kubeconfig.my_cluster_kubeconfig.cluster_address
+#     cluster_ca_certificate = crusoe_kubeconfig.my_cluster_kubeconfig.cluster_ca_certificate
+#     client_certificate = crusoe_kubeconfig.my_cluster_kubeconfig.client_certificate
+#     client_key = crusoe_kubeconfig.my_cluster_kubeconfig.client_key
+#     username = crusoe_kubeconfig.my_cluster_kubeconfig.username
+# }
+#
+# resource "time_sleep" "wait_5m" {
+#   depends_on = [crusoe_kubernetes_cluster.my_cluster]
+#
+#   # Sleep for 5 minutes to allow the cluster to become ready
+#   create_duration = "5m"
+# }
+#
+# # Optional: Use the Kubernetes provider to create a ConfigMap
+# resource "kubernetes_config_map" "my-configmap" {
+#   metadata {
+#     name = "my-configmap"
+#     namespace = "default"
+#   }
+#
+#   data = {
+#     configkey = "configvalue"
+#   }
+#
+#   depends_on = [time_sleep.wait_5m]
+# }
+
 output "cluster" {
   value = crusoe_kubernetes_cluster.my_cluster
 }
 
 output "nodepool" {
   value = crusoe_kubernetes_node_pool.c1a_nodepool
+}
+
+# Optional: Output the kubeconfig YAML to a file
+resource "local_file" "kubeconfig_file" {
+  content = crusoe_kubeconfig.my_cluster_kubeconfig.kubeconfig_yaml
+  filename = "kubeconfig.yaml"
 }

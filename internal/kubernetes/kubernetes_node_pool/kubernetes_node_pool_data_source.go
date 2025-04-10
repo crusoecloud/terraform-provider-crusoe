@@ -12,6 +12,11 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ datasource.DataSource = &kubernetesNodePoolDataSource{}
+)
+
 type kubernetesNodePoolDataSource struct {
 	client *swagger.APIClient
 }

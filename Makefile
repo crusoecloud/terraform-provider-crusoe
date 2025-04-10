@@ -1,7 +1,7 @@
 # Set any default go build tags
 BUILDTAGS :=
 
-GOLANGCI_VERSION = v1.55.2
+GOLANGCI_VERSION = v1.62.0
 TFPLUGINDOCS_VERSION = v0.18.0
 GO_ACC_VERSION = latest
 GOTESTSUM_VERSION = latest
@@ -60,7 +60,7 @@ lint:
 lint-ci: ## Verifies `golangci-lint` passes and outputs in CI-friendly format
 	@echo "==> $@"
 	@golangci-lint version
-	@golangci-lint run ./... --out-format code-climate > golangci-lint.json
+	@golangci-lint run ./... --out-format code-climate --timeout 20m0s > golangci-lint.json
 
 .PHONY: docs
 docs: build-deps

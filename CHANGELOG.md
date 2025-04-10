@@ -1,3 +1,19 @@
+## 0.5.27
+
+ENHANCEMENTS:
+
+* Allow fallback project IDs to be used with the VPC network resource
+
+## 0.5.26
+
+ENHANCEMENTS:
+
+* N/A
+
+BUG FIXES:
+
+* N/A
+
 ## 0.5.25
 
 ENHANCEMENTS:

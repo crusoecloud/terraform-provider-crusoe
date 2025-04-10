@@ -25,6 +25,11 @@ import (
 
 var emptyStringList, _ = types.ListValue(types.StringType, []attr.Value{})
 
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ resource.Resource = &kubernetesClusterResource{}
+)
+
 type kubernetesClusterResource struct {
 	client *swagger.APIClient
 }
@@ -79,7 +84,7 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"project_id": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
 				Required:      true,
@@ -148,17 +153,12 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 
 	var state kubernetesClusterResourceModel
 
-	projectID := plan.ProjectID.ValueString()
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch project ID",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
-	if projectID == "" {
-		fallbackProjectID, fallbackErr := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if fallbackErr != nil {
-			resp.Diagnostics.AddError("Failed to fetch Node Pools",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", fallbackErr))
-
-			return
-		}
-		projectID = fallbackProjectID
+		return
 	}
 
 	addOns, err := common.TFListToStringSlice(plan.AddOns)
