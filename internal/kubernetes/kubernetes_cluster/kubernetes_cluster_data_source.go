@@ -118,15 +118,7 @@ func (d *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
-	var state kubernetesClusterDataSourceModel
-
-	diags = resp.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &resp.Diagnostics, config.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -139,6 +131,14 @@ func (d *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.R
 		resp.Diagnostics.AddError("Failed to read Kubernetes Cluster",
 			fmt.Sprintf("Error reading the Kubernetes Cluster: %s", common.UnpackAPIError(err)))
 
+		return
+	}
+
+	var state kubernetesClusterDataSourceModel
+
+	diags = resp.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 

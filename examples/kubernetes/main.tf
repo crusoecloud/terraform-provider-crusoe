@@ -8,7 +8,7 @@ terraform {
 
 locals {
   my_ssh_public_key = file("~/.ssh/id_ed25519.pub")
-  control_plane_version = "1.30.8-cmk.23"
+  control_plane_version = "1.30.8-cmk.26"
   worker_version = "1.30.8-cmk.6"
   location = "us-east1-a"
   add_ons = [
@@ -17,8 +17,12 @@ locals {
     "nvidia_network_operator",
     "crusoe_csi",
   ]
+  # Changing the worker count will modify the nodepool in-place
+  # Requesting more workers will scale the nodepool until the new desired count is reached
+  # Note that requesting fewer workers will not delete existing VMs - they must be deleted manually
   worker_count = 1
   worker_type = "c1a.4x"
+  kubeconfig_path = "./kubeconfig.yaml"
 }
 
 resource "crusoe_kubernetes_cluster" "my_cluster" {
@@ -54,6 +58,12 @@ resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
   # requested_node_labels = {
   #   "labelkey" = "labelvalue"
   # }
+
+  lifecycle {
+    ignore_changes = [
+    ssh_key,
+    ]
+  }
 }
 
 resource "crusoe_kubeconfig" "my_cluster_kubeconfig" {
@@ -98,8 +108,8 @@ output "nodepool" {
   value = crusoe_kubernetes_node_pool.c1a_nodepool
 }
 
-# Optional: Output the kubeconfig YAML to a file
+# Optional: Output the kubeconfig YAML to a local file on disk
 resource "local_file" "kubeconfig_file" {
   content = crusoe_kubeconfig.my_cluster_kubeconfig.kubeconfig_yaml
-  filename = "kubeconfig.yaml"
+  filename = local.kubeconfig_path
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -151,7 +153,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 
 	var state kubernetesNodePoolResourceModel
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -225,16 +227,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	var state kubernetesNodePoolResourceModel
-
-	diags = resp.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, stored.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -255,14 +248,24 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
+	var state kubernetesNodePoolResourceModel
+
+	diags = resp.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
-	state.State = types.StringValue(kubernetesNodePool.State)
-	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
 	state.Version = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
+	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
+	state.IBPartitionID = stored.IBPartitionID
+	state.RequestedNodeLabels = stored.RequestedNodeLabels
 	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
@@ -284,18 +287,18 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	var prevState kubernetesNodePoolResourceModel
-	diags = req.State.Get(ctx, &prevState)
+	var stored kubernetesNodePoolResourceModel
+	diags = req.State.Get(ctx, &stored)
 	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if plan.InstanceCount.ValueInt64() < prevState.InstanceCount.ValueInt64() {
+	if plan.InstanceCount.ValueInt64() < stored.InstanceCount.ValueInt64() {
 		resp.Diagnostics.AddAttributeWarning(path.Root("instance_count"), "Node pool instance count decreased", "Decreasing node pool instance count will not delete node pool VMs. Manual deletion is required.")
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, prevState.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, stored.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -303,15 +306,13 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	var state kubernetesNodePoolResourceModel
-
 	// Update node pool instance count
 	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.UpdateNodePool(ctx,
 		swagger.KubernetesNodePoolPatchRequest{
 			Count: plan.InstanceCount.ValueInt64(),
 		},
 		projectID,
-		state.ID.ValueString(),
+		stored.ID.ValueString(),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update node pool",
@@ -329,6 +330,8 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
+	var state kubernetesNodePoolResourceModel
+
 	// Update state
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
@@ -342,7 +345,8 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
-	state.SSHKey = plan.SSHKey
+	state.SSHKey = stored.SSHKey
+	state.RequestedNodeLabels = stored.RequestedNodeLabels
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 
@@ -384,4 +388,45 @@ func (r *kubernetesNodePoolResource) Delete(ctx context.Context, req resource.De
 
 		return
 	}
+}
+
+func (r *kubernetesNodePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resourceIdentifiers := strings.Split(req.ID, ",")
+
+	// We allow "node_pool_id" (project_id is implicitly defined via env variable) or "node_pool_id,project_id" (explicit project_id)
+	if len(resourceIdentifiers) != 1 && len(resourceIdentifiers) != 2 {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Expected format node_pool_id,project_id, got %q", req.ID))
+
+		return
+	}
+
+	nodePoolID := resourceIdentifiers[0]
+	var projectID string
+
+	if len(resourceIdentifiers) == 2 {
+		projectID = resourceIdentifiers[1]
+	}
+
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, projectID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch project ID",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+		return
+	}
+
+	if _, parseErr := uuid.Parse(nodePoolID); parseErr != nil {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse node pool ID: %v", parseErr))
+
+		return
+	}
+
+	if _, parseErr := uuid.Parse(projectID); parseErr != nil {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse project ID: %v", parseErr))
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), nodePoolID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }

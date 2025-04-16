@@ -116,15 +116,7 @@ func (d *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	var state kubernetesNodePoolDataSourceModel
-
-	diags = resp.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &resp.Diagnostics, config.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -137,6 +129,14 @@ func (d *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource.
 		resp.Diagnostics.AddError("Failed to get Kubernetes Node Pool", fmt.Sprintf("Failed to get node pool: %s.",
 			common.UnpackAPIError(err)))
 
+		return
+	}
+
+	var state kubernetesNodePoolDataSourceModel
+
+	diags = resp.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 

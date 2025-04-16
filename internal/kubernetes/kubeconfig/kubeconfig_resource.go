@@ -147,9 +147,7 @@ func (r *kubeConfigResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	var state kubeConfigResourceModel
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -164,6 +162,8 @@ func (r *kubeConfigResource) Create(ctx context.Context, req resource.CreateRequ
 
 		return
 	}
+
+	var state kubeConfigResourceModel
 
 	state.ClusterID = types.StringValue(plan.ClusterID.ValueString())
 	state.ProjectID = types.StringValue(projectID)
@@ -196,8 +196,6 @@ func (r *kubeConfigResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	var state kubeConfigResourceModel
-
 	if stored.ClusterID.IsUnknown() ||
 		stored.ProjectID.IsUnknown() ||
 		stored.ClusterAddress.IsUnknown() ||
@@ -211,6 +209,8 @@ func (r *kubeConfigResource) Read(ctx context.Context, req resource.ReadRequest,
 
 		return
 	}
+
+	var state kubeConfigResourceModel
 
 	state.ClusterID = stored.ClusterID
 	state.ProjectID = stored.ProjectID

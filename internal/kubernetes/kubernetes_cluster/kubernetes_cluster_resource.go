@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -153,7 +156,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 
 	var state kubernetesClusterResourceModel
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -224,16 +227,7 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	var state kubernetesClusterResourceModel
-
-	diags = resp.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, state.ProjectID.ValueString())
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, stored.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
 			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
@@ -242,7 +236,7 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 	}
 
 	// Interact with 3rd party API to read data source.
-	kubernetesCluster, httpResp, err := r.client.KubernetesClustersApi.GetCluster(ctx, projectID, state.ID.ValueString())
+	kubernetesCluster, httpResp, err := r.client.KubernetesClustersApi.GetCluster(ctx, projectID, stored.ID.ValueString())
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -253,6 +247,15 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 		resp.Diagnostics.AddError("Failed to read Kubernetes Cluster",
 			fmt.Sprintf("Failed to get cluster: %s", common.UnpackAPIError(err)))
 
+		return
+	}
+
+	var state kubernetesClusterResourceModel
+
+	diags = resp.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -326,4 +329,45 @@ func (r *kubernetesClusterResource) Delete(
 
 		return
 	}
+}
+
+func (r *kubernetesClusterResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resourceIdentifiers := strings.Split(req.ID, ",")
+
+	// We allow "cluster_id" (project_id is implicitly defined via env variable) or "cluster_id,project_id" (explicit project_id)
+	if len(resourceIdentifiers) != 1 && len(resourceIdentifiers) != 2 {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Expected format cluster_id,project_id, got %q", req.ID))
+
+		return
+	}
+
+	clusterID := resourceIdentifiers[0]
+	var projectID string
+
+	if len(resourceIdentifiers) == 2 {
+		projectID = resourceIdentifiers[1]
+	}
+
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, projectID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch project ID",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+		return
+	}
+
+	if _, parseErr := uuid.Parse(clusterID); parseErr != nil {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse cluster ID: %v", parseErr))
+
+		return
+	}
+
+	if _, parseErr := uuid.Parse(projectID); parseErr != nil {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse project ID: %v", parseErr))
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), clusterID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }

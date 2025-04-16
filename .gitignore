@@ -1,7 +1,6 @@
 .DS_Store
 vendor
 
-terraform-provider-hashicups
 terraform-provider-crusoe
 bin
 *.zip
@@ -9,9 +8,10 @@ bin
 # Local .terraform directories
 **/.terraform/*
 
-# .tfstate files
+# Terraform state files
 *.tfstate
 *.tfstate.*
+.terraform.lock.hcl
 
 # Crash log files
 crash.log
