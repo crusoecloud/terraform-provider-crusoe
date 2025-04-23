@@ -21,7 +21,10 @@ import (
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
-var errProjectNotFound = errors.New("project for instance not found")
+var (
+	errProjectNotFound = errors.New("project for instance not found")
+	diskDetachWarning  = "To avoid potential data loss, it is critical to unmount any disks attached to the instance before detachment."
+)
 
 type vmResource struct {
 	client *swagger.APIClient
@@ -464,6 +467,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	addedDisks, removedDisks := getDisksDiff(tStateDisks, tPlanDisks)
 
 	if len(removedDisks) > 0 {
+		resp.Diagnostics.AddWarning("Disk Detachment", diskDetachWarning)
 		detachResp, httpResp, err := r.client.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
 			DetachDisks: removedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
