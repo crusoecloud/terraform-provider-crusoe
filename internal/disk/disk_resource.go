@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -126,7 +127,45 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 }
 
 func (r *diskResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceIdentifiers := strings.Split(req.ID, ",")
+
+	// We allow "disk_id" (project_id is implicitly defined via env variable) or "disk_id,project_id" (explicit project_id)
+	diskID := resourceIdentifiers[0]
+	var projectID string
+
+	switch len(resourceIdentifiers) {
+	case 1:
+		projectID = ""
+	case 2:
+		projectID = resourceIdentifiers[1]
+	default:
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Expected format disk_id,project_id, got %q", req.ID))
+
+		return
+	}
+
+	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, projectID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch project ID",
+			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+		return
+	}
+
+	if _, parseErr := uuid.Parse(diskID); parseErr != nil {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse disk ID: %v", parseErr))
+
+		return
+	}
+
+	if _, parseErr := uuid.Parse(projectID); parseErr != nil {
+		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse project ID: %v", parseErr))
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), diskID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -208,7 +247,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
-	projectID := ""
+	var projectID string
 	if state.ProjectID.ValueString() == "" {
 		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
@@ -245,14 +284,8 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	state.Name = types.StringValue(disk.Name)
-	state.Type = types.StringValue(disk.Type_)
-	state.Size = types.StringValue(formatSize(state.Size.ValueString(), disk.Size))
-	state.SerialNumber = types.StringValue(disk.SerialNumber)
-	state.BlockSize = types.Int64Value(disk.BlockSize)
-
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	diskToTerraformResourceModel(disk, &state)
+	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
