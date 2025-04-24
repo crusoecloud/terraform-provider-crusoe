@@ -154,8 +154,6 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	var state kubernetesClusterResourceModel
-
 	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
@@ -196,6 +194,8 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 
 		return
 	}
+
+	var state kubernetesClusterResourceModel
 
 	state.ID = types.StringValue(kubernetesCluster.Id)
 	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)

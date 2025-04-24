@@ -151,8 +151,6 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	var state kubernetesNodePoolResourceModel
-
 	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch project ID",
@@ -193,6 +191,8 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 
 		return
 	}
+
+	var state kubernetesNodePoolResourceModel
 
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
