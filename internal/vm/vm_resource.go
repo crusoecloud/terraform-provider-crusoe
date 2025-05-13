@@ -40,7 +40,8 @@ type vmResourceModel struct {
 	Image               types.String `tfsdk:"image"`
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
-	FQDN                types.String `tfsdk:"fqdn"`
+	InternalDNSName     types.String `tfsdk:"internal_dns_name"`
+	ExternalDNSName     types.String `tfsdk:"external_dns_name"`
 	Disks               types.Set    `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
@@ -98,7 +99,7 @@ func (r *vmResource) Metadata(ctx context.Context, req resource.MetadataRequest,
 
 func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version: 1,
+		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -162,8 +163,13 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 				Default: setdefault.StaticValue(types.Set{}),
 			},
-			"fqdn": schema.StringAttribute{
+			"internal_dns_name": schema.StringAttribute{
 				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
+			"external_dns_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{
@@ -377,7 +383,14 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	plan.ID = types.StringValue(instance.Id)
 	plan.ReservationID = types.StringValue(instance.ReservationId)
-	plan.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+	plan.InternalDNSName = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+
+	if len(instance.NetworkInterfaces) > 0 {
+		plan.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)
+	} else {
+		plan.ExternalDNSName = types.StringNull()
+	}
+
 	plan.ProjectID = types.StringValue(projectID)
 
 	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)

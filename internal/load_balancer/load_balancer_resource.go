@@ -323,7 +323,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		projectID = plan.ProjectID.ValueString()
 	}
 
-	dataResp, httpResp, err := r.client.LoadBalancersApi.CreateLoadBalancer(ctx, postReq, projectID)
+	dataResp, httpResp, err := r.client.InternalLoadBalancersApi.CreateLoadBalancer(ctx, postReq, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create load balancer",
 			fmt.Sprintf("There was an error starting a create load balancer operation (%s): %s", projectID, common.UnpackAPIError(err)))
@@ -333,7 +333,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	defer httpResp.Body.Close()
 
 	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](
-		ctx, dataResp.Operation, projectID, r.client.LoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation)
+		ctx, dataResp.Operation, projectID, r.client.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create load balancer",
 			fmt.Sprintf("There was an error creating a load balancer: %s", common.UnpackAPIError(err)))
@@ -377,7 +377,7 @@ func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 		projectID = state.ProjectID.ValueString()
 	}
 
-	loadBalancer, httpResp, err := r.client.LoadBalancersApi.GetLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	loadBalancer, httpResp, err := r.client.InternalLoadBalancersApi.GetLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get load balancer",
 			fmt.Sprintf("Fetching load balancer failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -456,7 +456,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		patchReq.HealthCheck.FailureCount = healthCheckAttributesMap["failure_count"].String()
 	}
 
-	dataResp, httpResp, err := r.client.LoadBalancersApi.PatchLoadBalancer(ctx,
+	dataResp, httpResp, err := r.client.InternalLoadBalancersApi.PatchLoadBalancer(ctx,
 		patchReq,
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
@@ -470,7 +470,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.LoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
+		return r.client.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update load balancer",
@@ -492,7 +492,7 @@ func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	dataResp, httpResp, err := r.client.LoadBalancersApi.DeleteLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	dataResp, httpResp, err := r.client.InternalLoadBalancersApi.DeleteLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete load balancer",
 			fmt.Sprintf("There was an error starting a delete load balancer operation: %s", common.UnpackAPIError(err)))
@@ -502,7 +502,7 @@ func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.LoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
+		return r.client.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete load balancer",

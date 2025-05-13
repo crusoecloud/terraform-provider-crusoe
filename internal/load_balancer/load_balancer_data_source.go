@@ -216,7 +216,7 @@ func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadR
 		projectID = fallbackProjectID
 	}
 
-	dataResp, httpResp, err := ds.client.LoadBalancersApi.ListLoadBalancers(ctx, projectID)
+	dataResp, httpResp, err := ds.client.InternalLoadBalancersApi.ListLoadBalancers(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch load balancers", "Could not fetch load balancers data at this time.")
 

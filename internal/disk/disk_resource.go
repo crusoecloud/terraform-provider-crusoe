@@ -261,7 +261,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		projectID = state.ProjectID.ValueString()
 	}
 
-	dataResp, httpResp, err := r.client.DisksApi.ListDisks(ctx, projectID)
+	dataResp, httpResp, err := r.client.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
 			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))

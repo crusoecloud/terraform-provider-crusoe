@@ -99,7 +99,7 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	dataResp, httpResp, err := ds.client.DisksApi.ListDisks(ctx, projectID)
+	dataResp, httpResp, err := ds.client.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Disks", "Could not fetch Disk data at this time.")
 

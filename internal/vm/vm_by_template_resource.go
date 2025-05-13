@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/go-uuid"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -37,7 +37,8 @@ type vmByTemplateResourceModel struct {
 	Image               types.String `tfsdk:"image"`
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
-	FQDN                types.String `tfsdk:"fqdn"`
+	InternalDNSName     types.String `tfsdk:"internal_dns_name"`
+	ExternalDNSName     types.String `tfsdk:"external_dns_name"`
 	Disks               types.Set    `tfsdk:"disks"`
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
@@ -69,7 +70,7 @@ func (r *vmByTemplateResource) Metadata(ctx context.Context, req resource.Metada
 
 func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version: 1,
+		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -134,8 +135,13 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 					},
 				},
 			},
-			"fqdn": schema.StringAttribute{
+			"internal_dns_name": schema.StringAttribute{
 				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+			},
+			"external_dns_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{
@@ -258,7 +264,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 		projectID = plan.ProjectID.ValueString()
 	}
 	instanceTemplateID := plan.InstanceTemplateID.ValueString()
-	if _, err := uuid.ParseUUID(instanceTemplateID); err != nil {
+	if _, err := uuid.Parse(instanceTemplateID); err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("The instance template ID is not a valid UUID: %v", err))
 
@@ -306,7 +312,6 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 
 	plan.ID = types.StringValue(instance.Id)
 	plan.Name = types.StringValue(instance.Name)
-	plan.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.ProjectID = types.StringValue(projectID)
 	plan.Type = types.StringValue(instance.Type_)
 	plan.Location = types.StringValue(instance.Location)
@@ -315,6 +320,13 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	plan.SSHKey = types.StringValue(instanceTemplateResp.SshPublicKey)
 	plan.StartupScript = types.StringValue(instanceTemplateResp.StartupScript)
 	plan.ShutdownScript = types.StringValue(instanceTemplateResp.ShutdownScript)
+	plan.InternalDNSName = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+
+	if len(instance.NetworkInterfaces) > 0 {
+		plan.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)
+	} else {
+		plan.ExternalDNSName = types.StringNull()
+	}
 
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	plan.NetworkInterfaces = networkInterfaces

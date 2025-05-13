@@ -108,7 +108,8 @@ func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID st
 // In the case that a warning is returned because IP addresses are missing - which should never
 // be the case - we still return a partial response that should be usable.
 func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.NetworkInterface) (interfaces []vmNetworkInterfaceDataModel, warning string) {
-	for _, networkInterface := range networkInterfaces {
+	for i := range networkInterfaces {
+		networkInterface := networkInterfaces[i]
 		var publicIP string
 		var privateIP string
 		if len(networkInterface.Ips) == 0 {
@@ -138,7 +139,8 @@ func vmNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.Network
 // the ordering of interfaces in the plan is maintained.
 func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.NetworkInterface) (networkInterfacesList types.List, warning diag.Diagnostics) {
 	interfaces := make([]vmNetworkInterfaceResourceModel, 0, len(networkInterfaces))
-	for _, networkInterface := range networkInterfaces {
+	for i := range networkInterfaces {
+		networkInterface := networkInterfaces[i]
 		var publicIP swagger.PublicIpv4Address
 		var privateIP swagger.PrivateIpv4Address
 		if len(networkInterface.Ips) == 0 {
@@ -236,11 +238,17 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.Type_)
 	state.ProjectID = types.StringValue(instance.ProjectId)
-	state.FQDN = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	state.Location = types.StringValue(instance.Location)
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
 	state.ReservationID = types.StringValue(instance.ReservationId)
+	state.InternalDNSName = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+
+	if len(instance.NetworkInterfaces) > 0 {
+		state.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)
+	} else {
+		state.ExternalDNSName = types.StringNull()
+	}
 
 	if len(instance.Disks) > 0 {
 		disks := make([]vmDiskResourceModel, 0, len(instance.Disks))

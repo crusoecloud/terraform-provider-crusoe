@@ -22,15 +22,16 @@ description: |-
 
 ### Optional
 
+- `external_dns_name` (String)
 - `project_id` (String)
 
 ### Read-Only
 
 - `disks` (Attributes Set) (see [below for nested schema](#nestedatt--disks))
-- `fqdn` (String)
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `id` (String) The ID of this resource.
 - `image` (String)
+- `internal_dns_name` (String)
 - `location` (String)
 - `name` (String)
 - `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
