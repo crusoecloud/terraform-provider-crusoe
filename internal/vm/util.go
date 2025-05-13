@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	DiskOS       = "os"
-	StateRunning = "STATE_RUNNING"
+	DiskOS                 = "os"
+	StateRunning           = "STATE_RUNNING"
+	FQDNDeprecationMessage = "This field is deprecated as of provider version v0.5.29 and " +
+		"will be removed in the next major version, use internal_dns_name instead"
 )
 
 var vmNetworkInterfaceSchema = types.ObjectType{
@@ -242,7 +244,10 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
 	state.ReservationID = types.StringValue(instance.ReservationId)
-	state.InternalDNSName = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+
+	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+	state.InternalDNSName = internalDNSName
+	state.FQDN = internalDNSName // fqdn is deprecated but kept for backward compatibility
 
 	if len(instance.NetworkInterfaces) > 0 {
 		state.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)

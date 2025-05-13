@@ -36,6 +36,7 @@ description: |-
 
 ### Read-Only
 
+- `fqdn` (String, Deprecated)
 - `id` (String) The ID of this resource.
 - `internal_dns_name` (String)
 

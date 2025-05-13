@@ -1,3 +1,26 @@
+## 0.5.29
+
+ENHANCEMENTS:
+
+* Adds new VM instance attribute: `external_dns_name`
+* **Deprecated:** VM instance attribute `fqdn` is now deprecated and will be removed in the next major version. Use `internal_dns_name` instead
+
+BUG FIXES:
+
+* Fixes an issue where state data for disks was being lost during import
+
+## 0.5.28
+
+ENHANCEMENTS:
+
+* Adds support for kubeconfig resources
+* Adds ability to update kubernetes nodepool size in place
+* Supports importing kubernetes cluster state
+
+BUG FIXES:
+
+* N/A
+
 ## 0.5.27
 
 ENHANCEMENTS:

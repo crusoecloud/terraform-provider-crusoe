@@ -40,6 +40,7 @@ type vmResourceModel struct {
 	Image               types.String `tfsdk:"image"`
 	StartupScript       types.String `tfsdk:"startup_script"`
 	ShutdownScript      types.String `tfsdk:"shutdown_script"`
+	FQDN                types.String `tfsdk:"fqdn"`
 	InternalDNSName     types.String `tfsdk:"internal_dns_name"`
 	ExternalDNSName     types.String `tfsdk:"external_dns_name"`
 	Disks               types.Set    `tfsdk:"disks"`
@@ -162,6 +163,11 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 					},
 				},
 				Default: setdefault.StaticValue(types.Set{}),
+			},
+			"fqdn": schema.StringAttribute{
+				Computed:           true,
+				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				DeprecationMessage: FQDNDeprecationMessage,
 			},
 			"internal_dns_name": schema.StringAttribute{
 				Computed:      true,
@@ -383,7 +389,10 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	plan.ID = types.StringValue(instance.Id)
 	plan.ReservationID = types.StringValue(instance.ReservationId)
-	plan.InternalDNSName = types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+
+	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
+	plan.InternalDNSName = internalDNSName
+	plan.FQDN = internalDNSName // fqdn is deprecated but kept for backward compatibility
 
 	if len(instance.NetworkInterfaces) > 0 {
 		plan.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)
