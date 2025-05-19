@@ -1,3 +1,13 @@
+## 0.5.30
+
+ENHANCEMENTS:
+
+* N/A
+
+BUG FIXES:
+
+* Fixed an issue where the `ib_partition_id` field would be set to null when updating a nodepool
+
 ## 0.5.29
 
 ENHANCEMENTS:
@@ -9,7 +19,7 @@ BUG FIXES:
 
 * Fixes an issue where state data for disks was being lost during import
 
-## 0.5.28
+## 0.5.28 (April 18, 2025)
 
 ENHANCEMENTS:
 
@@ -21,13 +31,13 @@ BUG FIXES:
 
 * N/A
 
-## 0.5.27
+## 0.5.27 (February 7, 2025)
 
 ENHANCEMENTS:
 
 * Allow fallback project IDs to be used with the VPC network resource
 
-## 0.5.26
+## 0.5.26 (January 30, 2025)
 
 ENHANCEMENTS:
 
@@ -37,7 +47,7 @@ BUG FIXES:
 
 * N/A
 
-## 0.5.25
+## 0.5.25 (January 9, 2025)
 
 ENHANCEMENTS:
 
@@ -47,13 +57,13 @@ BUG FIXES:
 
 * Removes deprecated CMK cluster configuration parameter.
 
-## 0.5.24 (January 9, 2025)
+## 0.5.24 (December 19, 2025)
 
 ENHANCEMENTS:
 
 * Adds initial support for Crusoe Managed Kubernetes (CMK) clusters and node pools.
 
-## 0.5.23 (December 5, 2024)
+## 0.5.23 (December 13, 2024)
 
 ENHANCEMENTS:
 
@@ -64,7 +74,7 @@ BUG FIXES:
 
 * Fixes an issue with creating a VM with disks set to an empty list.
 
-## 0.5.22 (October 22, 2024)
+## 0.5.22 (October 24, 2024)
 BUG FIXES:
 
 * Fixes representation of disks to be order-agnostic. 

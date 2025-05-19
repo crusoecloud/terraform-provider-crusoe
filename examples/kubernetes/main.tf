@@ -8,8 +8,8 @@ terraform {
 
 locals {
   my_ssh_public_key = file("~/.ssh/id_ed25519.pub")
-  control_plane_version = "1.30.8-cmk.26"
-  worker_version = "1.30.8-cmk.6"
+  control_plane_version = "1.30.8-cmk.28"
+  worker_version = "1.30.8-cmk.7"
   location = "us-east1-a"
   add_ons = [
     "cluster_autoscaler",

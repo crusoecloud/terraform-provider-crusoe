@@ -196,7 +196,6 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
-	state.State = types.StringValue(kubernetesNodePool.State)
 	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
 	state.Version = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
@@ -208,6 +207,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
+	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 
 	state.SSHKey = plan.SSHKey
@@ -335,20 +335,21 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	// Update state
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
-	state.State = types.StringValue(kubernetesNodePool.State)
 	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count) // For now, this is the only field that we expect to change
 	state.Version = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
+	state.IBPartitionID = plan.IBPartitionID
+	state.RequestedNodeLabels = plan.RequestedNodeLabels
 	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
-	state.SSHKey = stored.SSHKey
-	state.RequestedNodeLabels = stored.RequestedNodeLabels
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
+
+	state.SSHKey = plan.SSHKey
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
