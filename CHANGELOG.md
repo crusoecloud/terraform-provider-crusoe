@@ -1,13 +1,3 @@
-## 0.5.30
-
-ENHANCEMENTS:
-
-* N/A
-
-BUG FIXES:
-
-* Fixed an issue where the `ib_partition_id` field would be set to null when updating a nodepool
-
 ## 0.5.29
 
 ENHANCEMENTS:
@@ -18,6 +8,7 @@ ENHANCEMENTS:
 BUG FIXES:
 
 * Fixes an issue where state data for disks was being lost during import
+* Fixed an issue where the `ib_partition_id` field would be set to null when updating a nodepool
 
 ## 0.5.28 (April 18, 2025)
 
