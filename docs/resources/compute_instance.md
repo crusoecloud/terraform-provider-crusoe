@@ -24,7 +24,6 @@ description: |-
 ### Optional
 
 - `disks` (Attributes Set) (see [below for nested schema](#nestedatt--disks))
-- `external_dns_name` (String)
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `image` (String)
 - `location` (String)
@@ -36,6 +35,7 @@ description: |-
 
 ### Read-Only
 
+- `external_dns_name` (String)
 - `fqdn` (String, Deprecated)
 - `id` (String) The ID of this resource.
 - `internal_dns_name` (String)

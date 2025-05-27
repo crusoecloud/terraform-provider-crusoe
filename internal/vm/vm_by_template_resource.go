@@ -147,7 +147,6 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"external_dns_name": schema.StringAttribute{
 				Computed:      true,
-				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{

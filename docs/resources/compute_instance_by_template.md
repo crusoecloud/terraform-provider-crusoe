@@ -22,12 +22,12 @@ description: |-
 
 ### Optional
 
-- `external_dns_name` (String)
 - `project_id` (String)
 
 ### Read-Only
 
 - `disks` (Attributes Set) (see [below for nested schema](#nestedatt--disks))
+- `external_dns_name` (String)
 - `fqdn` (String, Deprecated)
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `id` (String) The ID of this resource.
