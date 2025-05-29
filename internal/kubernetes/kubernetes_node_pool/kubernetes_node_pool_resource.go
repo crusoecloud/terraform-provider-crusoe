@@ -184,7 +184,8 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	kubernetesNodePool, _, err := common.AwaitOperationAndResolve[swagger.KubernetesNodePool](ctx, asyncOperation.Operation, projectID, r.client.KubernetesNodePoolOperationsApi.GetKubernetesNodePoolsOperation)
+	// Wait for operation to complete
+	kubernetesNodePoolResponse, err := AwaitNodePoolOperation(ctx, asyncOperation.Operation, projectID, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
 			fmt.Sprintf("Error creating a node pool: %s", common.UnpackAPIError(err)))
@@ -192,23 +193,30 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
+	if kubernetesNodePoolResponse.Details != nil && kubernetesNodePoolResponse.Details.Error_ != "" {
+		// TODO: Return created count once NumVmsCreated is populated
+		resp.Diagnostics.AddWarning("Unable to create desired number of VMs",
+			fmt.Sprintf("Warning -- Unable to create desired number of VMs due to the following error: %s",
+				kubernetesNodePoolResponse.Details.Error_))
+	}
+
 	var state kubernetesNodePoolResourceModel
 
-	state.ID = types.StringValue(kubernetesNodePool.Id)
-	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
-	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
-	state.Version = types.StringValue(kubernetesNodePool.ImageId)
-	state.Type = types.StringValue(kubernetesNodePool.Type_)
-	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
-	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
+	state.ID = types.StringValue(kubernetesNodePoolResponse.NodePool.Id)
+	state.ProjectID = types.StringValue(kubernetesNodePoolResponse.NodePool.ProjectId)
+	state.InstanceCount = types.Int64Value(kubernetesNodePoolResponse.NodePool.Count)
+	state.Version = types.StringValue(kubernetesNodePoolResponse.NodePool.ImageId)
+	state.Type = types.StringValue(kubernetesNodePoolResponse.NodePool.Type_)
+	state.ClusterID = types.StringValue(kubernetesNodePoolResponse.NodePool.ClusterId)
+	state.SubnetID = types.StringValue(kubernetesNodePoolResponse.NodePool.SubnetId)
 	state.IBPartitionID = plan.IBPartitionID
 	state.RequestedNodeLabels = plan.RequestedNodeLabels
-	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
+	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePoolResponse.NodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
-	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
+	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(kubernetesNodePool.State)
-	state.Name = types.StringValue(kubernetesNodePool.Name)
+	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
+	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
 
 	state.SSHKey = plan.SSHKey
 
@@ -322,7 +330,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	}
 
 	// Wait for operation to complete
-	kubernetesNodePool, _, err := common.AwaitOperationAndResolve[swagger.KubernetesNodePool](ctx, asyncOperation.Operation, projectID, r.client.KubernetesNodePoolOperationsApi.GetKubernetesNodePoolsOperation)
+	kubernetesNodePoolResponse, err := AwaitNodePoolOperation(ctx, asyncOperation.Operation, projectID, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update node pool",
 			fmt.Sprintf("Error updating a node pool: %s", common.UnpackAPIError(err)))
@@ -330,24 +338,31 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
+	if kubernetesNodePoolResponse.Details != nil && kubernetesNodePoolResponse.Details.Error_ != "" {
+		// TODO: Return created count once NumVmsCreated is populated
+		resp.Diagnostics.AddWarning("Unable to provision all instances",
+			fmt.Sprintf("Warning -- Unable to create desired number of VMs due to the following error: %s",
+				kubernetesNodePoolResponse.Details.Error_))
+	}
+
 	var state kubernetesNodePoolResourceModel
 
 	// Update state
-	state.ID = types.StringValue(kubernetesNodePool.Id)
-	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
-	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count) // For now, this is the only field that we expect to change
-	state.Version = types.StringValue(kubernetesNodePool.ImageId)
-	state.Type = types.StringValue(kubernetesNodePool.Type_)
-	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
-	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
+	state.ID = types.StringValue(kubernetesNodePoolResponse.NodePool.Id)
+	state.ProjectID = types.StringValue(kubernetesNodePoolResponse.NodePool.ProjectId)
+	state.InstanceCount = types.Int64Value(kubernetesNodePoolResponse.NodePool.Count) // For now, this is the only field that we expect to change
+	state.Version = types.StringValue(kubernetesNodePoolResponse.NodePool.ImageId)
+	state.Type = types.StringValue(kubernetesNodePoolResponse.NodePool.Type_)
+	state.ClusterID = types.StringValue(kubernetesNodePoolResponse.NodePool.ClusterId)
+	state.SubnetID = types.StringValue(kubernetesNodePoolResponse.NodePool.SubnetId)
 	state.IBPartitionID = plan.IBPartitionID
 	state.RequestedNodeLabels = plan.RequestedNodeLabels
-	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
+	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePoolResponse.NodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
-	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
+	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(kubernetesNodePool.State)
-	state.Name = types.StringValue(kubernetesNodePool.Name)
+	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
+	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
 
 	state.SSHKey = plan.SSHKey
 

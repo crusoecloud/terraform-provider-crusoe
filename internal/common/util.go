@@ -59,7 +59,7 @@ var (
 	OpInProgress opStatus = "IN_PROGRESS"
 	OpFailed     opStatus = "FAILED"
 
-	errUnableToGetOpRes = errors.New("failed to get result of operation")
+	ErrUnableToGetOpRes = errors.New("failed to get result of operation")
 
 	// fallback error presented to the user in unexpected situations
 	errMultipleProjects = errors.New("User has multiple projects. Please specify a project to be used.")
@@ -195,13 +195,13 @@ func GetProjectIDOrFallback(ctx context.Context, client *swagger.APIClient, diag
 func parseOpResult[T any](opResult interface{}) (*T, error) {
 	b, err := json.Marshal(opResult)
 	if err != nil {
-		return nil, errUnableToGetOpRes
+		return nil, ErrUnableToGetOpRes
 	}
 
 	var result T
 	err = json.Unmarshal(b, &result)
 	if err != nil {
-		return nil, errUnableToGetOpRes
+		return nil, ErrUnableToGetOpRes
 	}
 
 	return &result, nil

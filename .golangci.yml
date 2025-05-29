@@ -29,6 +29,8 @@ linters-settings:
   gosec:
     global:
       audit: enabled # Run extra checks that might be "nosy"
+    excludes:
+      - G115  # https://github.com/securego/gosec/issues/1187
   gomoddirectives:
     replace-allow-list:
       - github.com/crusoecloud/client-go
