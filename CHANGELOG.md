@@ -1,4 +1,14 @@
-## 0.5.29
+## 0.5.30
+
+ENHANCEMENTS:
+
+* Add support for best effort nodepool creation
+
+BUG FIXES:
+
+* Fix an issue where the `external_dns_name` field was read-write instead of read-only
+
+## 0.5.29 (May 19, 2025)
 
 ENHANCEMENTS:
 
