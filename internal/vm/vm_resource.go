@@ -319,7 +319,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		})
 	}
 
-	// public static IPs
+	// public IP types
 	newNetworkInterfaces := make([]swagger.NetworkInterface, 0)
 	if !plan.NetworkInterfaces.IsUnknown() && !plan.NetworkInterfaces.IsNull() {
 		tNetworkInterfaces := make([]vmNetworkInterfaceResourceModel, 0, len(plan.NetworkInterfaces.Elements()))
@@ -536,9 +536,9 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	// handle toggling static/dynamic public IPs
+	// handle updating public IP type
 	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
-		// instances must be running to toggle static public IP
+		// instances must be running to update public IP type
 		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",

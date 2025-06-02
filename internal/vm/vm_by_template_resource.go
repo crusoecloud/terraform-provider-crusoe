@@ -488,9 +488,9 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 	}
 
-	// handle toggling static/dynamic public IPs
+	// handle updating public IP type
 	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
-		// instances must be running to toggle static public IP
+		// instances must be running to change public IP type
 		instance, httpResp, err := r.client.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",

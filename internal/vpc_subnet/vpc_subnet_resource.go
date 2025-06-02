@@ -8,6 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -21,12 +24,20 @@ type vpcSubnetResource struct {
 }
 
 type vpcSubnetResourceModel struct {
-	ID        types.String `tfsdk:"id"`
-	ProjectID types.String `tfsdk:"project_id"`
-	Name      types.String `tfsdk:"name"`
-	CIDR      types.String `tfsdk:"cidr"`
-	Location  types.String `tfsdk:"location"`
-	Network   types.String `tfsdk:"network"`
+	ID                types.String `tfsdk:"id"`
+	ProjectID         types.String `tfsdk:"project_id"`
+	Name              types.String `tfsdk:"name"`
+	CIDR              types.String `tfsdk:"cidr"`
+	Location          types.String `tfsdk:"location"`
+	Network           types.String `tfsdk:"network"`
+	NATGatewayEnabled types.Bool   `tfsdk:"nat_gateway_enabled"`
+	NATGateways       types.List   `tfsdk:"nat_gateways"`
+}
+
+type vpcSubnetNatGatewayResourceModel struct {
+	ID                types.String `tfsdk:"id"`
+	PublicIpv4Address types.String `tfsdk:"public_ipv4_address"`
+	PublicIpv4Id      types.String `tfsdk:"public_ipv4_id"`
 }
 
 func NewVPCSubnetResource() resource.Resource {
@@ -57,7 +68,7 @@ func (r *vpcSubnetResource) Metadata(ctx context.Context, req resource.MetadataR
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version: 1,
+		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -92,6 +103,30 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 					stringplanmodifier.UseStateForUnknown(),
 				}, // maintain across updates
 			},
+			"nat_gateway_enabled": schema.BoolAttribute{
+				MarkdownDescription: common.DevelopmentMessage,
+				Optional:            true,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"nat_gateways": schema.ListNestedAttribute{
+				MarkdownDescription: common.DevelopmentMessage,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+				NestedObject: schema.NestedAttributeObject{
+					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Computed: true,
+						},
+						"public_ipv4_address": schema.StringAttribute{
+							Computed: true,
+						},
+						"public_ipv4_id": schema.StringAttribute{
+							Computed: true,
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -124,10 +159,11 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	dataResp, httpResp, err := r.client.VPCSubnetsApi.CreateVPCSubnet(ctx, swagger.VpcSubnetPostRequest{
-		Name:         plan.Name.ValueString(),
-		Cidr:         plan.CIDR.ValueString(),
-		Location:     plan.Location.ValueString(),
-		VpcNetworkId: plan.Network.ValueString(),
+		Name:              plan.Name.ValueString(),
+		Cidr:              plan.CIDR.ValueString(),
+		Location:          plan.Location.ValueString(),
+		VpcNetworkId:      plan.Network.ValueString(),
+		NatGatewayEnabled: plan.NATGatewayEnabled.ValueBool(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VPC Subnet",
@@ -143,6 +179,15 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 	plan.Location = types.StringValue(dataResp.Subnet.Location)
 	plan.Network = types.StringValue(dataResp.Subnet.VpcNetworkId)
 	plan.ProjectID = types.StringValue(projectID)
+
+	natGatewaysList, natDiags := natGatewaysToTerraformResourceModel(ctx, dataResp.Subnet.NatGateways)
+	if natDiags.HasError() {
+		resp.Diagnostics.Append(natDiags...)
+
+		return
+	}
+	plan.NATGateways = natGatewaysList
+	plan.NATGatewayEnabled = types.BoolValue(len(natGatewaysList.Elements()) > 0)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -173,7 +218,7 @@ func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	vpcSubnetToTerraformResourceModel(&vpcSubnet, &state)
+	vpcSubnetToTerraformResourceModel(ctx, &vpcSubnet, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -195,11 +240,20 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	dataResp, httpResp, err := r.client.VPCSubnetsApi.PatchVPCSubnet(ctx,
-		swagger.VpcSubnetPatchRequest{Name: plan.Name.ValueString()},
-		plan.ProjectID.ValueString(),
-		plan.ID.ValueString(),
-	)
+	patchReq := swagger.VpcSubnetPatchRequest{
+		Name: plan.Name.ValueString(),
+	}
+	if !plan.NATGatewayEnabled.IsUnknown() && !plan.NATGatewayEnabled.IsNull() {
+		natGatewayEnabled := plan.NATGatewayEnabled.ValueBool()
+		if natGatewayEnabled && len(plan.NATGateways.Elements()) > 0 {
+			resp.Diagnostics.AddWarning("NAT Gateway Update",
+				"NAT Gateway is already enabled for this subnet")
+		}
+		patchReq.NatGatewayEnabled = natGatewayEnabled
+	}
+
+	dataResp, httpResp, err := r.client.VPCSubnetsApi.PatchVPCSubnet(ctx, patchReq,
+		plan.ProjectID.ValueString(), plan.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Subnet",
 			fmt.Sprintf("There was an error starting an update VPC Subnet operation: %s.\n\n", common.UnpackAPIError(err)))

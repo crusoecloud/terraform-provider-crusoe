@@ -24,8 +24,19 @@ description: |-
 
 ### Optional
 
+- `nat_gateway_enabled` (Boolean) This feature is currently in development. Reach out to support@crusoecloud.com with any questions.
 - `project_id` (String)
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `nat_gateways` (Attributes List) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--nat_gateways))
+
+<a id="nestedatt--nat_gateways"></a>
+### Nested Schema for `nat_gateways`
+
+Read-Only:
+
+- `id` (String)
+- `public_ipv4_address` (String)
+- `public_ipv4_id` (String)

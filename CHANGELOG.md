@@ -3,6 +3,7 @@
 ENHANCEMENTS:
 
 * Add support for best effort nodepool creation
+* Add support for VPC Subnet NAT Gateways
 
 BUG FIXES:
 
