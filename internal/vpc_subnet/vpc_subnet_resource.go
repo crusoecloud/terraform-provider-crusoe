@@ -187,7 +187,6 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	plan.NATGateways = natGatewaysList
-	plan.NATGatewayEnabled = types.BoolValue(len(natGatewaysList.Elements()) > 0)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
