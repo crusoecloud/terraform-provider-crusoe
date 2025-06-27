@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -106,6 +107,8 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 			"nat_gateway_enabled": schema.BoolAttribute{
 				MarkdownDescription: common.DevelopmentMessage,
 				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"nat_gateways": schema.ListNestedAttribute{
@@ -187,6 +190,7 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	plan.NATGateways = natGatewaysList
+	plan.NATGatewayEnabled = types.BoolValue(len(natGatewaysList.Elements()) > 0)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
