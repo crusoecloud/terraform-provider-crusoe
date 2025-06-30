@@ -23,6 +23,7 @@ description: |-
 
 ### Optional
 
+- `custom_image` (String)
 - `disks` (Attributes Set) (see [below for nested schema](#nestedatt--disks))
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `image` (String)
