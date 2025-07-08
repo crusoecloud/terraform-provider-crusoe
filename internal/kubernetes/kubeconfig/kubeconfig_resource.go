@@ -42,7 +42,7 @@ type kubeConfigResourceModel struct {
 	KubeConfigYaml       types.String `tfsdk:"kubeconfig_yaml"`
 }
 
-func templateKubeConfig(params *swagger.KubernetesAuthenticationClientCertificateDetails) (*string, error) {
+func templateKubeConfig(params *swagger.KubernetesAuthenticationDetails) (*string, error) {
 	kubeConfig := k8sApi.NewConfig()
 
 	// Create a new cluster with the given address and CA certificate
@@ -155,7 +155,7 @@ func (r *kubeConfigResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	res, _, err := r.client.KubernetesClustersApi.GetClusterCredentials(ctx, projectID, plan.ClusterID.ValueString())
+	res, _, err := r.client.KubernetesClustersApi.GetClusterCredentials(ctx, projectID, plan.ClusterID.ValueString(), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create kubeconfig",
 			fmt.Sprintf("Error creating kubeconfig: %s", common.UnpackAPIError(err)))
@@ -222,7 +222,7 @@ func (r *kubeConfigResource) Read(ctx context.Context, req resource.ReadRequest,
 	state.UserName = stored.UserName
 
 	kubeConfigYaml, err := templateKubeConfig(
-		&swagger.KubernetesAuthenticationClientCertificateDetails{
+		&swagger.KubernetesAuthenticationDetails{
 			ClusterAddress:        state.ClusterAddress.ValueString(),
 			ClusterCaCertificate:  state.ClusterCACertificate.ValueString(),
 			ClusterName:           state.ClusterName.ValueString(),
