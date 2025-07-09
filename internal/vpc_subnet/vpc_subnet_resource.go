@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -106,6 +107,8 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 			"nat_gateway_enabled": schema.BoolAttribute{
 				MarkdownDescription: common.DevelopmentMessage,
 				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"nat_gateways": schema.ListNestedAttribute{
@@ -244,12 +247,12 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 		Name: plan.Name.ValueString(),
 	}
 	if !plan.NATGatewayEnabled.IsUnknown() && !plan.NATGatewayEnabled.IsNull() {
-		natGatewayEnabled := plan.NATGatewayEnabled.ValueBool()
-		if natGatewayEnabled && len(plan.NATGateways.Elements()) > 0 {
-			resp.Diagnostics.AddWarning("NAT Gateway Update",
-				"NAT Gateway is already enabled for this subnet")
+		switch plan.NATGatewayEnabled.ValueBool() {
+		case true:
+			patchReq.NatGatewayAction = "enable"
+		case false:
+			patchReq.NatGatewayAction = "disable"
 		}
-		patchReq.NatGatewayEnabled = natGatewayEnabled
 	}
 
 	dataResp, httpResp, err := r.client.VPCSubnetsApi.PatchVPCSubnet(ctx, patchReq,

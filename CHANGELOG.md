@@ -1,3 +1,13 @@
+## 0.5.31
+
+ENHANCEMENTS:
+
+* N/A
+
+BUG FIXES:
+
+* Fixes an issue with setting the `nat_gateway_enabled` field for VPC subnet resources
+
 ## 0.5.30
 
 ENHANCEMENTS:
