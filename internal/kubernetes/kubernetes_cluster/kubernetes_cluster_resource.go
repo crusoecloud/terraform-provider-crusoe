@@ -255,6 +255,12 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	state.Location = types.StringValue(kubernetesCluster.Location)
 	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
 	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	state.OIDCIssuerURL = plan.OIDCIssuerURL
+	state.OIDCClientID = plan.OIDCClientID
+	state.OIDCUsernameClaim = plan.OIDCUsernameClaim
+	state.OIDCUsernamePrefix = plan.OIDCUsernamePrefix
+	state.OIDCGroupsClaim = plan.OIDCGroupsClaim
+	state.OIDCCACert = plan.OIDCCACert
 	resp.Diagnostics.Append(diags...)
 
 	diags = resp.State.Set(ctx, &state)
@@ -318,7 +324,12 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
 	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
 	resp.Diagnostics.Append(diags...)
-
+	state.OIDCIssuerURL = stored.OIDCIssuerURL
+	state.OIDCClientID = stored.OIDCClientID
+	state.OIDCUsernameClaim = stored.OIDCUsernameClaim
+	state.OIDCUsernamePrefix = stored.OIDCUsernamePrefix
+	state.OIDCGroupsClaim = stored.OIDCGroupsClaim
+	state.OIDCCACert = stored.OIDCCACert
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

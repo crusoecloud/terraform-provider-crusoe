@@ -191,6 +191,7 @@ func (r *kubeConfigResource) Create(ctx context.Context, req resource.CreateRequ
 
 	state.ClusterID = types.StringValue(plan.ClusterID.ValueString())
 	state.ProjectID = types.StringValue(projectID)
+	state.AuthType = plan.AuthType
 	state.ClusterAddress = types.StringValue(res.ClusterAddress)
 	state.ClusterCACertificate = types.StringValue(res.ClusterCaCertificate)
 	state.ClusterName = types.StringValue(res.ClusterName)
