@@ -40,6 +40,14 @@ resource "crusoe_kubernetes_cluster" "my_cluster" {
   # Optional: Add additional add-ons
   # See `crusoe kubernetes clusters create --help` for available add-ons
   # add_ons = local.add_ons
+
+  # Optional: Configure OIDC authentication for Kubernetes
+  # Replace with your own identity provider values
+  # oidc_issuer_url      = "https://auth.example.com/oauth2/aussah0123456bd97"
+  # oidc_client_id       = "0123456789abcdef"
+  # oidc_username_claim  = "sub"      # typically "sub" or "email"
+  # oidc_groups_claim    = "groups"   # claim used to identify user groups
+  # oidc_username_prefix = ""         # prefix prepended to username claim
 }
 
 resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
@@ -68,6 +76,9 @@ resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
 
 resource "crusoe_kubeconfig" "my_cluster_kubeconfig" {
   cluster_id = crusoe_kubernetes_cluster.my_cluster.id
+  # Optional: Specify authentication type for kubeconfig.
+  # Supported values: "admin_cert" (default), "oidc"
+  # auth_type  = "oidc"
 }
 
 # # Optional: Use the kubeconfig with the Kubernetes provider

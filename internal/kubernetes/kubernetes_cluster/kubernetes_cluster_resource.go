@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -54,6 +55,12 @@ type kubernetesClusterResourceModel struct {
 	Location              types.String `tfsdk:"location"`
 	DNSName               types.String `tfsdk:"dns_name"`
 	NodePoolIds           types.List   `tfsdk:"nodepool_ids"`
+	OIDCIssuerURL         types.String `tfsdk:"oidc_issuer_url"`
+	OIDCClientID          types.String `tfsdk:"oidc_client_id"`
+	OIDCUsernameClaim     types.String `tfsdk:"oidc_username_claim"`
+	OIDCUsernamePrefix    types.String `tfsdk:"oidc_username_prefix"`
+	OIDCGroupsClaim       types.String `tfsdk:"oidc_groups_claim"`
+	OIDCCACert            types.String `tfsdk:"oidc_ca_cert"`
 }
 
 func (r *kubernetesClusterResource) Configure(_ context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -141,6 +148,31 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Computed:      true,
 				PlanModifiers: []planmodifier.List{},
 			},
+			"oidc_issuer_url": schema.StringAttribute{
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"oidc_client_id": schema.StringAttribute{
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"oidc_username_claim": schema.StringAttribute{
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"oidc_username_prefix": schema.StringAttribute{
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"oidc_groups_claim": schema.StringAttribute{
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"oidc_ca_cert": schema.StringAttribute{
+				Optional:      true,
+				Description:   "CA certificate used to verify the OIDC server (optional).",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
 		},
 	}
 }
@@ -169,8 +201,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	//nolint:gosec // Sanity check for int64 --> int32 narrowing performed at field level (see schema)
-	asyncOperation, _, err := r.client.KubernetesClustersApi.CreateCluster(ctx, swagger.KubernetesClusterPostRequest{
+	createRequest := swagger.KubernetesClusterPostRequest{
 		AddOns:                addOns,
 		ClusterCidr:           plan.ClusterCidr.ValueString(),
 		Location:              plan.Location.ValueString(),
@@ -179,7 +210,21 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		ServiceClusterIpRange: plan.ServiceClusterIpRange.ValueString(),
 		SubnetId:              plan.SubnetID.ValueString(),
 		Version:               plan.Version.ValueString(),
-	}, projectID)
+	}
+
+	authConfig, diagErr := buildOIDCAuthConfig(ctx, &plan)
+	if diagErr != nil {
+		resp.Diagnostics.Append(diagErr...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+	if authConfig != nil {
+		createRequest.AuthConfig = authConfig
+	}
+
+	//nolint:gosec // Sanity check for int64 --> int32 narrowing performed at field level (see schema)
+	asyncOperation, _, err := r.client.KubernetesClustersApi.CreateCluster(ctx, createRequest, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create cluster",
 			fmt.Sprintf("Error starting a create cluster operation: %s", common.UnpackAPIError(err)))
@@ -370,4 +415,40 @@ func (r *kubernetesClusterResource) ImportState(ctx context.Context, req resourc
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), clusterID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
+}
+
+func buildOIDCAuthConfig(ctx context.Context, plan *kubernetesClusterResourceModel) (*swagger.KubernetesClusterAuthConfig, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if plan.OIDCIssuerURL.ValueString() == "" && plan.OIDCClientID.ValueString() == "" {
+		return nil, nil
+	}
+
+	if plan.OIDCIssuerURL.ValueString() == "" || plan.OIDCClientID.ValueString() == "" {
+		diags.AddError("Invalid OIDC configuration",
+			"Both oidc_issuer_url and oidc_client_id must be provided together.")
+
+		return nil, diags
+	}
+
+	usernameClaim := "sub"
+	if plan.OIDCUsernameClaim.ValueString() != "" {
+		usernameClaim = plan.OIDCUsernameClaim.ValueString()
+	}
+
+	var caCertContent string
+	if plan.OIDCCACert.ValueString() != "" {
+		caCertContent = plan.OIDCCACert.ValueString()
+	}
+
+	return &swagger.KubernetesClusterAuthConfig{
+		Oidc: &swagger.OidcAuthConfig{
+			IssuerUrl:      plan.OIDCIssuerURL.ValueString(),
+			ClientId:       plan.OIDCClientID.ValueString(),
+			UsernameClaim:  usernameClaim,
+			UsernamePrefix: plan.OIDCUsernamePrefix.ValueString(),
+			GroupsClaim:    plan.OIDCGroupsClaim.ValueString(),
+			CaCert:         caCertContent,
+		},
+	}, diags
 }

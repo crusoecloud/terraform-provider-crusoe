@@ -21,6 +21,7 @@ description: |-
 
 ### Optional
 
+- `auth_type` (String) Authentication type for fetching kubeconfig. Allowed: 'admin_cert', 'oidc'. If unset, will default to 'admin_cert'.
 - `project_id` (String)
 
 ### Read-Only

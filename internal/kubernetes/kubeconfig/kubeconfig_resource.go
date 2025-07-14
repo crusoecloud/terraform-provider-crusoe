@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antihax/optional"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"k8s.io/client-go/tools/clientcmd"
 	k8sApi "k8s.io/client-go/tools/clientcmd/api"
@@ -40,9 +43,15 @@ type kubeConfigResourceModel struct {
 	ClientKey            types.String `tfsdk:"client_key"`
 	UserName             types.String `tfsdk:"username"`
 	KubeConfigYaml       types.String `tfsdk:"kubeconfig_yaml"`
+	AuthType             types.String `tfsdk:"auth_type"`
 }
 
 func templateKubeConfig(params *swagger.KubernetesAuthenticationDetails) (*string, error) {
+	if params.KubeConfig != "" {
+		return &params.KubeConfig, nil
+	}
+
+	// TODO: The following lines are legacy/fallback and can be removed in a future release.
 	kubeConfig := k8sApi.NewConfig()
 
 	// Create a new cluster with the given address and CA certificate
@@ -134,6 +143,14 @@ func (r *kubeConfigResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Computed:  true,
 				Sensitive: true,
 			},
+			"auth_type": schema.StringAttribute{
+				Optional:    true,
+				Description: "Authentication type for fetching kubeconfig. Allowed: 'admin_cert', 'oidc'. If unset, will default to 'admin_cert'.",
+				Validators: []validator.String{
+					stringvalidator.OneOf("admin_cert", "oidc"),
+				},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
+			},
 		},
 	}
 }
@@ -155,7 +172,14 @@ func (r *kubeConfigResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	res, _, err := r.client.KubernetesClustersApi.GetClusterCredentials(ctx, projectID, plan.ClusterID.ValueString(), nil)
+	var opts *swagger.KubernetesClustersApiGetClusterCredentialsOpts
+	if plan.AuthType.ValueString() != "" {
+		opts = &swagger.KubernetesClustersApiGetClusterCredentialsOpts{
+			AuthType: optional.NewString(plan.AuthType.ValueString()),
+		}
+	}
+
+	res, _, err := r.client.KubernetesClustersApi.GetClusterCredentials(ctx, projectID, plan.ClusterID.ValueString(), opts)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create kubeconfig",
 			fmt.Sprintf("Error creating kubeconfig: %s", common.UnpackAPIError(err)))
@@ -214,6 +238,7 @@ func (r *kubeConfigResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	state.ClusterID = stored.ClusterID
 	state.ProjectID = stored.ProjectID
+	state.AuthType = stored.AuthType
 	state.ClusterAddress = stored.ClusterAddress
 	state.ClusterCACertificate = stored.ClusterCACertificate
 	state.ClusterName = stored.ClusterName

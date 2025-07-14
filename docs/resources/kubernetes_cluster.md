@@ -26,6 +26,12 @@ description: |-
 - `add_ons` (List of String)
 - `cluster_cidr` (String)
 - `node_cidr_mask_size` (Number)
+- `oidc_ca_cert` (String) CA certificate used to verify the OIDC server (optional).
+- `oidc_client_id` (String)
+- `oidc_groups_claim` (String)
+- `oidc_issuer_url` (String)
+- `oidc_username_claim` (String)
+- `oidc_username_prefix` (String)
 - `project_id` (String)
 - `service_cluster_ip_range` (String)
 - `subnet_id` (String)
