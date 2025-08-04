@@ -366,6 +366,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Type_:                    plan.Type.ValueString(),
 		Location:                 plan.Location.ValueString(),
 		Image:                    plan.Image.ValueString(),
+		CustomImage:              plan.CustomImage.ValueString(),
 		SshPublicKey:             plan.SSHKey.ValueString(),
 		StartupScript:            plan.StartupScript.ValueString(),
 		ShutdownScript:           plan.ShutdownScript.ValueString(),
