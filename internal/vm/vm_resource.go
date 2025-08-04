@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -168,13 +167,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 					},
 				},
-				Default: setdefault.StaticValue(types.SetNull(types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"id":              types.StringType,
-						"attachment_type": types.StringType,
-						"mode":            types.StringType,
-					},
-				})),
+				Default: setdefault.StaticValue(types.Set{}),
 			},
 			"fqdn": schema.StringAttribute{
 				Computed:           true,
