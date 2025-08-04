@@ -11,7 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/custom_image"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
@@ -68,6 +70,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		load_balancer.NewLoadBalancerDataSource,
 		kubernetes_cluster.NewKubernetesClusterDataSource,
 		kubernetes_node_pool.NewKubernetesNodePoolDataSource,
+		custom_image.NewCustomImageDataSource,
 	}
 }
 
@@ -150,6 +153,19 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	// Create an API client and make it available during DataSource and Resource type Configure methods.
 	client := common.NewAPIClient(clientConfig.ApiEndpoint, clientConfig.AccessKeyID, clientConfig.SecretKey)
-	resp.DataSourceData = client
-	resp.ResourceData = client
+
+	// Create a new HTTP client with the same configuration as the API client
+	cfg := swagger.NewConfiguration()
+	cfg.BasePath = clientConfig.ApiEndpoint
+	cfg.UserAgent = fmt.Sprintf("CrusoeTerraform/%s", "dev")
+
+	// Create provider data with the correct base path and HTTP client
+	providerData := &common.ProviderData{
+		APIClient:  client,
+		BasePath:   clientConfig.ApiEndpoint,
+		HTTPClient: cfg.HTTPClient,
+	}
+
+	resp.DataSourceData = providerData
+	resp.ResourceData = providerData
 }

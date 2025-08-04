@@ -2,9 +2,11 @@ package common
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/BurntSushi/toml"
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
 
 const (
@@ -25,6 +27,12 @@ type Config struct {
 // ConfigFile reflects the structure of a valid Crusoe config, which should have a default profile at the root level.
 type ConfigFile struct {
 	Default Config
+}
+
+type ProviderData struct {
+	APIClient  *swagger.APIClient
+	BasePath   string
+	HTTPClient *http.Client
 }
 
 // GetConfig populates a config struct based on default values, the user's Crusoe config file, and environment variables,
