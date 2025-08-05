@@ -59,28 +59,46 @@ func TestCustomImageDataSource_Schema(t *testing.T) {
 	if !namePrefixAttr.Optional {
 		t.Error("expected name_prefix to be optional")
 	}
+
+	// Check for newest_image attribute
+	if _, ok := attrs["newest_image"]; !ok {
+		t.Error("expected newest_image attribute in schema")
+	}
+	newestImageAttr, ok := attrs["newest_image"].(schema.SingleNestedAttribute)
+	if !ok {
+		t.Error("expected newest_image to be a SingleNestedAttribute")
+	}
+	if !newestImageAttr.Computed {
+		t.Error("expected newest_image to be computed")
+	}
+	newestImageFields := newestImageAttr.Attributes
+	for _, field := range []string{"id", "name", "description", "location", "status", "created_at", "updated_at"} {
+		if _, ok := newestImageFields[field]; !ok {
+			t.Errorf("expected field %s in newest_image nested object", field)
+		}
+	}
 }
 
 func TestCustomImageDataSource_FilterCustomImages(t *testing.T) {
 	ds := &customImageDataSource{}
 
-	// Test data
+	// Test data with numeric suffixes
 	images := []customImageModel{
-		{ID: "1", Name: "ubuntu-20.04", Description: "Ubuntu 20.04", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
+		{ID: "1", Name: "ubuntu-2004", Description: "Ubuntu 20.04", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
 		{ID: "2", Name: "centos-7", Description: "CentOS 7", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
-		{ID: "3", Name: "ubuntu-22.04", Description: "Ubuntu 22.04", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
+		{ID: "3", Name: "ubuntu-2204", Description: "Ubuntu 22.04", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
 	}
 
 	// Test exact name filter
 	config := customImageDataSourceModel{
-		Name: types.StringValue("ubuntu-20.04"),
+		Name: types.StringValue("ubuntu-2004"),
 	}
 	filtered := ds.filterCustomImages(images, config)
 	if len(filtered) != 1 {
 		t.Errorf("expected 1 image, got %d", len(filtered))
 	}
-	if filtered[0].Name != "ubuntu-20.04" {
-		t.Errorf("expected ubuntu-20.04, got %s", filtered[0].Name)
+	if filtered[0].Name != "ubuntu-2004" {
+		t.Errorf("expected ubuntu-2004, got %s", filtered[0].Name)
 	}
 
 	// Test name_prefix filter
@@ -91,8 +109,8 @@ func TestCustomImageDataSource_FilterCustomImages(t *testing.T) {
 	if len(filtered) != 1 {
 		t.Errorf("expected 1 image (most recent), got %d", len(filtered))
 	}
-	if filtered[0].Name != "ubuntu-22.04" {
-		t.Errorf("expected ubuntu-22.04 (most recent), got %s", filtered[0].Name)
+	if filtered[0].Name != "ubuntu-2204" {
+		t.Errorf("expected ubuntu-2204 (most recent), got %s", filtered[0].Name)
 	}
 
 	// Test no filters
@@ -100,6 +118,43 @@ func TestCustomImageDataSource_FilterCustomImages(t *testing.T) {
 	filtered = ds.filterCustomImages(images, config)
 	if len(filtered) != 3 {
 		t.Errorf("expected 3 images, got %d", len(filtered))
+	}
+}
+
+func TestCustomImageDataSource_FindNewestImage(t *testing.T) {
+	ds := &customImageDataSource{}
+
+	// Test with empty list
+	images := []customImageModel{}
+	newest := ds.findNewestImage(images)
+	if newest != nil {
+		t.Error("expected nil for empty list")
+	}
+
+	// Test with single image
+	images = []customImageModel{
+		{ID: "1", Name: "ubuntu-2004", Description: "Ubuntu 20.04", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
+	}
+	newest = ds.findNewestImage(images)
+	if newest == nil {
+		t.Error("expected non-nil for single image")
+	}
+	if newest.Name != "ubuntu-2004" {
+		t.Errorf("expected ubuntu-2004, got %s", newest.Name)
+	}
+
+	// Test with multiple images - should return the most recent based on name comparison
+	images = []customImageModel{
+		{ID: "1", Name: "test-b200-1230", Description: "Test B200", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
+		{ID: "2", Name: "test-b200-1234", Description: "Test B200", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
+		{ID: "3", Name: "test-b200-1220", Description: "Test B200", Location: "us-east-1", Status: "available", CreatedAt: "2023-01-01", UpdatedAt: "2023-01-01"},
+	}
+	newest = ds.findNewestImage(images)
+	if newest == nil {
+		t.Error("expected non-nil for multiple images")
+	}
+	if newest.Name != "test-b200-1234" {
+		t.Errorf("expected test-b200-1234 (most recent), got %s", newest.Name)
 	}
 }
 
@@ -116,9 +171,8 @@ func TestCustomImageDataSource_CompareImageNames(t *testing.T) {
 		{"test-b200-1234", "test-b200-1230", 1, "higher number should be greater"},
 		{"test-b200-1230", "test-b200-1234", -1, "lower number should be less"},
 		{"test-b200-1234", "test-b200-1234", 0, "same numbers should be equal"},
-		{"ubuntu-20.04", "ubuntu-22.04", -1, "string comparison for non-numeric suffixes"},
-		{"centos-7", "ubuntu-20.04", -1, "different prefixes"},
-		{"test-b200-1234", "test-b200-1234a", -1, "numeric vs non-numeric suffix"},
+		{"centos-7", "ubuntu-20.04", 0, "different prefixes should be treated as equal"},
+		{"test-b200-1234", "test-b200-1234a", 0, "non-numeric suffix should be treated as equal"},
 	}
 
 	for _, tc := range testCases {

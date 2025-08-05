@@ -28,6 +28,7 @@ type customImageDataSourceModel struct {
 	Name         types.String       `tfsdk:"name"`
 	NamePrefix   types.String       `tfsdk:"name_prefix"`
 	CustomImages []customImageModel `tfsdk:"custom_images"`
+	NewestImage  *customImageModel  `tfsdk:"newest_image"`
 }
 
 type customImageModel struct {
@@ -89,6 +90,18 @@ func (ds *customImageDataSource) Schema(ctx context.Context, request datasource.
 				},
 			},
 		},
+		"newest_image": schema.SingleNestedAttribute{
+			Computed: true,
+			Attributes: map[string]schema.Attribute{
+				"id":          schema.StringAttribute{Computed: true},
+				"name":        schema.StringAttribute{Computed: true},
+				"description": schema.StringAttribute{Computed: true},
+				"location":    schema.StringAttribute{Computed: true},
+				"status":      schema.StringAttribute{Computed: true},
+				"created_at":  schema.StringAttribute{Computed: true},
+				"updated_at":  schema.StringAttribute{Computed: true},
+			},
+		},
 	}}
 }
 
@@ -143,6 +156,7 @@ func (ds *customImageDataSource) Read(ctx context.Context, req datasource.ReadRe
 	state.Name = config.Name
 	state.NamePrefix = config.NamePrefix
 	state.CustomImages = filteredImages
+	state.NewestImage = ds.findNewestImage(filteredImages)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -181,6 +195,26 @@ func (ds *customImageDataSource) filterCustomImages(images []customImageModel, c
 	}
 
 	return filtered
+}
+
+// findNewestImage finds the most recent image from a list of custom images
+func (ds *customImageDataSource) findNewestImage(images []customImageModel) *customImageModel {
+	if len(images) == 0 {
+		return nil
+	}
+
+	if len(images) == 1 {
+		return &images[0]
+	}
+
+	// Sort by name in descending order to get the most recent (highest numeric suffix)
+	sortedImages := make([]customImageModel, len(images))
+	copy(sortedImages, images)
+	sort.Slice(sortedImages, func(i, j int) bool {
+		return ds.compareImageNames(sortedImages[i].Name, sortedImages[j].Name) > 0
+	})
+
+	return &sortedImages[0]
 }
 
 // compareImageNames compares two image names and returns:
