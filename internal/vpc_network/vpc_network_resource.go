@@ -247,7 +247,21 @@ func (r *vpcNetworkResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	dataResp, httpResp, err := r.client.VPCNetworksApi.DeleteVPCNetwork(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	projectID := ""
+	if state.ProjectID.ValueString() == "" {
+		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to delete VPC Network",
+				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
+			return
+		}
+		projectID = project
+	} else {
+		projectID = state.ProjectID.ValueString()
+	}
+
+	dataResp, httpResp, err := r.client.VPCNetworksApi.DeleteVPCNetwork(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VPC Network",
 			fmt.Sprintf("There was an error starting a delete VPC Network operation: %s", common.UnpackAPIError(err)))
@@ -256,7 +270,7 @@ func (r *vpcNetworkResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 	defer httpResp.Body.Close()
 
-	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, projectID, func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
 	})
 	if err != nil {
