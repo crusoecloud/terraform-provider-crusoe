@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/custom_image"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/firewall_rule"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/ib_network"
@@ -68,6 +69,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		load_balancer.NewLoadBalancerDataSource,
 		kubernetes_cluster.NewKubernetesClusterDataSource,
 		kubernetes_node_pool.NewKubernetesNodePoolDataSource,
+		custom_image.NewCustomImageDataSource,
 	}
 }
 
