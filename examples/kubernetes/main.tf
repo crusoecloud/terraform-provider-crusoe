@@ -66,6 +66,9 @@ resource "crusoe_kubernetes_node_pool" "c1a_nodepool" {
   # requested_node_labels = {
   #   "labelkey" = "labelvalue"
   # }
+  
+  # Optional: Use local ephemeral NVMe disks for containerd storage
+  # ephemeral_storage_for_containerd = true
 
   lifecycle {
     ignore_changes = [

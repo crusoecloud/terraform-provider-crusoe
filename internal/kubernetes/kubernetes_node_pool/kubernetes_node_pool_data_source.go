@@ -26,17 +26,18 @@ func NewKubernetesNodePoolDataSource() datasource.DataSource {
 }
 
 type kubernetesNodePoolDataSourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	ProjectID     types.String `tfsdk:"project_id"`
-	Version       types.String `tfsdk:"version"`
-	Type          types.String `tfsdk:"type"`
-	InstanceCount types.Int64  `tfsdk:"instance_count"`
-	ClusterID     types.String `tfsdk:"cluster_id"`
-	SubnetID      types.String `tfsdk:"subnet_id"`
-	NodeLabels    types.Map    `tfsdk:"node_labels"`
-	InstanceIDs   types.List   `tfsdk:"instance_ids"`
-	State         types.String `tfsdk:"state"`
-	Name          types.String `tfsdk:"name"`
+	ID                            types.String `tfsdk:"id"`
+	ProjectID                     types.String `tfsdk:"project_id"`
+	Version                       types.String `tfsdk:"version"`
+	Type                          types.String `tfsdk:"type"`
+	InstanceCount                 types.Int64  `tfsdk:"instance_count"`
+	ClusterID                     types.String `tfsdk:"cluster_id"`
+	SubnetID                      types.String `tfsdk:"subnet_id"`
+	NodeLabels                    types.Map    `tfsdk:"node_labels"`
+	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
+	State                         types.String `tfsdk:"state"`
+	Name                          types.String `tfsdk:"name"`
+	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
 }
 
 func (e *kubernetesNodePoolDataSource) Metadata(_ context.Context,
@@ -85,6 +86,9 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 				Optional: true,
 			},
 			"name": schema.StringAttribute{
+				Optional: true,
+			},
+			"ephemeral_storage_for_containerd": schema.BoolAttribute{
 				Optional: true,
 			},
 		},
@@ -153,6 +157,7 @@ func (d *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource.
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
+	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

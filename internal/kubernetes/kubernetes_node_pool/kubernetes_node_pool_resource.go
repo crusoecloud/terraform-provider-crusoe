@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -34,20 +36,21 @@ func NewKubernetesNodePoolResource() resource.Resource {
 }
 
 type kubernetesNodePoolResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	ProjectID           types.String `tfsdk:"project_id"`
-	Version             types.String `tfsdk:"version"`
-	Type                types.String `tfsdk:"type"`
-	InstanceCount       types.Int64  `tfsdk:"instance_count"`
-	ClusterID           types.String `tfsdk:"cluster_id"`
-	SubnetID            types.String `tfsdk:"subnet_id"`
-	IBPartitionID       types.String `tfsdk:"ib_partition_id"`
-	RequestedNodeLabels types.Map    `tfsdk:"requested_node_labels"`
-	AllNodeLabels       types.Map    `tfsdk:"all_node_labels"`
-	InstanceIDs         types.List   `tfsdk:"instance_ids"`
-	SSHKey              types.String `tfsdk:"ssh_key"`
-	State               types.String `tfsdk:"state"`
-	Name                types.String `tfsdk:"name"`
+	ID                            types.String `tfsdk:"id"`
+	ProjectID                     types.String `tfsdk:"project_id"`
+	Version                       types.String `tfsdk:"version"`
+	Type                          types.String `tfsdk:"type"`
+	InstanceCount                 types.Int64  `tfsdk:"instance_count"`
+	ClusterID                     types.String `tfsdk:"cluster_id"`
+	SubnetID                      types.String `tfsdk:"subnet_id"`
+	IBPartitionID                 types.String `tfsdk:"ib_partition_id"`
+	RequestedNodeLabels           types.Map    `tfsdk:"requested_node_labels"`
+	AllNodeLabels                 types.Map    `tfsdk:"all_node_labels"`
+	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
+	SSHKey                        types.String `tfsdk:"ssh_key"`
+	State                         types.String `tfsdk:"state"`
+	Name                          types.String `tfsdk:"name"`
+	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
 }
 
 func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -113,7 +116,8 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"requested_node_labels": schema.MapAttribute{
 				ElementType:   types.StringType,
 				Optional:      true,
-				PlanModifiers: []planmodifier.Map{}, // maintain across updates
+				Computed:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"all_node_labels": schema.MapAttribute{
 				ElementType:   types.StringType,
@@ -136,6 +140,11 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"name": schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
+			"ephemeral_storage_for_containerd": schema.BoolAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -166,15 +175,16 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.CreateNodePool(ctx, swagger.KubernetesNodePoolPostRequest{
-		ClusterId:       plan.ClusterID.ValueString(),
-		Count:           plan.InstanceCount.ValueInt64(),
-		IbPartitionId:   plan.IBPartitionID.ValueString(),
-		Name:            plan.Name.ValueString(),
-		NodeLabels:      nodeLabels,
-		NodePoolVersion: plan.Version.ValueString(),
-		ProductName:     plan.Type.ValueString(),
-		SshPublicKey:    plan.SSHKey.ValueString(),
-		SubnetId:        plan.SubnetID.ValueString(),
+		ClusterId:                     plan.ClusterID.ValueString(),
+		Count:                         plan.InstanceCount.ValueInt64(),
+		IbPartitionId:                 plan.IBPartitionID.ValueString(),
+		Name:                          plan.Name.ValueString(),
+		NodeLabels:                    nodeLabels,
+		NodePoolVersion:               plan.Version.ValueString(),
+		ProductName:                   plan.Type.ValueString(),
+		SshPublicKey:                  plan.SSHKey.ValueString(),
+		SubnetId:                      plan.SubnetID.ValueString(),
+		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
@@ -216,6 +226,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
 	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
+	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePoolResponse.NodePool.EphemeralStorageForContainerd)
 
 	state.SSHKey = plan.SSHKey
 
@@ -280,6 +291,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	state.SSHKey = stored.SSHKey
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
+	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -301,9 +313,6 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if plan.RequestedNodeLabels.IsNull() {
-		plan.RequestedNodeLabels = stored.RequestedNodeLabels
-	}
 	if plan.InstanceCount.ValueInt64() < stored.InstanceCount.ValueInt64() {
 		resp.Diagnostics.AddAttributeWarning(path.Root("instance_count"), "Node pool instance count decreased", "Decreasing node pool instance count will not delete node pool VMs. Manual deletion is required.")
 	}
@@ -324,8 +333,9 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	}
 
 	patchRequest := swagger.KubernetesNodePoolPatchRequest{
-		Count:      plan.InstanceCount.ValueInt64(),
-		NodeLabels: nodeLabels,
+		Count:                         plan.InstanceCount.ValueInt64(),
+		NodeLabels:                    nodeLabels,
+		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 	}
 
 	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.UpdateNodePool(
@@ -375,6 +385,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
 	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
+	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePoolResponse.NodePool.EphemeralStorageForContainerd)
 
 	state.SSHKey = plan.SSHKey
 

@@ -25,6 +25,7 @@ description: |-
 
 ### Optional
 
+- `ephemeral_storage_for_containerd` (Boolean)
 - `ib_partition_id` (String)
 - `project_id` (String)
 - `requested_node_labels` (Map of String)

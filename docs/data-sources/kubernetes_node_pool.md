@@ -18,6 +18,7 @@ description: |-
 ### Optional
 
 - `cluster_id` (String)
+- `ephemeral_storage_for_containerd` (Boolean)
 - `image_id` (String)
 - `instance_count` (Number)
 - `instance_ids` (List of String)
