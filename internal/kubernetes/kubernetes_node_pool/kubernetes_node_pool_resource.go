@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -114,7 +113,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"requested_node_labels": schema.MapAttribute{
 				ElementType:   types.StringType,
 				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown(), mapplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.Map{}, // maintain across updates
 			},
 			"all_node_labels": schema.MapAttribute{
 				ElementType:   types.StringType,
@@ -302,6 +301,9 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if plan.RequestedNodeLabels.IsNull() {
+		plan.RequestedNodeLabels = stored.RequestedNodeLabels
+	}
 	if plan.InstanceCount.ValueInt64() < stored.InstanceCount.ValueInt64() {
 		resp.Diagnostics.AddAttributeWarning(path.Root("instance_count"), "Node pool instance count decreased", "Decreasing node pool instance count will not delete node pool VMs. Manual deletion is required.")
 	}
@@ -314,11 +316,21 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	// Update node pool instance count
-	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.UpdateNodePool(ctx,
-		swagger.KubernetesNodePoolPatchRequest{
-			Count: plan.InstanceCount.ValueInt64(),
-		},
+	nodeLabels, err := common.TFMapToStringMap(plan.RequestedNodeLabels)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update node pool", fmt.Sprintf("error when parsing requested_node_labels as string map: %s", err))
+
+		return
+	}
+
+	patchRequest := swagger.KubernetesNodePoolPatchRequest{
+		Count:      plan.InstanceCount.ValueInt64(),
+		NodeLabels: nodeLabels,
+	}
+
+	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.UpdateNodePool(
+		ctx,
+		patchRequest,
 		projectID,
 		stored.ID.ValueString(),
 	)
