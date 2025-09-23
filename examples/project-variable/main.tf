@@ -12,14 +12,14 @@ locals {
 
 variable "project_id" {
   type    = string
-  default = "<PROJECT_ID>"
+  default = "dc799c96-a9f8-4cd7-89e8-aca3a1b00f48"
 }
 
 // new VM
 resource "crusoe_compute_instance" "my_vm" {
   name     = "my-new-vm"
-  type     = "a40.1x"
-  location = "us-northcentral1-a"
+  type     = "c1a.2x"
+  location = "us-southcentraldevelopment1-a"
 
   disks = [
     // disk attached at startup
@@ -37,9 +37,9 @@ resource "crusoe_compute_instance" "my_vm" {
 
 resource "crusoe_storage_disk" "data_disk" {
   name       = "data-disk"
-  size       = "200GiB"
+  size       = "2GiB"
   project_id = var.project_id
-  location   = "us-northcentral1-a"
+  location   = "us-southcentraldevelopment1-a"
 }
 
 // firewall rule
