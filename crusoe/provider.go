@@ -3,10 +3,6 @@ package crusoe
 import (
 	"context"
 	"fmt"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/image"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/manifest"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/repository"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/token"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -28,6 +24,10 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubernetes_node_pool"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/load_balancer"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/image"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/manifest"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/repository"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/token"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_subnet"

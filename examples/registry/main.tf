@@ -8,10 +8,10 @@ terraform {
 
 locals {
   location   = "us-southcentral1-a"
-  repo_name  = "my_registry_repo"
+  repo_name  = "standard-bug-bash"
   mode       = "pull-through-cache"
-  image_name = "my_image"
-  tag        = "latest"
+  image_name = "busybox"
+  tag        = "1.34"
   provider   = "docker-hub"
   url        = "https://hub.docker.com"
   alias      = "my_token_alias"

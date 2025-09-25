@@ -3,11 +3,13 @@ package image
 import (
 	"context"
 	"fmt"
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type imagesDataSource struct {
@@ -42,15 +44,18 @@ func (i *imagesDataSource) Configure(ctx context.Context, req datasource.Configu
 			"Unexpected ProviderData type",
 			fmt.Sprintf("Expected *swagger.APIClient, got: %T", req.ProviderData),
 		)
+
 		return
 	}
 	i.client = client
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (i *imagesDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_registry_images"
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (i *imagesDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
@@ -86,6 +91,7 @@ func (i *imagesDataSource) Schema(ctx context.Context, request datasource.Schema
 	}
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (i *imagesDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
 	var state imagesDataSourceModel
 	diags := request.Config.Get(ctx, &state)

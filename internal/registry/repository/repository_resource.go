@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/antihax/optional"
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,6 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -63,10 +66,12 @@ func (r *repositoryResource) Configure(_ context.Context, req resource.Configure
 	r.client = client
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_registry_repository"
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version: 2,
@@ -116,6 +121,7 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 	}
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 	var plan repositoryResourceModel
 	diags := request.Plan.Get(ctx, &plan)
@@ -136,6 +142,7 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 	if repositoryMode == "pull-through-cache" {
 		if plan.UpstreamRegistry == nil {
 			response.Diagnostics.AddError("Missing upstream_registry block", "The 'upstream_registry' block is required when mode is 'pull-through-cache'. Please provide it in your configuration.")
+
 			return
 		}
 		provider := plan.UpstreamRegistry.Provider.ValueString()
@@ -189,6 +196,7 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 	response.Diagnostics.Append(diags...)
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 	var stored repositoryResourceModel
 	diags := request.State.Get(ctx, &stored)
@@ -248,15 +256,15 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
-
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 	panic("Updating repository is not currently supported")
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-
 	var stored repositoryResourceModel
 	diags := request.State.Get(ctx, &stored)
 	response.Diagnostics.Append(diags...)
@@ -276,10 +284,23 @@ func (r *repositoryResource) Delete(ctx context.Context, request resource.Delete
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete repository",
 			fmt.Sprintf("Error deleting repository: %s", common.UnpackAPIError(err)))
+
+		return
 	}
 	defer httpResp.Body.Close()
 }
 
 func (r *repositoryResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	// Expect import ID as <location>/<name>
+	parts := strings.SplitN(req.ID, "/", 2)
+	if len(parts) != 2 {
+		resp.Diagnostics.AddError(
+			"Invalid import ID format",
+			"Expected import ID in the format <location>/<name> (e.g., us-southcentral1-a/standard-bug-bash)",
+		)
+
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("location"), parts[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }

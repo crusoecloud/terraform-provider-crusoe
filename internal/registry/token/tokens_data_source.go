@@ -3,11 +3,13 @@ package token
 import (
 	"context"
 	"fmt"
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 const keyUsageRegistry = "registry"
@@ -43,15 +45,18 @@ func (t *tokensDataSource) Configure(ctx context.Context, req datasource.Configu
 			"Unexpected ProviderData type",
 			fmt.Sprintf("Expected *swagger.APIClient, got: %T", req.ProviderData),
 		)
+
 		return
 	}
 	t.client = client
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (t *tokensDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_registry_tokens"
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (t *tokensDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
 		Description: "Fetches a list of container registry tokens.",
@@ -87,6 +92,7 @@ func (t *tokensDataSource) Schema(ctx context.Context, request datasource.Schema
 	}
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (t *tokensDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
 	var state tokensDataSourceModel
 	diags := request.Config.Get(ctx, &state)
@@ -98,12 +104,14 @@ func (t *tokensDataSource) Read(ctx context.Context, request datasource.ReadRequ
 	projectID, err := common.GetProjectIDOrFallback(ctx, t.client, &response.Diagnostics, state.ProjectID.ValueString())
 	if err != nil {
 		response.Diagnostics.AddError("Failed to fetch project ID", fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+
 		return
 	}
 
 	tokens, httpResp, err := t.client.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list tokens", fmt.Sprintf("Error listing tokens: %s", common.UnpackAPIError(err)))
+
 		return
 	}
 	defer httpResp.Body.Close()

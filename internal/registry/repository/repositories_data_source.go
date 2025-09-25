@@ -3,11 +3,13 @@ package repository
 import (
 	"context"
 	"fmt"
-	"github.com/crusoecloud/client-go/swagger/v1alpha5"
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type registryRepositoriesDataSource struct {
@@ -41,15 +43,18 @@ func (d *registryRepositoriesDataSource) Configure(ctx context.Context, req data
 			"Unexpected ProviderData type",
 			fmt.Sprintf("Expected *swagger.APIClient, got: %T", req.ProviderData),
 		)
+
 		return
 	}
 	d.client = client
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (d *registryRepositoriesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_registry_repositories"
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (d *registryRepositoriesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
@@ -72,6 +77,7 @@ func (d *registryRepositoriesDataSource) Schema(_ context.Context, _ datasource.
 	}
 }
 
+//nolint:gocritic // Implements Terraform defined interface
 func (d *registryRepositoriesDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
 	var state registryRepositoriesDataSourceModel
 	diags := request.Config.Get(ctx, &state)
