@@ -22,6 +22,7 @@ description: |-
 
 ### Optional
 
+- `nvlink_domain_id` (String) NVLink domain ID to use for NVLink communication.
 - `project_id` (String)
 
 ### Read-Only

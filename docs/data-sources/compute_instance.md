@@ -19,6 +19,7 @@ description: |-
 
 - `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
 - `name` (String)
+- `nv_link_domain_id` (String)
 - `project_id` (String)
 - `reservation_id` (String)
 
