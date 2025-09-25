@@ -6,7 +6,6 @@ import (
 	"github.com/antihax/optional"
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -61,27 +60,27 @@ func (t *tokenResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.UseStateForUnknown(), // maintain across updates
 				},
 			},
 			"alias": schema.StringAttribute{
 				Optional: true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.RequiresReplace(), // cannot be updated in place
 				},
 			},
 			"expires_at": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.UseStateForUnknown(), // maintain across updates
 				},
 			},
 			"token": schema.StringAttribute{
 				Computed:  true,
 				Sensitive: true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.UseStateForUnknown(), // maintain across updates
 				},
 			},
 		},
@@ -188,8 +187,4 @@ func (t *tokenResource) Delete(ctx context.Context, request resource.DeleteReque
 		return
 	}
 	defer httpResp.Body.Close()
-}
-
-func (t *tokenResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

@@ -6,42 +6,29 @@ terraform {
   }
 }
 
-variable "project_id" {
-  type    = string
-  default = "dc799c96-a9f8-4cd7-89e8-aca3a1b00f48"
+locals {
+  location   = "us-southcentral1-a"
+  repo_name  = "my_registry_repo"
+  mode       = "pull-through-cache"
+  image_name = "my_image"
+  tag        = "latest"
+  provider   = "docker-hub"
+  url        = "https://hub.docker.com"
+  alias      = "my_token_alias"
 }
 
 resource "crusoe_registry_repository" "my_registry_repo" {
-  location   = "us-southcentral1-a"
-  name       = "my_registry_repo"
-  mode       = "pull-through-cache"
-  project_id = var.project_id
+  location = local.location
+  name     = local.repo_name
+  mode     = local.mode
 
   upstream_registry = {
-    provider = "docker-hub"
-    url      = "https://hub.docker.com"
+    provider = local.provider
+    url      = local.url
   }
 }
 
-# Example of deleting a specific image from the registry
-resource "crusoe_registry_image" "delete_alpine" {
-  project_id = var.project_id
-  repo_name  = "aws-ecr-public"
-  image_name = "docker/library/alpine"
-  location   = "us-southcentral1-a"
-}
-
-# Example of deleting a specific manifest from the registry
-resource "crusoe_registry_manifest" "delete_alpine_manifest" {
-  project_id = "dc799c96-a9f8-4cd7-89e8-aca3a1b00f48"
-  repo_name  = "aws-ecr-public"
-  image_name = "docker/library/alpine"
-  digest = "sha256:56fd63902607fa52ae1735379eb9fb43d037a50f99846717afb5e96c33a80081"
-  location   = "us-southcentral1-a"
-}
-
 data "crusoe_registry_repositories" "all" {
-  project_id = var.project_id
 }
 
 output "registry_repositories" {
@@ -49,35 +36,32 @@ output "registry_repositories" {
 }
 
 data "crusoe_registry_images" "all" {
-  project_id = var.project_id
-  repo_name  = "aws-ecr-public"
-  location   = "us-southcentral1-a"
+  repo_name = local.repo_name
+  location  = local.location
 }
 
 output "registry_images" {
   value = [for image in data.crusoe_registry_images.all.images : image]
 }
 
-
 # Example of listing manifests for a specific image
 data "crusoe_registry_manifests" "busybox_manifests" {
-  project_id = var.project_id
-  repo_name  = "standard-bug-bash"
-  image_name = "busybox"
-  location   = "us-southcentral1-a"
+  repo_name  = local.repo_name
+  image_name = local.image_name
+  location   = local.location
 }
 
 output "busybox_manifests" {
   value = [for manifest in data.crusoe_registry_manifests.busybox_manifests.manifests : manifest]
 }
 
+
 # Example of listing manifests with tag filtering
 data "crusoe_registry_manifests" "latest_manifests" {
-  project_id   = var.project_id
-  repo_name    = "standard-bug-bash"
-  image_name   = "busybox"
-  location     = "us-southcentral1-a"
-  tag_contains = "1.35"
+  repo_name    = local.repo_name
+  image_name   = local.image_name
+  location     = local.location
+  tag_contains = local.tag
 }
 
 output "latest_manifests" {
@@ -86,8 +70,8 @@ output "latest_manifests" {
 
 # Example of creating a registry token
 resource "crusoe_registry_token" "my_token" {
-  alias      = "my-registry-token"
-  expires_at = "2025-10-21T23:59:59Z"
+  alias = local.alias
+  # expires_at = "2025-10-21T23:59:59Z" // Set value in RFC 3339 format
 }
 
 output "registry_token_id" {
@@ -99,7 +83,6 @@ output "registry_token_id" {
 
 # Example of listing all registry tokens
 data "crusoe_registry_tokens" "all_tokens" {
-  project_id = var.project_id
 }
 
 output "registry_tokens" {

@@ -99,8 +99,6 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		kubernetes_cluster.NewKubernetesClusterResource,
 		kubernetes_node_pool.NewKubernetesNodePoolResource,
 		repository.NewRegistryRepositoryResource,
-		image.NewRegistryImageResource,
-		manifest.NewRegistryManifestResource,
 		token.NewRegistryTokenResource,
 	}
 }
