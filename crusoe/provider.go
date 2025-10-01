@@ -24,6 +24,10 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubernetes_node_pool"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/load_balancer"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/image"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/manifest"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/repository"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/token"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_subnet"
@@ -70,6 +74,10 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		kubernetes_cluster.NewKubernetesClusterDataSource,
 		kubernetes_node_pool.NewKubernetesNodePoolDataSource,
 		custom_image.NewCustomImageDataSource,
+		repository.NewRegistryRepositoriesDataSource,
+		image.NewRegistryImagesDataSource,
+		manifest.NewRegistryManifestsDataSource,
+		token.NewRegistryTokensDataSource,
 	}
 }
 
@@ -90,6 +98,8 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		kubeconfig.NewKubeConfigResource,
 		kubernetes_cluster.NewKubernetesClusterResource,
 		kubernetes_node_pool.NewKubernetesNodePoolResource,
+		repository.NewRegistryRepositoryResource,
+		token.NewRegistryTokenResource,
 	}
 }
 
