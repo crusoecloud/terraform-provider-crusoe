@@ -22,15 +22,9 @@ type Config struct {
 	DefaultProject   string `toml:"default_project"`
 }
 
-// ConfigFile reflects the structure of a valid Crusoe config, which should have a default profile at the root level.
-type ConfigFile struct {
-	Default Config
-}
-
 // GetConfig populates a config struct based on default values, the user's Crusoe config file, and environment variables,
 // in ascending priority. The config file used is ~/.crusoe/config.
-// TODO: add support
-func GetConfig() (*Config, error) {
+func GetConfig(profiles ...string) (*Config, error) {
 	config := Config{
 		ApiEndpoint: defaultApiEndpoint,
 	}
@@ -43,16 +37,55 @@ func GetConfig() (*Config, error) {
 	}
 	configPath := homeDir + configFilePath
 
-	var configFile ConfigFile
-	_, err = toml.DecodeFile(configPath, &configFile)
-	if err == nil { // just skip if error - not having a config file is valid
-		config.AccessKeyID = configFile.Default.AccessKeyID
-		config.SecretKey = configFile.Default.SecretKey
-		config.SSHPublicKeyFile = configFile.Default.SSHPublicKeyFile
-		config.DefaultProject = configFile.Default.DefaultProject
+	var profilesMap map[string]Config
+	if _, err := toml.DecodeFile(configPath, &profilesMap); err != nil {
+		if !os.IsNotExist(err) {
+			// A real parsing error occurred, not just a missing file.
+			return nil, fmt.Errorf("error parsing config file at %s: %w", configPath, err)
+		}
+		profilesMap = make(map[string]Config)
+	}
 
-		if configFile.Default.ApiEndpoint != "" {
-			config.ApiEndpoint = configFile.Default.ApiEndpoint
+	var topLevel struct {
+		Profile string `toml:"profile"`
+	}
+
+	profileName := "default"
+
+	// Priority 3: 'profile' key in config file
+	if topLevel.Profile != "" {
+		profileName = topLevel.Profile
+	}
+
+	// Priority 2: CRUSOE_PROFILE environment variable
+	if envProfile := os.Getenv("CRUSOE_PROFILE"); envProfile != "" {
+		profileName = envProfile
+	}
+
+	// Priority 1: Function argument
+	if len(profiles) > 1 {
+		return nil, fmt.Errorf("GetConfig accepts at most one profile name, but %d were provided", len(profiles))
+	}
+
+	if len(profiles) > 0 && profiles[0] != "" {
+		profileName = profiles[0]
+	}
+
+	if profileConfig, ok := profilesMap[profileName]; ok {
+		if profileConfig.AccessKeyID != "" {
+			config.AccessKeyID = profileConfig.AccessKeyID
+		}
+		if profileConfig.SecretKey != "" {
+			config.SecretKey = profileConfig.SecretKey
+		}
+		if profileConfig.SSHPublicKeyFile != "" {
+			config.SSHPublicKeyFile = profileConfig.SSHPublicKeyFile
+		}
+		if profileConfig.DefaultProject != "" {
+			config.DefaultProject = profileConfig.DefaultProject
+		}
+		if profileConfig.ApiEndpoint != "" {
+			config.ApiEndpoint = profileConfig.ApiEndpoint
 		}
 	}
 

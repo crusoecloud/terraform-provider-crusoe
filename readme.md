@@ -7,13 +7,34 @@ This repo defines the official Terraform Provider for use with [Crusoe Cloud](ht
 
 To get started, first [install Terraform](https://developer.hashicorp.com/terraform/downloads). Then, get an access keypair from https://console.crusoecloud.com/security/tokens and add the following to `~/.crusoe/config`:
 
-Note that Terraform does not read the `profile="profile-name"` line at the top of the config file; it takes its environment directly from the `[default]` section. 
-
+Sample Config File:
 ```toml
 [default]
 access_key_id="MY_ACCESS_KEY"
 secret_key="MY_SECRET_KEY"
 ```
+
+# Profiles
+You may specify different profiles to use in your `~/.crusoe/config` file
+
+Example:
+```
+profile="profile1"
+
+[profile1]
+access_key_id="7useLCstekgdYQ8Te2vQxi"
+secret_key="coKGIrMJudgAtk3YKMpsB2"
+ssh_public_key_file="~/.ssh/id_rsa.pub"
+api_endpoint="http://test:80/v1alpha5"
+
+[profile2]
+access_key_id="CstekgdYQ8Te2vQxi7useL"
+secret_key="IrMJudgAtk3YKMpsB2coKG"
+```
+
+In the above, we have specified two profiles, where profile1 will be used as the default as we specify on the first line. If a value is not specified in the profile, the default value will be used. For example, profile2 did not specify an api_endpoint, so the default API endpoint to production will be used.
+
+You may set which profile you use with the environment variable `CRUSOE_PROFILE` like `export CRUSOE_PROFILE=profile2`
 
 Then, add the following to the start of your terraform file, for example `main.tf`:
 

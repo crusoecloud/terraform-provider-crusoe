@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.23.8
 
 require (
-	github.com/BurntSushi/toml v0.3.1
+	github.com/BurntSushi/toml v1.5.0
 	github.com/antihax/optional v1.0.0
 	github.com/crusoecloud/client-go v0.1.111
 	github.com/google/uuid v1.6.0
