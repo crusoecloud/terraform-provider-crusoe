@@ -27,7 +27,6 @@ type vmDataSourceFilter struct {
 	Type              *string                       `tfsdk:"type"`
 	Disks             []vmDiskResourceModel         `tfsdk:"disks"`
 	NetworkInterfaces []vmNetworkInterfaceDataModel `tfsdk:"network_interfaces"`
-	NvlinkDomainID    *string                       `tfsdk:"nvlink_domain_id"`
 }
 
 type vmNetworkInterfaceDataModel struct {
@@ -136,10 +135,6 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 			"reservation_id": schema.StringAttribute{
 				Optional: true,
 			},
-			"nv_link_domain_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
 		},
 	}
 }
@@ -187,7 +182,6 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		state.ProjectID = &vm.ProjectId
 		state.Name = &vm.Name
 		state.Type = &vm.Type_
-		state.NvlinkDomainID = &vm.NvlinkDomainId
 		attachedDisks := make([]vmDiskResourceModel, 0, len(vm.Disks))
 		for _, disk := range vm.Disks {
 			attachedDisks = append(attachedDisks, vmDiskResourceModel{

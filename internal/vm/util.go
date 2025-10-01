@@ -244,7 +244,6 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	networkInterfaces, _ := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
 	state.NetworkInterfaces = networkInterfaces
 	state.ReservationID = types.StringValue(instance.ReservationId)
-	state.NvlinkDomainID = types.StringValue(instance.NvlinkDomainId)
 
 	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	state.InternalDNSName = internalDNSName

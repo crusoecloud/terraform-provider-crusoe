@@ -39,7 +39,6 @@ type instanceTemplatesModel struct {
 	IBPartition         string      `tfsdk:"ib_partition"`
 	Disks               []diskModel `tfsdk:"disks"`
 	PlacementPolicy     string      `tfsdk:"placement_policy"`
-	NvlinkDomainID      string      `tfsdk:"nvlink_domain_id"`
 }
 
 func NewInstanceTemplatesDataSource() datasource.DataSource {
@@ -132,10 +131,6 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 						Optional: true,
 						Computed: true,
 					},
-					"nvlink_domain_id": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
-					},
 				},
 			},
 		},
@@ -186,7 +181,6 @@ func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.
 			ProjectID:       dataResp.Items[i].ProjectId,
 			Disks:           disks,
 			PlacementPolicy: dataResp.Items[i].PlacementPolicy,
-			NvlinkDomainID:  dataResp.Items[i].NvlinkDomainId,
 		})
 	}
 
