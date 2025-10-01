@@ -44,7 +44,6 @@ type vmByTemplateResourceModel struct {
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
-	NvlinkDomainID      types.String `tfsdk:"nvlink_domain_id"`
 }
 
 func NewVMByTemplateResource() resource.Resource {
@@ -227,12 +226,6 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
 			},
-			"nvlink_domain_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-				Description:   "NVLink domain ID to use for NVLink communication.",
-			},
 		},
 	}
 }
@@ -332,12 +325,6 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	plan.SSHKey = types.StringValue(instanceTemplateResp.SshPublicKey)
 	plan.StartupScript = types.StringValue(instanceTemplateResp.StartupScript)
 	plan.ShutdownScript = types.StringValue(instanceTemplateResp.ShutdownScript)
-
-	if instanceTemplateResp.NvlinkDomainId != "" {
-		plan.NvlinkDomainID = types.StringValue(instanceTemplateResp.NvlinkDomainId)
-	} else {
-		plan.NvlinkDomainID = types.StringNull()
-	}
 
 	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.InternalDNSName = internalDNSName

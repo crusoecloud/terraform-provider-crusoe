@@ -46,7 +46,6 @@ type instanceTemplateResourceModel struct {
 	DisksToCreate       types.Set    `tfsdk:"disks"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
 	PlacementPolicy     types.String `tfsdk:"placement_policy"`
-	NvlinkDomainID      types.String `tfsdk:"nvlink_domain_id"`
 }
 
 type diskToCreateResourceModel struct {
@@ -180,11 +179,6 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Validators:    []validator.String{stringvalidator.OneOf(spreadPlacementPolicy, unspecifiedPlacementPolicy)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
-			"nvlink_domain_id": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-				Description:   "NVLink domain ID to use for NVLink communication.",
-			},
 		},
 	}
 }
@@ -245,7 +239,6 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
 		ReservationId:       plan.ReservationID.ValueString(),
 		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
-		NvlinkDomainId:      plan.NvlinkDomainID.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",
@@ -262,12 +255,6 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	plan.Image = types.StringValue(dataResp.ImageName)
 	plan.PlacementPolicy = types.StringValue(dataResp.PlacementPolicy)
 	plan.ReservationID = types.StringValue(dataResp.ReservationId)
-
-	if dataResp.NvlinkDomainId != "" {
-		plan.NvlinkDomainID = types.StringValue(dataResp.NvlinkDomainId)
-	} else {
-		plan.NvlinkDomainID = types.StringNull()
-	}
 
 	disksToCreateResource := make([]diskToCreateResourceModel, 0, len(dataResp.Disks))
 	for _, diskToCreate := range disksToCreate {
@@ -336,11 +323,6 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	state.PublicIpAddressType = types.StringValue(instanceTemplate.PublicIpAddressType)
 	state.ID = types.StringValue(instanceTemplate.Id)
 
-	if instanceTemplate.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(instanceTemplate.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
 	if instanceTemplate.IbPartitionId != "" {
 		state.IBPartition = types.StringValue(instanceTemplate.IbPartitionId)
 	} else {
