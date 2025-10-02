@@ -85,7 +85,7 @@ Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 2. A Crusoe Cloud maintainer will review the pull request and, once approved, merge it into the `main` branch.
 3. Once your pull request has been approved, make a separate pull request to add your changes to the changelog into the `main` branch. There will be an (Unreleased) version that you can add your changes to.
 4. To release your changes, you can make a separate pull request from the `main` branch into the `release` branch. Merges into the release branch trigger our `goreleaser` job which handles distributing a new version.
-5. Once the pull request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released.
+5. Once the pull request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits. It will cause the `main` branch and `release` branch to diverge.
 6. A separate pull request will be made by a Crusoe Cloud maintainer to update the changelog with the date the newest version has been released.
 
 ## Maintaining Changelog
