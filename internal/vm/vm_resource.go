@@ -48,6 +48,7 @@ type vmResourceModel struct {
 	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
 	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
+	NvlinkDomainID      types.String `tfsdk:"nvlink_domain_id"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -119,10 +120,6 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"type": schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.String{
-					// TODO: re-enable once instance types are stabilized
-					// validators.RegexValidator{RegexPattern: "^a40\\.(1|2|4|8)x|a100\\.(1|2|4|8)x|a100\\.(1|2|4|8)x|a100-80gb\\.(1|2|4|8)x$"},
-				},
 			},
 			"ssh_key": schema.StringAttribute{
 				Required:      true,
@@ -261,8 +258,14 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"reservation_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+			},
+			"nvlink_domain_id": schema.StringAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Description:   "NVLink domain ID to use for NVLink communication.",
 			},
 		},
 	}
@@ -374,6 +377,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		Disks:                    diskIds,
 		HostChannelAdapters:      hostChannelAdapters,
 		ReservationSpecification: reservationSpecification,
+		NvlinkDomainId:           plan.NvlinkDomainID.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -394,10 +398,15 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	plan.ID = types.StringValue(instance.Id)
 	plan.ReservationID = types.StringValue(instance.ReservationId)
-
 	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.InternalDNSName = internalDNSName
 	plan.FQDN = internalDNSName // fqdn is deprecated but kept for backward compatibility
+
+	if instance.NvlinkDomainId != "" {
+		plan.NvlinkDomainID = types.StringValue(instance.NvlinkDomainId)
+	} else {
+		plan.NvlinkDomainID = types.StringNull()
+	}
 
 	if len(instance.NetworkInterfaces) > 0 {
 		plan.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)
