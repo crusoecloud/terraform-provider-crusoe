@@ -24,51 +24,68 @@ type Config struct {
 
 // GetConfig populates a config struct based on default values, the user's Crusoe config file, and environment variables,
 // in ascending priority. The config file used is ~/.crusoe/config.
-func GetConfig(profiles ...string) (*Config, error) {
+func GetConfig() (*Config, error) {
 	config := Config{
 		ApiEndpoint: defaultApiEndpoint,
 	}
 
-	// Parse config file
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		// failing to get the home dir is worth surfacing an error
 		return nil, fmt.Errorf("failed to find home dir: %w", err)
 	}
 	configPath := homeDir + configFilePath
 
-	var profilesMap map[string]Config
-	if _, err := toml.DecodeFile(configPath, &profilesMap); err != nil {
-		if !os.IsNotExist(err) {
-			// A real parsing error occurred, not just a missing file.
-			return nil, fmt.Errorf("error parsing config file at %s: %w", configPath, err)
+	var rawData map[string]interface{}
+	// Missing config/invalid config file is valid - credentials can come from env vars
+	if _, err := toml.DecodeFile(configPath, &rawData); err != nil {
+		if os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Info: config file not found at %s\n", configPath)
+			fmt.Fprintf(os.Stderr, "Using environment variables only.\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: error reading config file at %s: %v\n", configPath, err)
+			fmt.Fprintf(os.Stderr, "Continuing with environment variables only.\n")
 		}
-		profilesMap = make(map[string]Config)
+		rawData = make(map[string]interface{})
 	}
 
-	var topLevel struct {
-		Profile string `toml:"profile"`
+	topLevelProfile := ""
+	if profileVal, ok := rawData["profile"]; ok {
+		if profileStr, ok := profileVal.(string); ok {
+			topLevelProfile = profileStr
+		}
+	}
+
+	profilesMap := make(map[string]Config)
+	for key, val := range rawData {
+		valMap, ok := val.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		var profileConfig Config
+		if accessKey, ok := valMap["access_key_id"].(string); ok {
+			profileConfig.AccessKeyID = accessKey
+		}
+		if secretKey, ok := valMap["secret_key"].(string); ok {
+			profileConfig.SecretKey = secretKey
+		}
+		if sshKey, ok := valMap["ssh_public_key_file"].(string); ok {
+			profileConfig.SSHPublicKeyFile = sshKey
+		}
+		if apiEndpoint, ok := valMap["api_endpoint"].(string); ok {
+			profileConfig.ApiEndpoint = apiEndpoint
+		}
+		if defaultProject, ok := valMap["default_project"].(string); ok {
+			profileConfig.DefaultProject = defaultProject
+		}
+		profilesMap[key] = profileConfig
 	}
 
 	profileName := "default"
-
-	// Priority 3: 'profile' key in config file
-	if topLevel.Profile != "" {
-		profileName = topLevel.Profile
+	if topLevelProfile != "" {
+		profileName = topLevelProfile
 	}
-
-	// Priority 2: CRUSOE_PROFILE environment variable
 	if envProfile := os.Getenv("CRUSOE_PROFILE"); envProfile != "" {
 		profileName = envProfile
-	}
-
-	// Priority 1: Function argument
-	if len(profiles) > 1 {
-		return nil, fmt.Errorf("GetConfig accepts at most one profile name, but %d were provided", len(profiles))
-	}
-
-	if len(profiles) > 0 && profiles[0] != "" {
-		profileName = profiles[0]
 	}
 
 	if profileConfig, ok := profilesMap[profileName]; ok {
@@ -89,7 +106,6 @@ func GetConfig(profiles ...string) (*Config, error) {
 		}
 	}
 
-	// Handle environment variables
 	accessKey := os.Getenv("CRUSOE_ACCESS_KEY_ID")
 	secretKey := os.Getenv("CRUSOE_SECRET_KEY")
 	apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT")
