@@ -309,7 +309,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 		ctx, dataResp.Operation, projectID, r.client.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
-			fmt.Sprintf("There was an error creating a instance: %s", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error creating an instance: %s", common.UnpackAPIError(err)))
 
 		return
 	}

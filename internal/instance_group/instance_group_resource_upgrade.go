@@ -10,7 +10,7 @@ import (
 )
 
 // instanceGroupModelV0 is the minimal set of attributes that we will need from a prior state to
-// rebuild a instance group's state because these fields are not returned by the API.
+// rebuild an instance group's state because these fields are not returned by the API.
 type instanceGroupModelV0 struct {
 	ID                 types.String `tfsdk:"id"`
 	InstanceNamePrefix types.String `tfsdk:"instance_name_prefix"`

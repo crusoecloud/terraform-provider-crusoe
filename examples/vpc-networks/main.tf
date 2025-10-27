@@ -10,22 +10,34 @@ locals {
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
 }
 
+variable "name_prefix" {
+  type    = string
+  default = "tf-example-vpc-networks-"
+}
+
+variable "location" {
+  type    = string
+  default = "us-east1-a"
+}
+
+# Create a VPC network
 resource "crusoe_vpc_network" "my_vpc_network" {
-  name = "my-new-network"
+  name = "${var.name_prefix}network"
   cidr = "10.0.0.0/8"
 }
 
+# Create a VPC subnet
 resource "crusoe_vpc_subnet" "my_vpc_subnet" {
-  name = "my-new-subnet"
-  cidr = "10.0.0.0/16"
-  location = "us-northcentral1-a"
-  network = crusoe_vpc_network.my_vpc_network.id
+  name     = "${var.name_prefix}subnet"
+  cidr     = "10.0.0.0/16"
+  location = var.location
+  network  = crusoe_vpc_network.my_vpc_network.id
 }
 
-// firewall rule
+# Create a firewall rule
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   network           = crusoe_vpc_network.my_vpc_network.id
-  name              = "example-terraform-rule"
+  name              = "${var.name_prefix}firewall-rule"
   action            = "allow"
   direction         = "ingress"
   protocols         = "tcp"
@@ -34,26 +46,19 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   destination       = crusoe_vpc_network.my_vpc_network.cidr
   destination_ports = "1-65535"
 
-  // It is currently not possible for terraform to create subnets and firewall rules concurrently.
-  // This directive should be specified when creating firewall rules and subnets to avoid failures.
+  # It is currently not possible for terraform to create subnets and firewall rules concurrently.
+  # This directive should be specified when creating firewall rules and subnets to avoid failures.
   depends_on = [crusoe_vpc_subnet.my_vpc_subnet]
 }
 
-// Create a VM in the new subnet
+# Create a VM in the new subnet
 resource "crusoe_compute_instance" "my_vm" {
-  name = "my-new-vm"
-  type = "a40.1x"
-  location = "us-northcentral1-a"
-
-  # specify the base image
-  image = "ubuntu20.04:latest"
-
+  name     = "${var.name_prefix}vm"
+  type     = "c1a.2x"
+  image    = "ubuntu22.04:latest"
+  location = var.location
+  network_interfaces = [{
+    subnet = crusoe_vpc_subnet.my_vpc_subnet.id
+  }]
   ssh_key = local.my_ssh_key
-
-  network_interfaces = [
-      {
-        subnet = crusoe_vpc_subnet.my_vpc_subnet.id
-      }
-    ]
-
 }
