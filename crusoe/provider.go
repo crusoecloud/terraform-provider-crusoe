@@ -23,6 +23,7 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubernetes_cluster"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubernetes_node_pool"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/load_balancer"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/nvlink_domain"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/image"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/manifest"
@@ -78,6 +79,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		image.NewRegistryImagesDataSource,
 		manifest.NewRegistryManifestsDataSource,
 		token.NewRegistryTokensDataSource,
+		nvlink_domain.NewNvlinkDomainsDataSource,
 	}
 }
 
