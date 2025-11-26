@@ -101,8 +101,13 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"version": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required: true,
+				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
+					"Kubernetes Version Change Not Supported",
+					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
+						"Cannot change version from %q to %q. "+
+						"Please contact support@crusoecloud.com for assistance with cluster upgrades.",
+				)}, // in-place upgrades not supported by API
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
