@@ -1,3 +1,17 @@
+## 0.5.39
+
+ENHANCEMENTS:
+
+- Add NVLink domain support with fix for previous breaking change that forced VM replacement
+- Add support for `CRUSOE_PROFILE` environment variable to select config file profiles, matching CLI behavior
+- Add semi-automated regression and unit tests for all examples
+
+BUG FIXES:
+
+- Fix config file parsing issue when decoding top-level `profile=` separately from the rest of the config struct
+- Add `ImmutableStringModifier` plan modifier for Kubernetes cluster `version` attribute to block in-place version changes with a clear error message instead of silently destroying and recreating clusters
+- Make container registry `project_id` attribute computed
+
 ## 0.5.33
 
 ENHANCEMENTS:
