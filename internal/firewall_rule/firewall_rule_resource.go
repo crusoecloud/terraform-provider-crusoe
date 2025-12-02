@@ -19,7 +19,7 @@ import (
 )
 
 type firewallRuleResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type firewallRuleResourceModel struct {
@@ -45,7 +45,7 @@ func (r *firewallRuleResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -135,24 +135,12 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	projectID := ""
-	if plan.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to create firewall rule",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-			return
-		}
-		projectID = project
-	} else {
-		projectID = plan.ProjectID.ValueString()
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	sourcePortsStr := strings.ReplaceAll(plan.SourcePorts.ValueString(), "*", "1-65535")
 	destPortsStr := strings.ReplaceAll(plan.DestinationPorts.ValueString(), "*", "1-65535")
 
-	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequestV1Alpha5{
 		VpcNetworkId:     plan.Network.ValueString(),
 		Name:             plan.Name.ValueString(),
 		Action:           plan.Action.ValueString(),
@@ -173,7 +161,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 
 	firewallRule, _, err := common.AwaitOperationAndResolve[swagger.VpcFirewallRule](
 		ctx, dataResp.Operation, projectID,
-		r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
+		r.client.APIClient.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
 			fmt.Sprintf("There was an error creating a firewall rule: %s", common.UnpackAPIError(err)))
@@ -199,21 +187,9 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 
 	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
-	projectID := ""
-	if state.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to read firewall rule",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = state.ProjectID.ValueString()
-	}
-
-	rule, httpResp, err := r.client.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, projectID, state.ID.ValueString())
+	rule, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		// fw rule has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
@@ -267,7 +243,7 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 		patchReq.SourcePorts = stringToSlice(plan.SourcePorts.ValueString(), ",")
 	}
 
-	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.PatchVPCFirewallRule(ctx,
+	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.PatchVPCFirewallRule(ctx,
 		patchReq,
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
@@ -281,7 +257,7 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 
 	defer httpResp.Body.Close()
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.VpcFirewallRule](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.VpcFirewallRule](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to patch firewall rule",
 			fmt.Sprintf("There was an error updating the firewall rule: %s.", common.UnpackAPIError(err)))
@@ -302,7 +278,7 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	dataResp, httpResp, err := r.client.VPCFirewallRulesApi.DeleteVPCFirewallRule(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.DeleteVPCFirewallRule(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule",
 			fmt.Sprintf("There was an error starting a delete firewall rule operation: %s", common.UnpackAPIError(err)))
@@ -311,7 +287,7 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 	defer httpResp.Body.Close()
 
-	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule",
 			fmt.Sprintf("There was an error deleting a firewall rule: %s", common.UnpackAPIError(err)))

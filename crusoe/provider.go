@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -11,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/custom_image"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
@@ -148,22 +150,75 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		)
 	}
 
-	if clientConfig.DefaultProject == "" {
-		resp.Diagnostics.AddAttributeWarning(
-			path.Root("default_project"),
-			"Missing Crusoe Default Project",
-			"The provider did not find a default project specified in the configuration file and will attempt to infer the project to use when not specified. "+
-				"Set default_project in ~/.crusoe/config. "+
-				"If either is already set, ensure the value is not empty.",
-		)
-	}
-
+	// Exit if there are missing required attributes
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Create an API client and make it available during DataSource and Resource type Configure methods.
-	client := common.NewAPIClient(clientConfig.ApiEndpoint, clientConfig.AccessKeyID, clientConfig.SecretKey)
+	apiClient := common.NewAPIClient(clientConfig.ApiEndpoint, clientConfig.AccessKeyID, clientConfig.SecretKey)
+
+	opts := &swagger.ProjectsApiListProjectsOpts{
+		OrgId: optional.EmptyString(),
+	}
+
+	if clientConfig.DefaultProject != "" {
+		opts.ProjectName = optional.NewString(clientConfig.DefaultProject)
+	}
+
+	dataResp, _, err := apiClient.ProjectsApi.ListProjects(ctx, opts)
+	if err != nil {
+		common.AddProjectError(
+			resp,
+			clientConfig.DefaultProject,
+			"Failed to Infer Fallback Project",
+			fmt.Sprintf("The provider did not find a default project specified in the configuration file and failed to infer a fallback project. Error: %s \n\nSet default_project in ~/.crusoe/config.", err.Error()),
+			"Failed to Validate Crusoe Default Project",
+			fmt.Sprintf("Failed to retrieve the default project (%s) for the authenticated user. Error: %s", clientConfig.DefaultProject, err.Error()),
+		)
+
+		return
+	}
+
+	if len(dataResp.Items) == 0 {
+		common.AddProjectError(
+			resp,
+			clientConfig.DefaultProject,
+			"Failed to Infer Fallback Project",
+			"The provider did not find a default project specified in the configuration file and failed to infer a fallback project.\n\nSet default_project in ~/.crusoe/config.",
+			"Failed to Validate Crusoe Default Project",
+			fmt.Sprintf("Failed to retrieve the default project (%s) for the authenticated user.", clientConfig.DefaultProject),
+		)
+
+		return
+	}
+
+	if len(dataResp.Items) > 1 {
+		common.AddProjectError(
+			resp,
+			clientConfig.DefaultProject,
+			"Failed to Infer Fallback Project",
+			"The provider did not find a default project specified in the configuration file and found multiple projects for the authenticated user. Unable to determine a fallback project.\n\ndefault_project must be set in ~/.crusoe/config.",
+			"Failed to Validate Crusoe Default Project",
+			fmt.Sprintf("Failed to retrieve the default project (%s) for the authenticated user", clientConfig.DefaultProject),
+		)
+
+		return
+	}
+
+	if clientConfig.DefaultProject == "" {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("default_project"),
+			"Using Fallback Project",
+			fmt.Sprintf("The provider did not find a default project specified in the configuration file and will use %s as the fallback project.\n\nSet default_project in ~/.crusoe/config.", dataResp.Items[0].Name),
+		)
+	}
+
+	client := &common.CrusoeClient{
+		APIClient: apiClient,
+		ProjectID: dataResp.Items[0].Id,
+	}
+
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }

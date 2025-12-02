@@ -13,7 +13,7 @@ import (
 )
 
 type projectsDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type projectsDataSourceModel struct {
@@ -35,7 +35,7 @@ func (ds *projectsDataSource) Configure(_ context.Context, req datasource.Config
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -75,7 +75,7 @@ func (ds *projectsDataSource) Read(ctx context.Context, req datasource.ReadReque
 		OrgId: optional.EmptyString(),
 	}
 
-	dataResp, httpResp, err := ds.client.ProjectsApi.ListProjects(ctx, opts)
+	dataResp, httpResp, err := ds.client.APIClient.ProjectsApi.ListProjects(ctx, opts)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Projects",
 			fmt.Sprintf("Could not fetch Project data at this time: %v.", common.UnpackAPIError(err)))

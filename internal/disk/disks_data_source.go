@@ -2,7 +2,6 @@ package disk
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -12,7 +11,7 @@ import (
 )
 
 type disksDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type disksDataSourceModel struct {
@@ -40,7 +39,7 @@ func (ds *disksDataSource) Configure(_ context.Context, req datasource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -91,15 +90,7 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	projectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch disks",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
-
-	dataResp, httpResp, err := ds.client.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
+	dataResp, httpResp, err := ds.client.APIClient.DisksApi.ListDisks(ctx, ds.client.ProjectID, &swagger.DisksApiListDisksOpts{})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Disks", "Could not fetch Disk data at this time.")
 

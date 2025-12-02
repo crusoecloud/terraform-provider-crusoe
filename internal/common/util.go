@@ -12,8 +12,12 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/provider"
+	tfResource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
@@ -62,8 +66,7 @@ var (
 	ErrUnableToGetOpRes = errors.New("failed to get result of operation")
 
 	// fallback error presented to the user in unexpected situations
-	errMultipleProjects = errors.New("User has multiple projects. Please specify a project to be used.")
-	errUnexpected       = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
+	errUnexpected = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
 
 	// error messages
 	errBadMapCast  = errors.New("failed to cast tf map value to string")
@@ -139,57 +142,51 @@ func AwaitOperationAndResolve[T any](ctx context.Context, op *swagger.Operation,
 	return result, op, nil
 }
 
-// GetFallbackProject queries the API to get the list of projects belonging to the
-// logged-in user. If there is one project belonging to the user, it returns that project
-// else it adds an error to the diagnostics and returns.
-func GetFallbackProject(ctx context.Context, client *swagger.APIClient, diags *diag.Diagnostics) (string, error) {
-	config, err := GetConfig()
-	if err != nil {
-		return "", fmt.Errorf("failed to get config: %w", err)
-	}
-
-	opts := &swagger.ProjectsApiListProjectsOpts{
-		OrgId: optional.EmptyString(),
-	}
-
-	if config.DefaultProject != "" {
-		opts.ProjectName = optional.NewString(config.DefaultProject)
-	}
-
-	//nolint:bodyclose // Body is closed prior to ListProjects return
-	dataResp, _, err := client.ProjectsApi.ListProjects(ctx, opts)
-	if err != nil {
-		diags.AddError("Failed to retrieve project ID",
-			"Failed to retrieve project ID for the authenticated user.")
-
-		return "", err
-	}
-
-	if len(dataResp.Items) != 1 {
-		diags.AddError("Multiple projects found.",
-			"Multiple projects found for the authenticated user. Unable to determine which project to use.")
-
-		return "", errMultipleProjects
-	}
-
-	projectID := dataResp.Items[0].Id
-
-	if config.DefaultProject == "" {
-		diags.AddWarning("Default project not specified",
-			fmt.Sprintf("A project_id was not specified in the configuration file. "+
-				"Please specify a project in the terraform file or set a 'default_project' in your configuration file. "+
-				"Falling back to project: %s.", dataResp.Items[0].Name))
-	}
-
-	return projectID, nil
+type CrusoeClient struct {
+	APIClient *swagger.APIClient
+	ProjectID string
 }
 
-func GetProjectIDOrFallback(ctx context.Context, client *swagger.APIClient, diags *diag.Diagnostics, projectID string) (string, error) {
-	if projectID != "" {
-		return projectID, nil
+func GetProjectIDOrFallback(client *CrusoeClient, projectId string) string {
+	if projectId != "" {
+		return projectId
 	}
 
-	return GetFallbackProject(ctx, client, diags)
+	return client.ProjectID
+}
+
+func GetProjectIDFromPointerOrFallback(client *CrusoeClient, projectId *string) string {
+	projectIdStr := ""
+	if projectId != nil {
+		projectIdStr = *projectId
+	}
+
+	return GetProjectIDOrFallback(client, projectIdStr)
+}
+
+func ParseResourceIdentifiers(req tfResource.ImportStateRequest, client *CrusoeClient, resourceIDFieldName string) (resourceID, projectID, err string) {
+	// We allow "{resourceIDFieldName}" (implicit project_id via env variable) or "{resourceIDFieldName},project_id" (explicit project_id)
+	resourceIdentifiers := strings.Split(req.ID, ",")
+
+	if (len(resourceIdentifiers) != 1) && (len(resourceIdentifiers) != 2) {
+		return "", "", fmt.Sprintf("Expected format %s,project_id, got %q", resourceIDFieldName, req.ID)
+	}
+
+	resourceID = resourceIdentifiers[0]
+	projectID = client.ProjectID
+	if len(resourceIdentifiers) == 2 {
+		projectID = resourceIdentifiers[1]
+	}
+
+	if _, parseErr := uuid.Parse(resourceID); parseErr != nil {
+		return "", "", fmt.Sprintf("Failed to parse %s: %v", resourceIDFieldName, parseErr)
+	}
+
+	if _, parseErr := uuid.Parse(projectID); parseErr != nil {
+		return "", "", fmt.Sprintf("Failed to parse project ID: %v", parseErr)
+	}
+
+	return resourceID, projectID, ""
 }
 
 func parseOpResult[T any](opResult interface{}) (*T, error) {
@@ -467,4 +464,14 @@ func StringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
 	}
 
 	return types.MapValue(types.StringType, tfMap)
+}
+
+func AddProjectError(resp *provider.ConfigureResponse, defaultProject, titleIfEmpty, msgIfEmpty, titleIfSet, msgIfSet string) {
+	title := titleIfEmpty
+	msg := msgIfEmpty
+	if defaultProject != "" {
+		title = titleIfSet
+		msg = msgIfSet
+	}
+	resp.Diagnostics.AddAttributeError(path.Root("default_project"), title, msg)
 }

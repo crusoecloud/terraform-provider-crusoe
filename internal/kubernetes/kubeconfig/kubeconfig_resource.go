@@ -25,7 +25,7 @@ var (
 )
 
 type kubeConfigResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 // NewKubeConfigResource is a helper function to simplify the provider implementation.
@@ -92,7 +92,7 @@ func (r *kubeConfigResource) Configure(_ context.Context, request resource.Confi
 		return
 	}
 
-	client, ok := request.ProviderData.(*swagger.APIClient)
+	client, ok := request.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		response.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -164,13 +164,7 @@ func (r *kubeConfigResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	var opts *swagger.KubernetesClustersApiGetClusterCredentialsOpts
 	if plan.AuthType.ValueString() != "" {
@@ -179,7 +173,7 @@ func (r *kubeConfigResource) Create(ctx context.Context, req resource.CreateRequ
 		}
 	}
 
-	res, _, err := r.client.KubernetesClustersApi.GetClusterCredentials(ctx, projectID, plan.ClusterID.ValueString(), opts)
+	res, _, err := r.client.APIClient.KubernetesClustersApi.GetClusterCredentials(ctx, projectID, plan.ClusterID.ValueString(), opts)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create kubeconfig",
 			fmt.Sprintf("Error creating kubeconfig: %s", common.UnpackAPIError(err)))

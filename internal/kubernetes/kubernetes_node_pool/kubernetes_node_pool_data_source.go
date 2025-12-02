@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -18,7 +17,7 @@ var (
 )
 
 type kubernetesNodePoolDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 func NewKubernetesNodePoolDataSource() datasource.DataSource {
@@ -95,23 +94,23 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 	}
 }
 
-func (d *kubernetesNodePoolDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (ds *kubernetesNodePoolDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
 
-	d.client = client
+	ds.client = client
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (d *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var config kubernetesNodePoolDataSourceModel
 
 	diags := req.Config.Get(ctx, &config)
@@ -120,15 +119,9 @@ func (d *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &resp.Diagnostics, config.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
-		return
-	}
-
-	kubernetesNodePool, _, err := d.client.KubernetesNodePoolsApi.GetNodePool(ctx, projectID, config.ID.ValueString())
+	kubernetesNodePool, _, err := ds.client.APIClient.KubernetesNodePoolsApi.GetNodePool(ctx, projectID, config.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Kubernetes Node Pool", fmt.Sprintf("Failed to get node pool: %s.",
 			common.UnpackAPIError(err)))

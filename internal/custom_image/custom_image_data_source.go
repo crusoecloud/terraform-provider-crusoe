@@ -2,18 +2,16 @@ package custom_image
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type customImageDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type customImageDataSourceModel struct {
@@ -42,7 +40,7 @@ func (ds *customImageDataSource) Configure(_ context.Context, req datasource.Con
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -106,21 +104,9 @@ func (ds *customImageDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	var projectID string
-	if config.ProjectID != nil {
-		projectID = *config.ProjectID
-	} else {
-		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to fetch custom images",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
-			return
-		}
-		projectID = fallbackProjectID
-	}
-
-	apiResp, httpResp, err := ds.client.CustomImagesApi.ListCustomImages(ctx, projectID)
+	apiResp, httpResp, err := ds.client.APIClient.CustomImagesApi.ListCustomImages(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch custom images", err.Error())
 

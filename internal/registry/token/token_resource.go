@@ -22,7 +22,7 @@ var (
 )
 
 type tokenResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type tokenResourceModel struct {
@@ -36,11 +36,11 @@ func NewRegistryTokenResource() resource.Resource {
 	return &tokenResource{}
 }
 
-func (t *tokenResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *tokenResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
@@ -49,16 +49,16 @@ func (t *tokenResource) Configure(_ context.Context, req resource.ConfigureReque
 
 		return
 	}
-	t.client = client
+	r.client = client
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokenResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *tokenResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_registry_token"
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokenResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *tokenResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a container registry token for authentication.",
 		Attributes: map[string]schema.Attribute{
@@ -94,7 +94,7 @@ func (t *tokenResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokenResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (r *tokenResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 	var plan tokenResourceModel
 	diags := request.Plan.Get(ctx, &plan)
 	response.Diagnostics.Append(diags...)
@@ -116,7 +116,7 @@ func (t *tokenResource) Create(ctx context.Context, request resource.CreateReque
 		Body: optional.NewInterface(body),
 	}
 
-	token, httpResp, err := t.client.CcrApi.CreateCcrToken(ctx, tokenReq)
+	token, httpResp, err := r.client.APIClient.CcrApi.CreateCcrToken(ctx, tokenReq)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to create token",
 			fmt.Sprintf("Error creating token: %s", common.UnpackAPIError(err)))
@@ -126,7 +126,7 @@ func (t *tokenResource) Create(ctx context.Context, request resource.CreateReque
 	defer httpResp.Body.Close()
 
 	// After creating the token, fetch the token ID from the list API
-	tokens, listResp, err := t.client.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
+	tokens, listResp, err := r.client.APIClient.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to fetch token ID after creation",
 			fmt.Sprintf("Error fetching token list: %s", common.UnpackAPIError(err)))
@@ -163,7 +163,7 @@ func (t *tokenResource) Create(ctx context.Context, request resource.CreateReque
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokenResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (r *tokenResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 	var state tokenResourceModel
 	diags := request.State.Get(ctx, &state)
 	response.Diagnostics.Append(diags...)
@@ -178,7 +178,7 @@ func (t *tokenResource) Read(ctx context.Context, request resource.ReadRequest, 
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokenResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (r *tokenResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 	response.Diagnostics.AddError(
 		"Update Not Supported",
 		"Token updates are not supported. Please delete and recreate the token if changes are needed.",
@@ -186,7 +186,7 @@ func (t *tokenResource) Update(ctx context.Context, request resource.UpdateReque
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokenResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (r *tokenResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 	var state tokenResourceModel
 	diags := request.State.Get(ctx, &state)
 	response.Diagnostics.Append(diags...)
@@ -194,7 +194,7 @@ func (t *tokenResource) Delete(ctx context.Context, request resource.DeleteReque
 		return
 	}
 
-	httpResp, err := t.client.LimitedUsageAPIKeyApi.DeleteLimitedUsageAPIKey(ctx, state.ID.ValueString())
+	httpResp, err := r.client.APIClient.LimitedUsageAPIKeyApi.DeleteLimitedUsageAPIKey(ctx, state.ID.ValueString())
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete token",
 			fmt.Sprintf("Error deleting token: %s", common.UnpackAPIError(err)))
@@ -204,6 +204,6 @@ func (t *tokenResource) Delete(ctx context.Context, request resource.DeleteReque
 	defer httpResp.Body.Close()
 }
 
-func (t *tokenResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *tokenResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

@@ -57,7 +57,7 @@ var (
 		// Note: we will iterate through all projects to find the instance. This means we are not dependent
 		// on project ID being present in the previous state, which allows us to be backwards-compatible with
 		// more versions.
-		instance, err := findInstance(ctx, r.client, priorStateData.ID.ValueString())
+		instance, err := findInstance(ctx, r.client.APIClient, priorStateData.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to migrate instance to current version",
 				fmt.Sprintf("There was an error migrating the instance to the current version: %v", err))

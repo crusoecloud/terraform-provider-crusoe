@@ -27,7 +27,7 @@ const (
 )
 
 type instanceTemplateResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type instanceTemplateResourceModel struct {
@@ -71,7 +71,7 @@ func (r *instanceTemplateResource) Configure(ctx context.Context, req resource.C
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -203,19 +203,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	projectID := ""
-	if plan.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to create instance template",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-			return
-		}
-		projectID = project
-	} else {
-		projectID = plan.ProjectID.ValueString()
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	tDisks := make([]diskToCreateResourceModel, 0, len(plan.DisksToCreate.Elements()))
 	diags = plan.DisksToCreate.ElementsAs(ctx, &tDisks, true)
@@ -232,7 +220,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		})
 	}
 
-	dataResp, httpResp, err := r.client.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
 		TemplateName:        plan.Name.ValueString(),
 		Type_:               plan.Type.ValueString(),
 		Location:            plan.Location.ValueString(),
@@ -296,7 +284,7 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	instanceTemplate, httpResp, err := r.client.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	instanceTemplate, httpResp, err := r.client.APIClient.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get instance template",
 			fmt.Sprintf("Fetching Crusoe instance templates failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -382,7 +370,7 @@ func (r *instanceTemplateResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	httpResp, err := r.client.InstanceTemplatesApi.DeleteInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	httpResp, err := r.client.APIClient.InstanceTemplatesApi.DeleteInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance template",
 			fmt.Sprintf("There was an error starting a delete instance template operation: %s", common.UnpackAPIError(err)))

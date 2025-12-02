@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
-	"strings"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -35,7 +33,7 @@ var (
 )
 
 type kubernetesClusterResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 func NewKubernetesClusterResource() resource.Resource {
@@ -68,7 +66,7 @@ func (r *kubernetesClusterResource) Configure(_ context.Context, request resourc
 		return
 	}
 
-	client, ok := request.ProviderData.(*swagger.APIClient)
+	client, ok := request.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		response.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -101,8 +99,13 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"version": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required: true,
+				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
+					"Kubernetes Version Change Not Supported",
+					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
+						"Cannot change version from %q to %q. "+
+						"Please contact support@crusoecloud.com for assistance with cluster upgrades.",
+				)}, // in-place upgrades not supported by API
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
@@ -186,13 +189,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	addOns, err := common.TFListToStringSlice(plan.AddOns)
 	if err != nil {
@@ -224,7 +221,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	//nolint:gosec // Sanity check for int64 --> int32 narrowing performed at field level (see schema)
-	asyncOperation, _, err := r.client.KubernetesClustersApi.CreateCluster(ctx, createRequest, projectID)
+	asyncOperation, _, err := r.client.APIClient.KubernetesClustersApi.CreateCluster(ctx, createRequest, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create cluster",
 			fmt.Sprintf("Error starting a create cluster operation: %s", common.UnpackAPIError(err)))
@@ -232,7 +229,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	kubernetesCluster, _, err := common.AwaitOperationAndResolve[swagger.KubernetesCluster](ctx, asyncOperation.Operation, projectID, r.client.KubernetesClusterOperationsApi.GetKubernetesClustersOperation)
+	kubernetesCluster, _, err := common.AwaitOperationAndResolve[swagger.KubernetesCluster](ctx, asyncOperation.Operation, projectID, r.client.APIClient.KubernetesClusterOperationsApi.GetKubernetesClustersOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create cluster",
 			fmt.Sprintf("Error creating the cluster: %s", common.UnpackAPIError(err)))
@@ -278,16 +275,10 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, stored.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
 	// Interact with 3rd party API to read data source.
-	kubernetesCluster, httpResp, err := r.client.KubernetesClustersApi.GetCluster(ctx, projectID, stored.ID.ValueString())
+	kubernetesCluster, httpResp, err := r.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, stored.ID.ValueString())
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -358,15 +349,9 @@ func (r *kubernetesClusterResource) Delete(
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &response.Diagnostics, stored.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
-		return
-	}
-
-	asyncOperation, _, err := r.client.KubernetesClustersApi.DeleteCluster(ctx, projectID, stored.ID.ValueString())
+	asyncOperation, _, err := r.client.APIClient.KubernetesClustersApi.DeleteCluster(ctx, projectID, stored.ID.ValueString())
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete cluster",
 			fmt.Sprintf("Error starting a delete cluster operation: %s", common.UnpackAPIError(err)))
@@ -378,7 +363,7 @@ func (r *kubernetesClusterResource) Delete(
 		ctx,
 		asyncOperation.Operation,
 		projectID,
-		r.client.KubernetesClusterOperationsApi.GetKubernetesClustersOperation)
+		r.client.APIClient.KubernetesClusterOperationsApi.GetKubernetesClustersOperation)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete cluster",
 			fmt.Sprintf("Error deleting the cluster: %s", common.UnpackAPIError(err)))
@@ -388,38 +373,10 @@ func (r *kubernetesClusterResource) Delete(
 }
 
 func (r *kubernetesClusterResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resourceIdentifiers := strings.Split(req.ID, ",")
+	clusterID, projectID, err := common.ParseResourceIdentifiers(req, r.client, "cluster_id")
 
-	// We allow "cluster_id" (project_id is implicitly defined via env variable) or "cluster_id,project_id" (explicit project_id)
-	if len(resourceIdentifiers) != 1 && len(resourceIdentifiers) != 2 {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Expected format cluster_id,project_id, got %q", req.ID))
-
-		return
-	}
-
-	clusterID := resourceIdentifiers[0]
-	var projectID string
-
-	if len(resourceIdentifiers) == 2 {
-		projectID = resourceIdentifiers[1]
-	}
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, projectID)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
-
-	if _, parseErr := uuid.Parse(clusterID); parseErr != nil {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse cluster ID: %v", parseErr))
-
-		return
-	}
-
-	if _, parseErr := uuid.Parse(projectID); parseErr != nil {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse project ID: %v", parseErr))
+	if err != "" {
+		resp.Diagnostics.AddError("Invalid resource identifier", err)
 
 		return
 	}

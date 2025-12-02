@@ -43,7 +43,7 @@ func (r *vpcNetworkResource) UpgradeState(context.Context) map[int64]resource.St
 				// Note: we will iterate through all projects to find the VPC network. This means we are not dependent
 				// on project ID being present in the previous state, which allows us to be backwards-compatible with
 				// more versions.
-				vpcNetwork, projectID, err := findVpcNetwork(ctx, r.client, priorStateData.ID.ValueString())
+				vpcNetwork, projectID, err := findVpcNetwork(ctx, r.client.APIClient, priorStateData.ID.ValueString())
 				if err != nil {
 					resp.Diagnostics.AddError("Failed to migrate VPC network to current version",
 						fmt.Sprintf("There was an error migrating the VPC network to the current version: %v",

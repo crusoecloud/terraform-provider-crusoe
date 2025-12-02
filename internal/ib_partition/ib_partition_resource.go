@@ -19,7 +19,7 @@ import (
 const notFoundMessage = "404 Not Found"
 
 type ibPartitionResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type ibPartitionResourceModel struct {
@@ -38,7 +38,7 @@ func (r *ibPartitionResource) Configure(ctx context.Context, req resource.Config
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -93,21 +93,9 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	projectID := ""
-	if plan.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to create partition",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = plan.ProjectID.ValueString()
-	}
-
-	dataResp, httpResp, err := r.client.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha5{
 		Name:        plan.Name.ValueString(),
 		IbNetworkId: plan.IBNetworkID.ValueString(),
 	}, projectID)
@@ -136,21 +124,9 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 
 	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
-	projectID := ""
-	if state.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to read IB partition",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = state.ProjectID.ValueString()
-	}
-
-	partition, httpResp, err := r.client.IBPartitionsApi.GetIBPartition(ctx, projectID, state.ID.ValueString())
+	partition, httpResp, err := r.client.APIClient.IBPartitionsApi.GetIBPartition(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		if err.Error() == notFoundMessage {
 			// partition has most likely been deleted out of band, so we update Terraform state to match
@@ -189,7 +165,7 @@ func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	httpResp, err := r.client.IBPartitionsApi.DeleteIBPartition(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	httpResp, err := r.client.APIClient.IBPartitionsApi.DeleteIBPartition(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete partition",
 			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", common.UnpackAPIError(err)))

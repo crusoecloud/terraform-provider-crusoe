@@ -14,7 +14,7 @@ import (
 )
 
 type manifestsDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type manifestsDataSourceModel struct {
@@ -36,11 +36,11 @@ func NewRegistryManifestsDataSource() datasource.DataSource {
 	return &manifestsDataSource{}
 }
 
-func (m *manifestsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (ds *manifestsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected ProviderData type",
@@ -49,16 +49,16 @@ func (m *manifestsDataSource) Configure(ctx context.Context, req datasource.Conf
 
 		return
 	}
-	m.client = client
+	ds.client = client
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (m *manifestsDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (ds *manifestsDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_registry_manifests"
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (m *manifestsDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (ds *manifestsDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
@@ -98,7 +98,7 @@ func (m *manifestsDataSource) Schema(ctx context.Context, request datasource.Sch
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (m *manifestsDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (ds *manifestsDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
 	var state manifestsDataSourceModel
 	diags := request.Config.Get(ctx, &state)
 	response.Diagnostics.Append(diags...)
@@ -106,19 +106,15 @@ func (m *manifestsDataSource) Read(ctx context.Context, request datasource.ReadR
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, m.client, &response.Diagnostics, state.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID", fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-		return
-	}
 	opts := &swagger.CcrApiListCcrManifestsOpts{}
 	if !state.TagContains.IsNull() {
 		tagSearchQuery := state.TagContains.ValueString()
 		opts.TagContains = optional.NewString(tagSearchQuery)
 	}
 
-	manifests, httpResp, err := m.client.CcrApi.ListCcrManifests(ctx, projectID, state.RepoName.ValueString(), state.ImageName.ValueString(), state.Location.ValueString(), opts)
+	manifests, httpResp, err := ds.client.APIClient.CcrApi.ListCcrManifests(ctx, projectID, state.RepoName.ValueString(), state.ImageName.ValueString(), state.Location.ValueString(), opts)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list manifests", fmt.Sprintf("Error listing manifests: %s", common.UnpackAPIError(err)))
 

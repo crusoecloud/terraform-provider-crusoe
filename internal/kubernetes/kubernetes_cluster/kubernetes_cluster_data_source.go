@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -24,7 +23,7 @@ func NewKubernetesClusterDataSource() datasource.DataSource {
 
 // kubernetesClusterDataSource is the data source implementation.
 type kubernetesClusterDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type kubernetesClusterDataSourceModel struct {
@@ -42,28 +41,28 @@ type kubernetesClusterDataSourceModel struct {
 	NodePoolIds           types.List   `tfsdk:"nodepool_ids"`
 }
 
-func (d *kubernetesClusterDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (ds *kubernetesClusterDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
 		return
 	}
 
-	d.client = client
+	ds.client = client
 }
 
 // Metadata returns the data source type name.
-func (d *kubernetesClusterDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (ds *kubernetesClusterDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_kubernetes_cluster"
 }
 
 // Schema defines the schema for the data source.
-func (d *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (ds *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -109,7 +108,7 @@ func (d *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sch
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (d *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var config kubernetesClusterDataSourceModel
 
 	diags := req.Config.Get(ctx, &config)
@@ -118,15 +117,9 @@ func (d *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &resp.Diagnostics, config.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
-		return
-	}
-
-	kubernetesCluster, _, err := d.client.KubernetesClustersApi.GetCluster(ctx, projectID, config.ID.ValueString())
+	kubernetesCluster, _, err := ds.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, config.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read Kubernetes Cluster",
 			fmt.Sprintf("Error reading the Kubernetes Cluster: %s", common.UnpackAPIError(err)))
