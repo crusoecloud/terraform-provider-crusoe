@@ -16,7 +16,7 @@ import (
 )
 
 type projectResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type projectResourceModel struct {
@@ -34,7 +34,7 @@ func (r *projectResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -77,14 +77,14 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	orgID, err := getUserOrg(ctx, r.client)
+	orgID, err := getUserOrg(ctx, r.client.APIClient)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create project",
 			fmt.Sprintf("There was an error fetching the user's organization: %s", err))
 
 		return
 	}
-	dataResp, httpResp, err := r.client.ProjectsApi.CreateProject(ctx, swagger.ProjectsPostRequest{
+	dataResp, httpResp, err := r.client.APIClient.ProjectsApi.CreateProject(ctx, swagger.ProjectsPostRequest{
 		Name:           plan.Name.ValueString(),
 		OrganizationId: orgID,
 	})
@@ -114,7 +114,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	project, httpResp, err := r.client.ProjectsApi.GetProject(ctx, state.ID.ValueString())
+	project, httpResp, err := r.client.APIClient.ProjectsApi.GetProject(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get projects",
 			fmt.Sprintf("Fetching Crusoe projects failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -146,7 +146,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	_, httpResp, err := r.client.ProjectsApi.UpdateProject(ctx,
+	_, httpResp, err := r.client.APIClient.ProjectsApi.UpdateProject(ctx,
 		swagger.ProjectsPutRequest{Name: plan.Name.ValueString()},
 		plan.ID.ValueString(),
 	)
@@ -171,7 +171,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	httpResp, err := r.client.ProjectsApi.DeleteProject(ctx,
+	httpResp, err := r.client.APIClient.ProjectsApi.DeleteProject(ctx,
 		state.ID.ValueString(),
 	)
 	if err != nil {

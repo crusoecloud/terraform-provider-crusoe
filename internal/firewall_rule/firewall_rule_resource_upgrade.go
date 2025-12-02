@@ -43,7 +43,7 @@ func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.
 				// Note: we will iterate through all projects to find the firewall rule. This means we are not dependent
 				// on project ID being present in the previous state, which allows us to be backwards-compatible with
 				// more versions.
-				firewallRule, projectID, err := findFirewallRule(ctx, r.client, priorStateData.ID.ValueString())
+				firewallRule, projectID, err := findFirewallRule(ctx, r.client.APIClient, priorStateData.ID.ValueString())
 				if err != nil {
 					resp.Diagnostics.AddError("Failed to migrate firewall rule to current version",
 						fmt.Sprintf("There was an error migrating the firewall rule to the current version: %v",

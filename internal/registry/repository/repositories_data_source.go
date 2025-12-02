@@ -8,12 +8,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type registryRepositoriesDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type registryRepositoriesDataSourceModel struct {
@@ -33,11 +32,11 @@ func NewRegistryRepositoriesDataSource() datasource.DataSource {
 	return &registryRepositoriesDataSource{}
 }
 
-func (d *registryRepositoriesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (ds *registryRepositoriesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected ProviderData type",
@@ -46,16 +45,16 @@ func (d *registryRepositoriesDataSource) Configure(ctx context.Context, req data
 
 		return
 	}
-	d.client = client
+	ds.client = client
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (d *registryRepositoriesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (ds *registryRepositoriesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_registry_repositories"
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (d *registryRepositoriesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (ds *registryRepositoriesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
@@ -78,21 +77,17 @@ func (d *registryRepositoriesDataSource) Schema(_ context.Context, _ datasource.
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (d *registryRepositoriesDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (ds *registryRepositoriesDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
 	var state registryRepositoriesDataSourceModel
 	diags := request.Config.Get(ctx, &state)
 	response.Diagnostics.Append(diags...)
 	if response.Diagnostics.HasError() {
 		return
 	}
-	projectID, err := common.GetProjectIDOrFallback(ctx, d.client, &response.Diagnostics, state.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID", fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
-		return
-	}
+	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-	repos, httpResp, err := d.client.CcrApi.ListCcrRepositories(ctx, projectID)
+	repos, httpResp, err := ds.client.APIClient.CcrApi.ListCcrRepositories(ctx, projectID)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list repositories", fmt.Sprintf("Error listing repositories: %s", common.UnpackAPIError(err)))
 

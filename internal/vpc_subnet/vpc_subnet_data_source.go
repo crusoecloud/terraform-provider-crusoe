@@ -2,17 +2,15 @@ package vpc_subnet
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type vpcSubnetsDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type vpcSubnetsDataSourceModel struct {
@@ -38,7 +36,7 @@ func (ds *vpcSubnetsDataSource) Configure(_ context.Context, req datasource.Conf
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -92,21 +90,10 @@ func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	projectID := ""
-	if config.ProjectID != nil {
-		projectID = *config.ProjectID
-	} else {
-		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to fetch VPC Subnets",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
-			return
-		}
-		projectID = fallbackProjectID
-	}
+	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
-	dataResp, httpResp, err := ds.client.VPCSubnetsApi.ListVPCSubnets(ctx, projectID)
+	dataResp, httpResp, err := ds.client.APIClient.VPCSubnetsApi.ListVPCSubnets(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch VPC Subnets", "Could not fetch VPC Subnet data at this time.")
 

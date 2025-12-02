@@ -8,12 +8,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type ibNetworksDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type ibNetworksDataSourceModel struct {
@@ -42,7 +41,7 @@ func (ds *ibNetworksDataSource) Configure(_ context.Context, req datasource.Conf
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -91,15 +90,7 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 }
 
 func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	projectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch IB networks",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
-
-	dataResp, httpResp, err := ds.client.IBNetworksApi.ListIBNetworks(ctx, projectID)
+	dataResp, httpResp, err := ds.client.APIClient.IBNetworksApi.ListIBNetworks(ctx, ds.client.ProjectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch IB Networks",
 			fmt.Sprintf("Could not fetch Infiniband network data at this time: %s", common.UnpackAPIError(err)))

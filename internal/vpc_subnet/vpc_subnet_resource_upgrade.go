@@ -51,7 +51,7 @@ func (r *vpcSubnetResource) UpgradeState(ctx context.Context) map[int64]resource
 				},
 			},
 			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-				stateUpgraderFunc[*vpcSubnetModelV0](ctx, req, resp, r.client)
+				stateUpgraderFunc[*vpcSubnetModelV0](ctx, req, resp, r.client.APIClient)
 			},
 		},
 		1: {
@@ -93,7 +93,7 @@ func (r *vpcSubnetResource) UpgradeState(ctx context.Context) map[int64]resource
 				},
 			},
 			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-				stateUpgraderFunc[*vpcSubnetModelV1](ctx, req, resp, r.client)
+				stateUpgraderFunc[*vpcSubnetModelV1](ctx, req, resp, r.client.APIClient)
 			},
 		},
 	}

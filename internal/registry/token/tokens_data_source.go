@@ -8,14 +8,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 const keyUsageRegistry = "registry"
 
 type tokensDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type tokensDataSourceModel struct {
@@ -35,11 +34,11 @@ func NewRegistryTokensDataSource() datasource.DataSource {
 	return &tokensDataSource{}
 }
 
-func (t *tokensDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (ds *tokensDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected ProviderData type",
@@ -48,16 +47,16 @@ func (t *tokensDataSource) Configure(ctx context.Context, req datasource.Configu
 
 		return
 	}
-	t.client = client
+	ds.client = client
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokensDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (ds *tokensDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_registry_tokens"
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokensDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (ds *tokensDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
 		Description: "Fetches a list of container registry tokens.",
 		Attributes: map[string]schema.Attribute{
@@ -93,7 +92,7 @@ func (t *tokensDataSource) Schema(ctx context.Context, request datasource.Schema
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (t *tokensDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (ds *tokensDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
 	var state tokensDataSourceModel
 	diags := request.Config.Get(ctx, &state)
 	response.Diagnostics.Append(diags...)
@@ -101,14 +100,9 @@ func (t *tokensDataSource) Read(ctx context.Context, request datasource.ReadRequ
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, t.client, &response.Diagnostics, state.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID", fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-		return
-	}
-
-	tokens, httpResp, err := t.client.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
+	tokens, httpResp, err := ds.client.APIClient.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list tokens", fmt.Sprintf("Error listing tokens: %s", common.UnpackAPIError(err)))
 

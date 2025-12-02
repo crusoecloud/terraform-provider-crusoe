@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -32,7 +31,7 @@ const (
 )
 
 type diskResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type diskResourceModel struct {
@@ -56,7 +55,7 @@ func (r *diskResource) Configure(ctx context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -127,39 +126,10 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 }
 
 func (r *diskResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resourceIdentifiers := strings.Split(req.ID, ",")
+	diskID, projectID, err := common.ParseResourceIdentifiers(req, r.client, "disk_id")
 
-	// We allow "disk_id" (project_id is implicitly defined via env variable) or "disk_id,project_id" (explicit project_id)
-	diskID := resourceIdentifiers[0]
-	var projectID string
-
-	switch len(resourceIdentifiers) {
-	case 1:
-		projectID = ""
-	case 2:
-		projectID = resourceIdentifiers[1]
-	default:
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Expected format disk_id,project_id, got %q", req.ID))
-
-		return
-	}
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, projectID)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
-
-	if _, parseErr := uuid.Parse(diskID); parseErr != nil {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse disk ID: %v", parseErr))
-
-		return
-	}
-
-	if _, parseErr := uuid.Parse(projectID); parseErr != nil {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse project ID: %v", parseErr))
+	if err != "" {
+		resp.Diagnostics.AddError("Invalid resource identifier", err)
 
 		return
 	}
@@ -182,26 +152,14 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		diskType = persistentSSD
 	}
 
-	projectID := ""
-	if plan.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to create disk",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-			return
-		}
-		projectID = project
-	} else {
-		projectID = plan.ProjectID.ValueString()
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	blockSize := plan.BlockSize.ValueInt64()
 	if blockSize == 0 && diskType == persistentSSD {
 		blockSize = defaultBlockSize
 	}
 
-	dataResp, httpResp, err := r.client.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1Alpha5{
 		Name:      plan.Name.ValueString(),
 		Location:  plan.Location.ValueString(),
 		Type_:     diskType,
@@ -216,7 +174,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, projectID, r.client.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, projectID, r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error creating a disk: %s", common.UnpackAPIError(err)))
@@ -247,21 +205,9 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
-	var projectID string
-	if state.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to create disk",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = state.ProjectID.ValueString()
-	}
-
-	dataResp, httpResp, err := r.client.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
+	dataResp, httpResp, err := r.client.APIClient.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
 			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -304,7 +250,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	dataResp, httpResp, err := r.client.DisksApi.ResizeDisk(ctx,
+	dataResp, httpResp, err := r.client.APIClient.DisksApi.ResizeDisk(ctx,
 		swagger.DisksPatchRequest{Size: plan.Size.ValueString()},
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
@@ -319,7 +265,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.DiskOperationsApi.GetStorageDisksOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
@@ -342,7 +288,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	dataResp, httpResp, err := r.client.DisksApi.DeleteDisk(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	dataResp, httpResp, err := r.client.APIClient.DisksApi.DeleteDisk(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
 			fmt.Sprintf("There was an error starting a delete disk operation: %s", common.UnpackAPIError(err)))
@@ -351,7 +297,7 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 	defer httpResp.Body.Close()
 
-	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.DiskOperationsApi.GetStorageDisksOperation)
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
 			fmt.Sprintf("There was an error deleting a disk: %s", common.UnpackAPIError(err)))

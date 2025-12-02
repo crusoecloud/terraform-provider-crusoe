@@ -51,7 +51,7 @@ func (r *instanceGroupResource) UpgradeState(context.Context) map[int64]resource
 				// Note: we will iterate through all projects to find the instance group. This means we are not dependent
 				// on project ID being present in the previous state, which allows us to be backwards-compatible with
 				// more versions.
-				instanceGroup, projectID, err := findInstanceGroup(ctx, r.client, priorStateData.ID.ValueString())
+				instanceGroup, projectID, err := findInstanceGroup(ctx, r.client.APIClient, priorStateData.ID.ValueString())
 				if err != nil {
 					resp.Diagnostics.AddError("Failed to migrate instance group to current version",
 						fmt.Sprintf("There was an error migrating the instance group to the current version: %v",

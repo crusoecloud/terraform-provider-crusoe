@@ -9,14 +9,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 // vmDataSource is a Terraform datasource that can be used to fetch a single VM instance.
 // TODO: consider making another DataSource for getting multiple instances
 type vmDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type vmDataSourceFilter struct {
@@ -54,7 +53,7 @@ func (ds *vmDataSource) Configure(_ context.Context, req datasource.ConfigureReq
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -160,22 +159,10 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		return
 	}
 
-	projectID := ""
-	if config.ProjectID != nil {
-		projectID = *config.ProjectID
-	} else {
-		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to fetch Instance Groups",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-			return
-		}
-		projectID = fallbackProjectID
-	}
+	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
 	if config.ID != nil {
-		vm, err := getVM(ctx, ds.client, projectID, *config.ID)
+		vm, err := getVM(ctx, ds.client.APIClient, projectID, *config.ID)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to get Instance", fmt.Sprintf("Failed to get instance: %s.",
 				common.UnpackAPIError(err)))

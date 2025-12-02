@@ -18,7 +18,7 @@ import (
 )
 
 type vpcNetworkResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type vpcNetworkResourceModel struct {
@@ -40,7 +40,7 @@ func (r *vpcNetworkResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -106,21 +106,9 @@ func (r *vpcNetworkResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	projectID := ""
-	if plan.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to create VPC Network",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = plan.ProjectID.ValueString()
-	}
-
-	dataResp, httpResp, err := r.client.VPCNetworksApi.CreateVPCNetwork(ctx, swagger.VpcNetworkPostRequest{
+	dataResp, httpResp, err := r.client.APIClient.VPCNetworksApi.CreateVPCNetwork(ctx, swagger.VpcNetworkPostRequest{
 		Name: plan.Name.ValueString(),
 		Cidr: plan.CIDR.ValueString(),
 	}, projectID)
@@ -154,21 +142,9 @@ func (r *vpcNetworkResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	projectID := ""
-	if state.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to get VPC Network",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = state.ProjectID.ValueString()
-	}
-
-	vpcNetwork, httpResp, err := r.client.VPCNetworksApi.GetVPCNetwork(ctx, projectID, state.ID.ValueString())
+	vpcNetwork, httpResp, err := r.client.APIClient.VPCNetworksApi.GetVPCNetwork(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get VPC Network",
 			fmt.Sprintf("Fetching Crusoe VPC Networks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -211,7 +187,7 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	dataResp, httpResp, err := r.client.VPCNetworksApi.PatchVPCNetwork(ctx,
+	dataResp, httpResp, err := r.client.APIClient.VPCNetworksApi.PatchVPCNetwork(ctx,
 		swagger.VpcNetworkPatchRequest{Name: plan.Name.ValueString()},
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
@@ -225,7 +201,7 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
+		return r.client.APIClient.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Network",
@@ -247,21 +223,9 @@ func (r *vpcNetworkResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	projectID := ""
-	if state.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to delete VPC Network",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = state.ProjectID.ValueString()
-	}
-
-	dataResp, httpResp, err := r.client.VPCNetworksApi.DeleteVPCNetwork(ctx, projectID, state.ID.ValueString())
+	dataResp, httpResp, err := r.client.APIClient.VPCNetworksApi.DeleteVPCNetwork(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VPC Network",
 			fmt.Sprintf("There was an error starting a delete VPC Network operation: %s", common.UnpackAPIError(err)))
@@ -271,7 +235,7 @@ func (r *vpcNetworkResource) Delete(ctx context.Context, req resource.DeleteRequ
 	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, projectID, func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
+		return r.client.APIClient.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VPC Network",

@@ -25,7 +25,7 @@ var (
 )
 
 type repositoryResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type repositoryResourceModel struct {
@@ -56,7 +56,7 @@ func (r *repositoryResource) Configure(_ context.Context, req resource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -131,13 +131,8 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &response.Diagnostics, plan.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-		return
-	}
 	var upstreamRegistry *swagger.UpstreamRegistry
 	repositoryMode := plan.Mode.ValueString()
 	if repositoryMode == "pull-through-cache" {
@@ -178,7 +173,7 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 	opts := &swagger.CcrApiCreateCcrRepositoryOpts{
 		Body: optional.NewInterface(createRequest),
 	}
-	repository, httpResp, err := r.client.CcrApi.CreateCcrRepository(ctx, projectID, opts)
+	repository, httpResp, err := r.client.APIClient.CcrApi.CreateCcrRepository(ctx, projectID, opts)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to create repository",
 			fmt.Sprintf("Error creating the repository: %s", common.UnpackAPIError(err)))
@@ -206,15 +201,9 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &response.Diagnostics, stored.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
-		return
-	}
-
-	repository, httpResp, err := r.client.CcrApi.GetCcrRepository(ctx, projectID, stored.Name.ValueString(), stored.Location.ValueString())
+	repository, httpResp, err := r.client.APIClient.CcrApi.GetCcrRepository(ctx, projectID, stored.Name.ValueString(), stored.Location.ValueString())
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			response.State.RemoveResource(ctx)
@@ -273,15 +262,9 @@ func (r *repositoryResource) Delete(ctx context.Context, request resource.Delete
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &response.Diagnostics, stored.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
-		return
-	}
-
-	httpResp, err := r.client.CcrApi.DeleteCcrRepository(ctx, projectID, stored.Name.ValueString(), stored.Location.ValueString())
+	httpResp, err := r.client.APIClient.CcrApi.DeleteCcrRepository(ctx, projectID, stored.Name.ValueString(), stored.Location.ValueString())
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete repository",
 			fmt.Sprintf("Error deleting repository: %s", common.UnpackAPIError(err)))

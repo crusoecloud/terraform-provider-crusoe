@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -28,7 +26,7 @@ var (
 )
 
 type kubernetesNodePoolResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 func NewKubernetesNodePoolResource() resource.Resource {
@@ -58,7 +56,7 @@ func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.C
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -159,13 +157,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, plan.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	nodeLabels, err := common.TFMapToStringMap(plan.RequestedNodeLabels)
 	if err != nil {
@@ -174,7 +166,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.CreateNodePool(ctx, swagger.KubernetesNodePoolPostRequest{
+	asyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.CreateNodePool(ctx, swagger.KubernetesNodePoolPostRequest{
 		ClusterId:                     plan.ClusterID.ValueString(),
 		Count:                         plan.InstanceCount.ValueInt64(),
 		IbPartitionId:                 plan.IBPartitionID.ValueString(),
@@ -194,7 +186,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	// Wait for operation to complete
-	kubernetesNodePoolResponse, err := AwaitNodePoolOperation(ctx, asyncOperation.Operation, projectID, r.client)
+	kubernetesNodePoolResponse, err := AwaitNodePoolOperation(ctx, asyncOperation.Operation, projectID, r.client.APIClient)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
 			fmt.Sprintf("Error creating a node pool: %s", common.UnpackAPIError(err)))
@@ -245,15 +237,9 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, stored.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
-		return
-	}
-
-	kubernetesNodePool, httpResp, err := r.client.KubernetesNodePoolsApi.GetNodePool(ctx, projectID, stored.ID.ValueString())
+	kubernetesNodePool, httpResp, err := r.client.APIClient.KubernetesNodePoolsApi.GetNodePool(ctx, projectID, stored.ID.ValueString())
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -317,13 +303,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		resp.Diagnostics.AddAttributeWarning(path.Root("instance_count"), "Node pool instance count decreased", "Decreasing node pool instance count will not delete node pool VMs. Manual deletion is required.")
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, stored.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
+	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
 	nodeLabels, err := common.TFMapToStringMap(plan.RequestedNodeLabels)
 	if err != nil {
@@ -338,7 +318,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 	}
 
-	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.UpdateNodePool(
+	asyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.UpdateNodePool(
 		ctx,
 		patchRequest,
 		projectID,
@@ -352,7 +332,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	}
 
 	// Wait for operation to complete
-	kubernetesNodePoolResponse, err := AwaitNodePoolOperation(ctx, asyncOperation.Operation, projectID, r.client)
+	kubernetesNodePoolResponse, err := AwaitNodePoolOperation(ctx, asyncOperation.Operation, projectID, r.client.APIClient)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update node pool",
 			fmt.Sprintf("Error updating a node pool: %s", common.UnpackAPIError(err)))
@@ -404,15 +384,9 @@ func (r *kubernetesNodePoolResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, stored.ProjectID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
-		return
-	}
-
-	asyncOperation, _, err := r.client.KubernetesNodePoolsApi.DeleteNodePool(ctx, projectID, stored.ID.ValueString())
+	asyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.DeleteNodePool(ctx, projectID, stored.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete node pool",
 			fmt.Sprintf("Error starting a delete node pool operation: %s", common.UnpackAPIError(err)))
@@ -420,7 +394,7 @@ func (r *kubernetesNodePoolResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.KubernetesNodePool](ctx, asyncOperation.Operation, projectID, r.client.KubernetesNodePoolOperationsApi.GetKubernetesNodePoolsOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.KubernetesNodePool](ctx, asyncOperation.Operation, projectID, r.client.APIClient.KubernetesNodePoolOperationsApi.GetKubernetesNodePoolsOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete node pool",
 			fmt.Sprintf("Error deleting a node pool: %s", common.UnpackAPIError(err)))
@@ -430,38 +404,10 @@ func (r *kubernetesNodePoolResource) Delete(ctx context.Context, req resource.De
 }
 
 func (r *kubernetesNodePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resourceIdentifiers := strings.Split(req.ID, ",")
+	nodePoolID, projectID, err := common.ParseResourceIdentifiers(req, r.client, "node_pool_id")
 
-	// We allow "node_pool_id" (project_id is implicitly defined via env variable) or "node_pool_id,project_id" (explicit project_id)
-	if len(resourceIdentifiers) != 1 && len(resourceIdentifiers) != 2 {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Expected format node_pool_id,project_id, got %q", req.ID))
-
-		return
-	}
-
-	nodePoolID := resourceIdentifiers[0]
-	var projectID string
-
-	if len(resourceIdentifiers) == 2 {
-		projectID = resourceIdentifiers[1]
-	}
-
-	projectID, err := common.GetProjectIDOrFallback(ctx, r.client, &resp.Diagnostics, projectID)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch project ID",
-			fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
-
-		return
-	}
-
-	if _, parseErr := uuid.Parse(nodePoolID); parseErr != nil {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse node pool ID: %v", parseErr))
-
-		return
-	}
-
-	if _, parseErr := uuid.Parse(projectID); parseErr != nil {
-		resp.Diagnostics.AddError("Invalid resource identifier", fmt.Sprintf("Failed to parse project ID: %v", parseErr))
+	if err != "" {
+		resp.Diagnostics.AddError("Invalid resource identifier", err)
 
 		return
 	}

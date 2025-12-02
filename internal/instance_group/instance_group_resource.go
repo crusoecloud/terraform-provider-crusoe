@@ -21,7 +21,7 @@ import (
 )
 
 type instanceGroupResource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type instanceGroupResourceModel struct {
@@ -44,7 +44,7 @@ func (r *instanceGroupResource) Configure(ctx context.Context, req resource.Conf
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -126,21 +126,9 @@ func (r *instanceGroupResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	projectID := ""
-	if plan.ProjectID.ValueString() == "" {
-		project, err := common.GetFallbackProject(ctx, r.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to create Instance Group",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-			return
-		}
-		projectID = project
-	} else {
-		projectID = plan.ProjectID.ValueString()
-	}
-
-	dataResp, httpResp, err := r.client.InstanceGroupsApi.CreateInstanceGroup(ctx, swagger.InstanceGroupPostRequest{
+	dataResp, httpResp, err := r.client.APIClient.InstanceGroupsApi.CreateInstanceGroup(ctx, swagger.InstanceGroupPostRequest{
 		Name:       plan.Name.ValueString(),
 		TemplateId: plan.TemplateID.ValueString(),
 	}, projectID)
@@ -163,7 +151,7 @@ func (r *instanceGroupResource) Create(ctx context.Context, req resource.CreateR
 	// if user specifies that they want a non-zero number of instances
 	numInstances := plan.RunningInstanceCount.ValueInt64()
 	if numInstances > 0 {
-		addErr := addInstancesToGroup(ctx, r.client, plan.InstanceNamePrefix.ValueString(), dataResp.Id,
+		addErr := addInstancesToGroup(ctx, r.client.APIClient, plan.InstanceNamePrefix.ValueString(), dataResp.Id,
 			plan.TemplateID.ValueString(), projectID, numInstances)
 		if addErr != nil {
 			resp.Diagnostics.AddError("Failed to add instances to Instance Group",
@@ -186,7 +174,7 @@ func (r *instanceGroupResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	instanceGroup, httpResp, err := r.client.InstanceGroupsApi.GetInstanceGroup(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	instanceGroup, httpResp, err := r.client.APIClient.InstanceGroupsApi.GetInstanceGroup(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get Instance Group",
 			fmt.Sprintf("Fetching Crusoe Instance Groups failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -224,7 +212,7 @@ func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	dataResp, httpResp, err := r.client.InstanceGroupsApi.PatchInstanceGroup(ctx,
+	dataResp, httpResp, err := r.client.APIClient.InstanceGroupsApi.PatchInstanceGroup(ctx,
 		swagger.InstanceGroupPatchRequest{
 			Name:       plan.Name.ValueString(),
 			TemplateId: plan.TemplateID.ValueString(),
@@ -244,7 +232,7 @@ func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateR
 	numInstances := plan.RunningInstanceCount.ValueInt64()
 	// add instances
 	if numInstances > dataResp.RunningInstanceCount {
-		addErr := addInstancesToGroup(ctx, r.client, plan.InstanceNamePrefix.ValueString(), dataResp.Id,
+		addErr := addInstancesToGroup(ctx, r.client.APIClient, plan.InstanceNamePrefix.ValueString(), dataResp.Id,
 			plan.TemplateID.ValueString(), plan.ProjectID.ValueString(), numInstances)
 		if addErr != nil {
 			resp.Diagnostics.AddError("Failed to add instances to Instance Group",
@@ -253,7 +241,7 @@ func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 	} else if numInstances < dataResp.RunningInstanceCount {
-		newInstances, removeErr := removeInstancesFromGroup(ctx, r.client, plan.ProjectID.ValueString(), numInstances, dataResp.Instances)
+		newInstances, removeErr := removeInstancesFromGroup(ctx, r.client.APIClient, plan.ProjectID.ValueString(), numInstances, dataResp.Instances)
 		if removeErr != nil {
 			resp.Diagnostics.AddError("Failed to remove instances from Instance Group",
 				fmt.Sprintf("There was an error removing instances from the Instance Group: %s.\n\n", common.UnpackAPIError(removeErr)))
@@ -278,7 +266,7 @@ func (r *instanceGroupResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	instanceGroup, getHttpResp, err := r.client.InstanceGroupsApi.GetInstanceGroup(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	instanceGroup, getHttpResp, err := r.client.APIClient.InstanceGroupsApi.GetInstanceGroup(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete Instance Group",
 			fmt.Sprintf("Fetching Crusoe Instance Groups failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -287,7 +275,7 @@ func (r *instanceGroupResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 	defer getHttpResp.Body.Close()
 
-	_, removeErr := removeInstancesFromGroup(ctx, r.client, state.ProjectID.ValueString(), 0, instanceGroup.Instances)
+	_, removeErr := removeInstancesFromGroup(ctx, r.client.APIClient, state.ProjectID.ValueString(), 0, instanceGroup.Instances)
 	if removeErr != nil {
 		resp.Diagnostics.AddError("Failed to delete Instance Group",
 			fmt.Sprintf("There was an error removing instances from the Instance Group: %s.\n\n", common.UnpackAPIError(removeErr)))
@@ -295,7 +283,7 @@ func (r *instanceGroupResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	httpResp, err := r.client.InstanceGroupsApi.DeleteInstanceGroup(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	httpResp, err := r.client.APIClient.InstanceGroupsApi.DeleteInstanceGroup(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete Instance Group",
 			fmt.Sprintf("There was an error deleting the Instance Group: %s", common.UnpackAPIError(err)))

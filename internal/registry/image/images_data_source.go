@@ -8,12 +8,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type imagesDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type imagesDataSourceModel struct {
@@ -34,11 +33,11 @@ func NewRegistryImagesDataSource() datasource.DataSource {
 	return &imagesDataSource{}
 }
 
-func (i *imagesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (ds *imagesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected ProviderData type",
@@ -47,16 +46,16 @@ func (i *imagesDataSource) Configure(ctx context.Context, req datasource.Configu
 
 		return
 	}
-	i.client = client
+	ds.client = client
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (i *imagesDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (ds *imagesDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_registry_images"
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (i *imagesDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (ds *imagesDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
@@ -92,20 +91,16 @@ func (i *imagesDataSource) Schema(ctx context.Context, request datasource.Schema
 }
 
 //nolint:gocritic // Implements Terraform defined interface
-func (i *imagesDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (ds *imagesDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
 	var state imagesDataSourceModel
 	diags := request.Config.Get(ctx, &state)
 	response.Diagnostics.Append(diags...)
 	if response.Diagnostics.HasError() {
 		return
 	}
-	projectID, err := common.GetProjectIDOrFallback(ctx, i.client, &response.Diagnostics, state.ProjectID.ValueString())
-	if err != nil {
-		response.Diagnostics.AddError("Failed to fetch project ID", fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
+	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-		return
-	}
-	images, httpResp, err := i.client.CcrApi.ListCcrImages(ctx, projectID, state.RepoName.ValueString(), state.Location.ValueString())
+	images, httpResp, err := ds.client.APIClient.CcrApi.ListCcrImages(ctx, projectID, state.RepoName.ValueString(), state.Location.ValueString())
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list images", fmt.Sprintf("Error listing images: %s", common.UnpackAPIError(err)))
 

@@ -2,18 +2,16 @@ package instance_group
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type instanceGroupsDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type instanceGroupsDataSourceModel struct {
@@ -39,7 +37,7 @@ func (ds *instanceGroupsDataSource) Configure(_ context.Context, req datasource.
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -97,21 +95,10 @@ func (ds *instanceGroupsDataSource) Read(ctx context.Context, req datasource.Rea
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	projectID := ""
-	if config.ProjectID != nil {
-		projectID = *config.ProjectID
-	} else {
-		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to fetch Instance Groups",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
-			return
-		}
-		projectID = fallbackProjectID
-	}
+	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
-	dataResp, httpResp, err := ds.client.InstanceGroupsApi.ListInstanceGroups(ctx, projectID)
+	dataResp, httpResp, err := ds.client.APIClient.InstanceGroupsApi.ListInstanceGroups(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Instance Groups", "Could not fetch Instance Group data at this time.")
 

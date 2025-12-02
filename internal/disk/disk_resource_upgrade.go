@@ -43,7 +43,7 @@ func (r *diskResource) UpgradeState(context.Context) map[int64]resource.StateUpg
 				// Note: we will iterate through all projects to find the disk. This means we are not dependent
 				// on project ID being present in the previous state, which allows us to be backwards-compatible with
 				// more versions.
-				disk, projectID, err := findDisk(ctx, r.client, priorStateData.ID.ValueString())
+				disk, projectID, err := findDisk(ctx, r.client.APIClient, priorStateData.ID.ValueString())
 				if err != nil {
 					resp.Diagnostics.AddError("Failed to migrate disk to current version",
 						fmt.Sprintf("There was an error migrating the disk to the current version: %v",

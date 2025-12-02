@@ -43,7 +43,7 @@ func (r *ibPartitionResource) UpgradeState(context.Context) map[int64]resource.S
 				// Note: we will iterate through all projects to find the IB partition. This means we are not dependent
 				// on project ID being present in the previous state, which allows us to be backwards-compatible with
 				// more versions.
-				ibPartition, projectID, err := findIbPartition(ctx, r.client, priorStateData.ID.ValueString())
+				ibPartition, projectID, err := findIbPartition(ctx, r.client.APIClient, priorStateData.ID.ValueString())
 				if err != nil {
 					resp.Diagnostics.AddError("Failed to migrate IB partition to current version",
 						fmt.Sprintf("There was an error migrating the IB partition to the current version: %v",

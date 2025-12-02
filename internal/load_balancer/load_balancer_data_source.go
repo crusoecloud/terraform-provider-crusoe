@@ -2,18 +2,16 @@ package load_balancer
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 type loadBalancerDataSource struct {
-	client *swagger.APIClient
+	client *common.CrusoeClient
 }
 
 type loadBalancerDataSourceModel struct {
@@ -71,7 +69,7 @@ func (ds *loadBalancerDataSource) Configure(_ context.Context, req datasource.Co
 		return
 	}
 
-	client, ok := req.ProviderData.(*swagger.APIClient)
+	client, ok := req.ProviderData.(*common.CrusoeClient)
 	if !ok {
 		resp.Diagnostics.AddError("Failed to initialize provider", common.ErrorMsgProviderInitFailed)
 
@@ -202,21 +200,10 @@ func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	projectID := ""
-	if config.ProjectID != nil {
-		projectID = *config.ProjectID
-	} else {
-		fallbackProjectID, err := common.GetFallbackProject(ctx, ds.client, &resp.Diagnostics)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to fetch load balancers",
-				fmt.Sprintf("No project was specified and it was not possible to determine which project to use: %v", err))
 
-			return
-		}
-		projectID = fallbackProjectID
-	}
+	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
-	dataResp, httpResp, err := ds.client.InternalLoadBalancersApi.ListLoadBalancers(ctx, projectID)
+	dataResp, httpResp, err := ds.client.APIClient.InternalLoadBalancersApi.ListLoadBalancers(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch load balancers", "Could not fetch load balancers data at this time.")
 
