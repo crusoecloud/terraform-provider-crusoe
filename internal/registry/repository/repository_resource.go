@@ -77,6 +77,7 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
+				Computed: true,
 				Optional: true,
 			},
 			"location": schema.StringAttribute{
