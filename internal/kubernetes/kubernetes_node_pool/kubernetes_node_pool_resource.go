@@ -226,6 +226,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 
 	var state kubernetesNodePoolResourceModel
 
+	// Update state from API response
 	state.ID = types.StringValue(kubernetesNodePoolResponse.NodePool.Id)
 	state.ProjectID = types.StringValue(kubernetesNodePoolResponse.NodePool.ProjectId)
 	state.InstanceCount = types.Int64Value(kubernetesNodePoolResponse.NodePool.Count)
@@ -233,12 +234,6 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	state.Type = types.StringValue(kubernetesNodePoolResponse.NodePool.Type_)
 	state.ClusterID = types.StringValue(kubernetesNodePoolResponse.NodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePoolResponse.NodePool.SubnetId)
-	state.IBPartitionID = plan.IBPartitionID
-	if plan.RequestedNodeLabels.IsUnknown() {
-		state.RequestedNodeLabels = types.MapNull(types.StringType)
-	} else {
-		state.RequestedNodeLabels = plan.RequestedNodeLabels
-	}
 	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePoolResponse.NodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
@@ -246,7 +241,15 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
 	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePoolResponse.NodePool.EphemeralStorageForContainerd)
+
+	// Preserve Terraform-only fields from prior state (not in API)
+	state.IBPartitionID = plan.IBPartitionID
 	state.SSHKey = plan.SSHKey
+	if plan.RequestedNodeLabels.IsUnknown() {
+		state.RequestedNodeLabels = types.MapNull(types.StringType)
+	} else {
+		state.RequestedNodeLabels = plan.RequestedNodeLabels
+	}
 	if plan.BatchSize.IsNull() {
 		state.BatchSize = types.Int64Null()
 	} else {
@@ -367,9 +370,9 @@ func (r *kubernetesNodePoolResource) ModifyPlan(ctx context.Context, req resourc
 		return
 	}
 
-	needsRotation := ModifyPlanNodePoolNeedsRotation(ctx, &req, resp)
+	needsRollout := ModifyPlanNodePoolNeedsRollout(ctx, &req, resp)
 
-	if !needsRotation {
+	if !needsRollout {
 		return
 	}
 
@@ -387,17 +390,11 @@ func (r *kubernetesNodePoolResource) ModifyPlan(ctx context.Context, req resourc
 
 	// Build warning message based on which parameter is set
 	warningMsg := "Using batch_size or batch_percentage during updates will cause nodes to be deleted and recreated in batches. " +
-		"This will result in temporary capacity reduction during the rotate process. "
+		"This will result in temporary capacity reduction during the rollout process. "
 
 	if !plan.BatchPercentage.IsNull() {
-		warningMsg += "The calculated number of nodes based on the percentage will not exceed 10 nodes per batch. "
+		warningMsg += "The calculated number of nodes based on the percentage cannot exceed 10 nodes per batch. "
 	}
-
-	warningMsg += "\n\n" +
-		"Node rotation can take 5+ minutes and depends on the total number of nodes that need to be rotated." +
-		"\n\n" +
-		"⚠️ DO NOT INTERRUPT: Stopping this Terraform operation (Ctrl+C) will halt the rotation, " +
-		"potentially leaving nodes in a partially updated state. Let the operation complete."
 
 	resp.Diagnostics.AddWarning(
 		"Batch update will delete and recreate nodes",
@@ -471,14 +468,14 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 				kubernetesNodePoolResponse.Details.Error_))
 	}
 
-	// Detect if changes require node rotation
-	needsRotation := UpdateNodePoolNeedsRotation(ctx, &req, resp)
+	// Detect if changes require node rollout
+	needsRollout := UpdateNodePoolNeedsRollout(ctx, &req, resp)
 
 	// run rollout if batch_size or batch_percentage is specified
 	batchSizeSet := !plan.BatchSize.IsNull() && plan.BatchSize.ValueInt64() > 0
 	batchPercentageSet := !plan.BatchPercentage.IsNull() && plan.BatchPercentage.ValueInt64() > 0
 
-	if needsRotation && (batchSizeSet || batchPercentageSet) {
+	if needsRollout && (batchSizeSet || batchPercentageSet) {
 		rolloutRequest := swagger.KubernetesNodePoolRotateStartRequest{}
 		if batchSizeSet {
 			rolloutRequest.Count = plan.BatchSize.ValueInt64()
@@ -488,26 +485,20 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 			rolloutRequest.Strategy = "PERCENTAGE"
 		}
 
-		rotateAsyncOperation, _, rotateAsyncOperationErr := r.client.APIClient.KubernetesNodePoolsApi.RotateNodePool(
+		_, _, rolloutAsyncOperationErr := r.client.APIClient.KubernetesNodePoolsApi.RotateNodePool(
 			ctx,
 			rolloutRequest,
 			projectID,
 			stored.ID.ValueString(),
 		)
-		if rotateAsyncOperationErr != nil {
-			resp.Diagnostics.AddError("Failed to rotate nodes",
-				fmt.Sprintf("Unable to rotate nodes: %s", common.UnpackAPIError(rotateAsyncOperationErr)))
-
-			return
-		}
-
-		// Wait for rotate operation to complete
-		_, err = AwaitNodePoolOperation(ctx, rotateAsyncOperation.Operation, projectID, r.client.APIClient)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to rotate nodes",
-				fmt.Sprintf("Unable to rotate nodes: %s", common.UnpackAPIError(err)))
-
-			return
+		if rolloutAsyncOperationErr != nil {
+			resp.Diagnostics.AddError("Failed to initiate rollout of nodes",
+				fmt.Sprintf("Unable to rollout nodes changes: %s", common.UnpackAPIError(rolloutAsyncOperationErr)))
+		} else {
+			resp.Diagnostics.AddWarning(
+				"Rollout initiated",
+				"A new rollout has been initiated to replace nodes with the latest config.",
+			)
 		}
 	}
 
@@ -544,7 +535,11 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	state.EphemeralStorageForContainerd = types.BoolValue(updatedNodePool.EphemeralStorageForContainerd)
 
 	// Preserve fields not returned by API
-	state.RequestedNodeLabels = plan.RequestedNodeLabels
+	if plan.RequestedNodeLabels.IsUnknown() {
+		state.RequestedNodeLabels = types.MapNull(types.StringType)
+	} else {
+		state.RequestedNodeLabels = plan.RequestedNodeLabels
+	}
 	state.IBPartitionID = plan.IBPartitionID
 	state.SSHKey = plan.SSHKey
 	state.BatchSize = plan.BatchSize

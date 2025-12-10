@@ -1,3 +1,26 @@
+## 0.5.41
+
+ENHANCEMENTS:
+
+- Updated node pool rollout to initiate when batch params are updated
+- Removed awaiting on rollout completion
+- Copy changes
+
+BUG FIXES:
+
+- Fixed node pool state error when updating
+
+## 0.5.40
+
+ENHANCEMENTS:
+
+- Add support for upgrading node pool version and rolling out changes to existing nodes
+- Updated kubernetes example
+
+BUG FIXES:
+
+- N/A
+
 ## 0.5.39
 
 ENHANCEMENTS:

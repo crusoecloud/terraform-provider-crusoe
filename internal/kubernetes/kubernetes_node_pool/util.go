@@ -87,22 +87,16 @@ func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operati
 	return nil, ErrNodePoolBothNil
 }
 
-// nodePoolNeedsRotation checks if plan and state differences require rotation
-func nodePoolNeedsRotation(plan, state *kubernetesNodePoolResourceModel) bool {
-	if !plan.Version.Equal(state.Version) {
-		return true
-	}
-	if !plan.RequestedNodeLabels.Equal(state.RequestedNodeLabels) {
-		return true
-	}
-	if !plan.EphemeralStorageForContainerd.Equal(state.EphemeralStorageForContainerd) {
-		return true
-	}
-
-	return false
+// nodePoolNeedsRollout checks if plan and state differences require rollout of changes
+func nodePoolNeedsRollout(plan, state *kubernetesNodePoolResourceModel) bool {
+	return !plan.Version.Equal(state.Version) ||
+		!plan.RequestedNodeLabels.Equal(state.RequestedNodeLabels) ||
+		!plan.EphemeralStorageForContainerd.Equal(state.EphemeralStorageForContainerd) ||
+		!plan.BatchPercentage.Equal(state.BatchPercentage) ||
+		!plan.BatchSize.Equal(state.BatchSize)
 }
 
-func UpdateNodePoolNeedsRotation(ctx context.Context, req *resource.UpdateRequest, resp *resource.UpdateResponse) bool {
+func UpdateNodePoolNeedsRollout(ctx context.Context, req *resource.UpdateRequest, resp *resource.UpdateResponse) bool {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return false
 	}
@@ -114,10 +108,10 @@ func UpdateNodePoolNeedsRotation(ctx context.Context, req *resource.UpdateReques
 		return false
 	}
 
-	return nodePoolNeedsRotation(&plan, &state)
+	return nodePoolNeedsRollout(&plan, &state)
 }
 
-func ModifyPlanNodePoolNeedsRotation(ctx context.Context, req *resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) bool {
+func ModifyPlanNodePoolNeedsRollout(ctx context.Context, req *resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) bool {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return false
 	}
@@ -129,5 +123,5 @@ func ModifyPlanNodePoolNeedsRotation(ctx context.Context, req *resource.ModifyPl
 		return false
 	}
 
-	return nodePoolNeedsRotation(&plan, &state)
+	return nodePoolNeedsRollout(&plan, &state)
 }
