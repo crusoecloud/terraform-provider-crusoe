@@ -401,6 +401,11 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 }
 
 func TFMapToStringMap(tfMap types.Map) (map[string]string, error) {
+	// Handle null or unknown maps
+	if tfMap.IsNull() || tfMap.IsUnknown() {
+		return map[string]string{}, nil
+	}
+
 	// Convert the Terraform map to a string map
 	stringMap := make(map[string]string)
 

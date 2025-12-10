@@ -74,18 +74,18 @@ run "validate_kubernetes_node_pool" {
   command = plan
 
   assert {
-    condition     = crusoe_kubernetes_node_pool.c1a_node_pool.name == "${var.name_prefix}c1a-node-pool"
-    error_message = "Expected kubernetes node pool name to be '${var.name_prefix}c1a-node-pool', but got '${crusoe_kubernetes_node_pool.c1a_node_pool.name}'."
+    condition     = crusoe_kubernetes_node_pool.my_node_pool.name == "${var.name_prefix}node-pool"
+    error_message = "Expected kubernetes node pool name to be '${var.name_prefix}node-pool', but got '${crusoe_kubernetes_node_pool.my_node_pool.name}'."
   }
 
   assert {
-    condition     = crusoe_kubernetes_node_pool.c1a_node_pool.instance_count == var.worker.count
-    error_message = "Expected kubernetes node pool instance count to be to be '${var.worker.count}', but got '${crusoe_kubernetes_node_pool.c1a_node_pool.instance_count}'."
+    condition     = crusoe_kubernetes_node_pool.my_node_pool.instance_count == var.worker.count
+    error_message = "Expected kubernetes node pool instance count to be to be '${var.worker.count}', but got '${crusoe_kubernetes_node_pool.my_node_pool.instance_count}'."
   }
 
   assert {
-    condition     = crusoe_kubernetes_node_pool.c1a_node_pool.type == var.worker.type
-    error_message = "Expected kubernetes node pool type to be to be '${var.worker.type}', but got '${crusoe_kubernetes_node_pool.c1a_node_pool.type}'."
+    condition     = crusoe_kubernetes_node_pool.my_node_pool.type == var.worker.type
+    error_message = "Expected kubernetes node pool type to be to be '${var.worker.type}', but got '${crusoe_kubernetes_node_pool.my_node_pool.type}'."
   }
 
 
@@ -100,6 +100,6 @@ run "validate_kubeconfig_file" {
 
   assert {
     condition     = local_file.kubeconfig_file.filename == var.kubeconfig_path
-    error_message = "Expected kubernetes node pool type to be to be '${var.kubeconfig_path}', but got '${crusoe_kubernetes_node_pool.c1a_node_pool.type}'."
+    error_message = "Expected kubernetes node pool type to be to be '${var.kubeconfig_path}', but got '${crusoe_kubernetes_node_pool.my_node_pool.type}'."
   }
 }

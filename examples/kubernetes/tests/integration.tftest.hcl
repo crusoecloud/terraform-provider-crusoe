@@ -22,12 +22,12 @@ run "validate_create_kubernetes_cluster" {
   }
 
   assert {
-    condition     = crusoe_kubernetes_node_pool.c1a_node_pool.id != null
+    condition     = crusoe_kubernetes_node_pool.my_node_pool.id != null
     error_message = "The node pool was not created successfully, as its ID is null."
   }
 
   assert {
-    condition     = crusoe_kubernetes_node_pool.c1a_node_pool.cluster_id == crusoe_kubernetes_cluster.my_cluster.id
+    condition     = crusoe_kubernetes_node_pool.my_node_pool.cluster_id == crusoe_kubernetes_cluster.my_cluster.id
     error_message = "The node pool cluster ID does not match the kubernetes cluster ID."
   }
 

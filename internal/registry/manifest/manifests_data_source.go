@@ -108,13 +108,15 @@ func (ds *manifestsDataSource) Read(ctx context.Context, request datasource.Read
 
 	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-	opts := &swagger.CcrApiListCcrManifestsOpts{}
+	opts := &swagger.CcrApiListCcrManifestsOpts{
+		Location: optional.NewString(state.Location.ValueString()),
+	}
 	if !state.TagContains.IsNull() {
 		tagSearchQuery := state.TagContains.ValueString()
 		opts.TagContains = optional.NewString(tagSearchQuery)
 	}
 
-	manifests, httpResp, err := ds.client.APIClient.CcrApi.ListCcrManifests(ctx, projectID, state.RepoName.ValueString(), state.ImageName.ValueString(), state.Location.ValueString(), opts)
+	manifests, httpResp, err := ds.client.APIClient.CcrApi.ListCcrManifests(ctx, projectID, state.RepoName.ValueString(), state.ImageName.ValueString(), opts)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list manifests", fmt.Sprintf("Error listing manifests: %s", common.UnpackAPIError(err)))
 

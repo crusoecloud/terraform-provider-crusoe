@@ -25,6 +25,8 @@ description: |-
 
 ### Optional
 
+- `batch_percentage` (Number) Percentage of nodes to update concurrently during rollout. The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. If both this and batch_size are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
+- `batch_size` (Number) Number of nodes to update at a time during rollout (minimum 1, maximum 10). Mutually exclusive with batch_percentage. If both this and batch_percentage are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
 - `ephemeral_storage_for_containerd` (Boolean)
 - `ib_partition_id` (String)
 - `project_id` (String)

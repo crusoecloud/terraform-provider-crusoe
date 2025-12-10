@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
@@ -83,4 +85,49 @@ func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operati
 	}
 
 	return nil, ErrNodePoolBothNil
+}
+
+// nodePoolNeedsRotation checks if plan and state differences require rotation
+func nodePoolNeedsRotation(plan, state *kubernetesNodePoolResourceModel) bool {
+	if !plan.Version.Equal(state.Version) {
+		return true
+	}
+	if !plan.RequestedNodeLabels.Equal(state.RequestedNodeLabels) {
+		return true
+	}
+	if !plan.EphemeralStorageForContainerd.Equal(state.EphemeralStorageForContainerd) {
+		return true
+	}
+
+	return false
+}
+
+func UpdateNodePoolNeedsRotation(ctx context.Context, req *resource.UpdateRequest, resp *resource.UpdateResponse) bool {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return false
+	}
+
+	var plan, state kubernetesNodePoolResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return false
+	}
+
+	return nodePoolNeedsRotation(&plan, &state)
+}
+
+func ModifyPlanNodePoolNeedsRotation(ctx context.Context, req *resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) bool {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return false
+	}
+
+	var plan, state kubernetesNodePoolResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return false
+	}
+
+	return nodePoolNeedsRotation(&plan, &state)
 }

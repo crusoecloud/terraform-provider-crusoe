@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -100,7 +102,11 @@ func (ds *imagesDataSource) Read(ctx context.Context, request datasource.ReadReq
 	}
 	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-	images, httpResp, err := ds.client.APIClient.CcrApi.ListCcrImages(ctx, projectID, state.RepoName.ValueString(), state.Location.ValueString())
+	imageOpts := &swagger.CcrApiListCcrImagesOpts{
+		Location: optional.NewString(state.Location.ValueString()),
+	}
+
+	images, httpResp, err := ds.client.APIClient.CcrApi.ListCcrImages(ctx, projectID, state.RepoName.ValueString(), imageOpts)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list images", fmt.Sprintf("Error listing images: %s", common.UnpackAPIError(err)))
 
