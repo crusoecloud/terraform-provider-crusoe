@@ -163,9 +163,10 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	var getError error
 
 	if clientConfig.DefaultProject != "" {
-		_, uidParseErr := uuid.Parse(clientConfig.DefaultProject)
+		// some users use the project id for default project, try parse it as a uuid and if no error use it as such
+		_, uuidParseErr := uuid.Parse(clientConfig.DefaultProject)
 
-		if uidParseErr == nil {
+		if uuidParseErr == nil {
 			projectId = clientConfig.DefaultProject
 			_, getError = getProjectById(ctx, apiClient.ProjectsApi, clientConfig.DefaultProject)
 		} else {
