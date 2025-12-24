@@ -192,7 +192,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			resp.Diagnostics.AddAttributeError(
 				path.Root("access_key_id"),
 				"Failed to auth user",
-				fmt.Sprintf("The provider failed to get the users identity for config profile %q. Error: %s \n\nCheck config in ~/.crusoe/config.", clientConfig.ProfileName, err.Error()))
+				fmt.Sprintf("The provider failed to get the users identity for config profile %q. \n\nError: %s \n\nCheck config in ~/.crusoe/config.", clientConfig.ProfileName, err.Error()))
 		} else {
 			userId = user.Identity.Email
 		}
@@ -200,14 +200,14 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		if clientConfig.DefaultProject == "" {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("default_project"),
-				"Failed to Infer Fallback Project",
-				fmt.Sprintf("The provider did not find a default project specified in the configuration file and failed to infer a fallback project for the authenticated user (%s). Error: %s \n\nSet the value of default_project in ~/.crusoe/config.", userId, getError.Error()),
+				fmt.Sprintf("The provider did not find a default project specified in the configuration file and failed to infer a fallback project for the authenticated user (%s)", userId),
+				fmt.Sprintf("Error: %s \n\nSet the value of default_project in ~/.crusoe/config.", getError.Error()),
 			)
 		} else {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("default_project"),
-				"Failed to Validate Crusoe Project",
-				fmt.Sprintf("Failed to resolve the project for the authenticated user (%s). Error: %s", userId, getError.Error()),
+				fmt.Sprintf("Failed to resolve the project for the authenticated user (%s)", userId),
+				fmt.Sprintf("Error: %s \n\nCheck the value of default_project in ~/.crusoe/config.", getError.Error()),
 			)
 		}
 
