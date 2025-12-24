@@ -15,6 +15,7 @@ const (
 
 // Config holds options that can be set via ~/.crusoe/config and env variables.
 type Config struct {
+	ProfileName      string
 	AccessKeyID      string `toml:"access_key_id"`
 	SecretKey        string `toml:"secret_key"`
 	SSHPublicKeyFile string `toml:"ssh_public_key_file"`
@@ -87,6 +88,8 @@ func GetConfig() (*Config, error) {
 	if envProfile := os.Getenv("CRUSOE_PROFILE"); envProfile != "" {
 		profileName = envProfile
 	}
+
+	config.ProfileName = profileName
 
 	if profileConfig, ok := profilesMap[profileName]; ok {
 		if profileConfig.AccessKeyID != "" {

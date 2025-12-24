@@ -3,8 +3,11 @@ package crusoe
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/antihax/optional"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -156,67 +159,129 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// Create an API client and make it available during DataSource and Resource type Configure methods.
 	apiClient := common.NewAPIClient(clientConfig.ApiEndpoint, clientConfig.AccessKeyID, clientConfig.SecretKey)
 
-	opts := &swagger.ProjectsApiListProjectsOpts{
-		OrgId: optional.EmptyString(),
-	}
+	var projectId string
+	var getError error
 
 	if clientConfig.DefaultProject != "" {
-		opts.ProjectName = optional.NewString(clientConfig.DefaultProject)
+		_, uidParseErr := uuid.Parse(clientConfig.DefaultProject)
+
+		if uidParseErr == nil {
+			projectId = clientConfig.DefaultProject
+			_, getError = getProjectById(ctx, apiClient.ProjectsApi, clientConfig.DefaultProject)
+		} else {
+			projectId, getError = getProjectByName(ctx, apiClient.ProjectsApi, clientConfig.DefaultProject)
+		}
+	} else {
+		var projectName string
+		projectId, projectName, getError = getDefaultProject(ctx, apiClient.ProjectsApi)
+
+		if getError == nil {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("default_project"),
+				"Using Fallback Project",
+				fmt.Sprintf("The provider did not find a default project specified in the configuration file and will use %s as the fallback project.\n\nSet default_project=%q in ~/.crusoe/config.", projectName, projectName),
+			)
+		}
 	}
 
-	dataResp, _, err := apiClient.ProjectsApi.ListProjects(ctx, opts)
-	if err != nil {
-		common.AddProjectError(
-			resp,
-			clientConfig.DefaultProject,
-			"Failed to Infer Fallback Project",
-			fmt.Sprintf("The provider did not find a default project specified in the configuration file and failed to infer a fallback project. Error: %s \n\nSet default_project in ~/.crusoe/config.", err.Error()),
-			"Failed to Validate Crusoe Default Project",
-			fmt.Sprintf("Failed to retrieve the default project (%s) for the authenticated user. Error: %s", clientConfig.DefaultProject, err.Error()),
-		)
+	if getError != nil {
+		userId := "unknown"
+		user, _, err := apiClient.IdentitiesApi.GetUserIdentity(ctx)
+
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("access_key_id"),
+				"Failed to auth user",
+				fmt.Sprintf("The provider failed to get the users identity for config profile %q. Error: %s \n\nCheck config in ~/.crusoe/config.", clientConfig.ProfileName, err.Error()))
+		} else {
+			userId = user.Identity.Email
+		}
+
+		if clientConfig.DefaultProject == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("default_project"),
+				"Failed to Infer Fallback Project",
+				fmt.Sprintf("The provider did not find a default project specified in the configuration file and failed to infer a fallback project for the authenticated user (%s). Error: %s \n\nSet the value of default_project in ~/.crusoe/config.", userId, getError.Error()),
+			)
+		} else {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("default_project"),
+				"Failed to Validate Crusoe Project",
+				fmt.Sprintf("Failed to resolve the project for the authenticated user (%s). Error: %s", userId, getError.Error()),
+			)
+		}
 
 		return
-	}
-
-	if len(dataResp.Items) == 0 {
-		common.AddProjectError(
-			resp,
-			clientConfig.DefaultProject,
-			"Failed to Infer Fallback Project",
-			"The provider did not find a default project specified in the configuration file and failed to infer a fallback project.\n\nSet default_project in ~/.crusoe/config.",
-			"Failed to Validate Crusoe Default Project",
-			fmt.Sprintf("Failed to retrieve the default project (%s) for the authenticated user.", clientConfig.DefaultProject),
-		)
-
-		return
-	}
-
-	if len(dataResp.Items) > 1 {
-		common.AddProjectError(
-			resp,
-			clientConfig.DefaultProject,
-			"Failed to Infer Fallback Project",
-			"The provider did not find a default project specified in the configuration file and found multiple projects for the authenticated user. Unable to determine a fallback project.\n\ndefault_project must be set in ~/.crusoe/config.",
-			"Failed to Validate Crusoe Default Project",
-			fmt.Sprintf("Failed to retrieve the default project (%s) for the authenticated user", clientConfig.DefaultProject),
-		)
-
-		return
-	}
-
-	if clientConfig.DefaultProject == "" {
-		resp.Diagnostics.AddAttributeWarning(
-			path.Root("default_project"),
-			"Using Fallback Project",
-			fmt.Sprintf("The provider did not find a default project specified in the configuration file and will use %s as the fallback project.\n\nSet default_project in ~/.crusoe/config.", dataResp.Items[0].Name),
-		)
 	}
 
 	client := &common.CrusoeClient{
 		APIClient: apiClient,
-		ProjectID: dataResp.Items[0].Id,
+		ProjectID: projectId,
 	}
 
 	resp.DataSourceData = client
 	resp.ResourceData = client
+}
+
+func getDefaultProject(ctx context.Context, projectsApiService *swagger.ProjectsApiService) (projectId, projectName string, err error) {
+	opts := &swagger.ProjectsApiListProjectsOpts{
+		OrgId: optional.EmptyString(),
+	}
+
+	dataResp, _, err := projectsApiService.ListProjects(ctx, opts)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	if len(dataResp.Items) == 0 {
+		return "", "", fmt.Errorf("no projects found")
+	}
+
+	if len(dataResp.Items) > 1 {
+		var projectNames []string
+		for _, project := range dataResp.Items {
+			projectNames = append(projectNames, project.Name)
+		}
+
+		slices.Sort(projectNames)
+
+		if len(projectNames) > 5 {
+			projectNames = append(projectNames[:5], "...")
+		}
+
+		return "", "", fmt.Errorf("failed to infer default project as more than one project found (%s)", strings.Join(projectNames, ", "))
+	}
+
+	return dataResp.Items[0].Id, dataResp.Items[0].Name, nil
+}
+
+func getProjectByName(ctx context.Context, projectsApiService *swagger.ProjectsApiService, projectName string) (projectId string, err error) {
+	opts := &swagger.ProjectsApiListProjectsOpts{
+		OrgId:       optional.EmptyString(),
+		ProjectName: optional.NewString(projectName),
+	}
+
+	dataResp, _, err := projectsApiService.ListProjects(ctx, opts)
+	if err != nil {
+		return "", fmt.Errorf("failed to get project by name %q: %w", projectName, err)
+	}
+
+	if len(dataResp.Items) == 0 {
+		return "", fmt.Errorf("failed to find project with name %q", projectName)
+	}
+
+	if len(dataResp.Items) > 1 {
+		return "", fmt.Errorf("internal error: got more than one project with name %q (%d)", projectName, len(dataResp.Items))
+	}
+
+	return dataResp.Items[0].Id, nil
+}
+
+func getProjectById(ctx context.Context, projectsApiService *swagger.ProjectsApiService, projectId string) (projectName string, err error) {
+	dataResp, _, err := projectsApiService.GetProject(ctx, projectId)
+	if err != nil {
+		return "", fmt.Errorf("failed to get project by id %q: %w", projectId, err)
+	}
+
+	return dataResp.Name, nil
 }

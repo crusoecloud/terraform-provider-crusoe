@@ -15,8 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/provider"
 	tfResource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -469,14 +467,4 @@ func StringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
 	}
 
 	return types.MapValue(types.StringType, tfMap)
-}
-
-func AddProjectError(resp *provider.ConfigureResponse, defaultProject, titleIfEmpty, msgIfEmpty, titleIfSet, msgIfSet string) {
-	title := titleIfEmpty
-	msg := msgIfEmpty
-	if defaultProject != "" {
-		title = titleIfSet
-		msg = msgIfSet
-	}
-	resp.Diagnostics.AddAttributeError(path.Root("default_project"), title, msg)
 }
