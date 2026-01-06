@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -23,6 +24,7 @@ import (
 )
 
 const (
+	defaultDiskType    = "<tf-default-disk-type>" // this is not a real value, used for validation logic to determine correct value
 	persistentSSD      = "persistent-ssd"
 	sharedVolume       = "shared-volume"
 	gibInTib           = 1024
@@ -98,10 +100,11 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"type": schema.StringAttribute{
 				Optional:   true,
 				Computed:   true,
+				Default:    stringdefault.StaticString(defaultDiskType),
 				Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),    // cannot be updated in place
-					stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
+					diskTypeModifier{},
+					stringplanmodifier.RequiresReplace(), // cannot be updated in place
 				},
 			},
 			"size": schema.StringAttribute{
@@ -148,8 +151,11 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	diskType := plan.Type.ValueString()
-	if diskType == "" {
-		diskType = persistentSSD
+	if diskType == "" || diskType == defaultDiskType {
+		resp.Diagnostics.AddError("Disk type should be specified",
+			"Disk type was not specified and Crusoe terraform module failed to set default. This is an internal Crusoe terraform error and you should not see this.")
+
+		return
 	}
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
@@ -207,7 +213,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-	dataResp, httpResp, err := r.client.APIClient.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
+	disk, httpResp, err := r.client.APIClient.DisksApi.GetDisk(ctx, projectID, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
 			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
@@ -216,21 +222,14 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 	defer httpResp.Body.Close()
 
-	var disk *swagger.DiskV1Alpha5
-	for i := range dataResp.Items {
-		if dataResp.Items[i].Id == state.ID.ValueString() {
-			disk = &dataResp.Items[i]
-		}
-	}
-
-	if disk == nil {
+	if httpResp.StatusCode == 404 {
 		// disk has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
 
 		return
 	}
 
-	diskToTerraformResourceModel(disk, &state)
+	diskToTerraformResourceModel(&disk, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
