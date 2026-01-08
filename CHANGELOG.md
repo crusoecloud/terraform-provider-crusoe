@@ -8,6 +8,8 @@ ENHANCEMENTS:
   - Split `instances` into `active_instance_ids` and `inactive_instance_ids`
   - Removed deprecated `instance_name_prefix` field
   - Added schema v0 → v1 state upgrade for existing users
+  - Support specifying project ID in config
+  - Improve handling of storage disk type
 
 BUG FIXES:
 
