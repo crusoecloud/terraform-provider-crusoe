@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	DiskOS                 = "os"
-	StateRunning           = "STATE_RUNNING"
-	FQDNDeprecationMessage = "This field is deprecated as of provider version v0.5.29 and " +
-		"will be removed in the next major version, use internal_dns_name instead"
+	DiskOS       = "os"
+	StateRunning = "STATE_RUNNING"
 )
+
+var FQDNDeprecationMessage = common.FormatDeprecationWithReplacement("v0.5.29", "internal_dns_name")
 
 var vmNetworkInterfaceSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{

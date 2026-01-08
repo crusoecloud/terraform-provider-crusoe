@@ -4,11 +4,14 @@ page_title: "crusoe_compute_instance_groups Data Source - terraform-provider-cru
 subcategory: ""
 description: |-
   This feature is currently in development. Reach out to support@crusoecloud.com with any questions.
+  Fetches a list of instance groups within a project.
 ---
 
 # crusoe_compute_instance_groups (Data Source)
 
 This feature is currently in development. Reach out to support@crusoecloud.com with any questions.
+
+Fetches a list of instance groups within a project.
 
 
 
@@ -17,22 +20,25 @@ This feature is currently in development. Reach out to support@crusoecloud.com w
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) The ID of the project this instance group belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
-- `instance_groups` (Attributes List) (see [below for nested schema](#nestedatt--instance_groups))
+- `instance_groups` (Attributes List) List of instance groups in the project. (see [below for nested schema](#nestedatt--instance_groups))
 
 <a id="nestedatt--instance_groups"></a>
 ### Nested Schema for `instance_groups`
 
-Required:
-
-- `instance_template` (String)
-- `name` (String)
-
 Read-Only:
 
-- `id` (String)
-- `instances` (List of String)
-- `running_instance_count` (Number)
+- `active_instance_ids` (List of String) A list of IDs of running instances in the instance group.
+- `created_at` (String) The timestamp when the instance group was created.
+- `desired_count` (Number) The desired number of VMs for the instance group.
+- `id` (String) The unique identifier of the instance group.
+- `inactive_instance_ids` (List of String) A list of IDs of non-running instances in the instance group.
+- `instance_template_id` (String) The ID of the instance template used for creating instances in this group.
+- `name` (String) The name of the instance group.
+- `project_id` (String) The ID of the project this instance group belongs to.
+- `running_instance_count` (Number) The number of running instances currently in the instance group.
+- `state` (String) The current state of the instance group. Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count).
+- `updated_at` (String) The timestamp when the instance group was most recently updated.

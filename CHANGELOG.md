@@ -1,3 +1,18 @@
+## 0.5.42
+
+ENHANCEMENTS:
+
+- Refactored `crusoe_compute_instance_group` resource with new API fields and state upgrade
+  - Renamed `instance_template` to `instance_template_id`
+  - Added `desired_count` (required), `state`, `created_at`, `updated_at` fields
+  - Split `instances` into `active_instance_ids` and `inactive_instance_ids`
+  - Removed deprecated `instance_name_prefix` field
+  - Added schema v0 → v1 state upgrade for existing users
+
+BUG FIXES:
+
+- N/A
+
 ## 0.5.41
 
 ENHANCEMENTS:

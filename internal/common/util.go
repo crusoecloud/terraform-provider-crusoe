@@ -468,3 +468,30 @@ func StringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
 
 	return types.MapValue(types.StringType, tfMap)
 }
+
+func FormatDeprecation(deprecatedInVersion string) string {
+	return fmt.Sprintf("This field is deprecated as of provider version %s "+
+		"and will be removed in the next major version. "+
+		"Please remove this field from your configuration.", deprecatedInVersion)
+}
+
+func FormatDeprecationWithReplacement(deprecatedInVersion, newFieldName string) string {
+	return FormatDeprecation(deprecatedInVersion) + fmt.Sprintf(" Use %s instead.", newFieldName)
+}
+
+// ValidateHTTPStatus checks if the HTTP response status code matches any of the accepted codes.
+// Returns true if valid, false if invalid (and adds error to diagnostics).
+func ValidateHTTPStatus(diagnostics *diag.Diagnostics, httpResp *http.Response, operation string, acceptedCodes ...int) bool {
+	for _, code := range acceptedCodes {
+		if httpResp.StatusCode == code {
+			return true
+		}
+	}
+
+	diagnostics.AddError(
+		fmt.Sprintf("Failed to %s", operation),
+		fmt.Sprintf("API returned unexpected status code %d", httpResp.StatusCode),
+	)
+
+	return false
+}

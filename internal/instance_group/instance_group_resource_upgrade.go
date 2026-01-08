@@ -2,18 +2,20 @@ package instance_group
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// instanceGroupModelV0 is the minimal set of attributes that we will need from a prior state to
-// rebuild an instance group's state because these fields are not returned by the API.
-type instanceGroupModelV0 struct {
-	ID                 types.String `tfsdk:"id"`
-	InstanceNamePrefix types.String `tfsdk:"instance_name_prefix"`
+type instanceGroupResourceModelV0 struct {
+	ID                   types.String `tfsdk:"id"`
+	Name                 types.String `tfsdk:"name"`
+	TemplateID           types.String `tfsdk:"instance_template"`
+	RunningInstanceCount types.Int64  `tfsdk:"running_instance_count"`
+	InstanceNamePrefix   types.String `tfsdk:"instance_name_prefix"`
+	Instances            types.List   `tfsdk:"instances"`
+	ProjectID            types.String `tfsdk:"project_id"`
 }
 
 func (r *instanceGroupResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
@@ -24,58 +26,59 @@ func (r *instanceGroupResource) UpgradeState(context.Context) map[int64]resource
 					"id": schema.StringAttribute{
 						Computed: true,
 					},
+					"project_id": schema.StringAttribute{
+						Optional: true,
+						Computed: true,
+					},
+					"name": schema.StringAttribute{
+						Required: true,
+					},
+					"instance_name_prefix": schema.StringAttribute{
+						Required: true,
+					},
+					"instance_template": schema.StringAttribute{
+						Required: true,
+					},
+					"running_instance_count": schema.Int64Attribute{
+						Required: true,
+					},
+					"instances": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
 				},
 			},
-			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
-				var priorStateData instanceGroupModelV0
-				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
-
-				if resp.Diagnostics.HasError() {
-					return
-				}
-
-				if priorStateData.ID.IsNull() {
-					resp.Diagnostics.AddError("Failed to migrate instance group to current version",
-						"No ID was associated with the instance group.")
-
-					return
-				}
-
-				if priorStateData.InstanceNamePrefix.IsNull() {
-					resp.Diagnostics.AddError("Failed to migrate instance group to current version",
-						"No instance name prefix was associated with the instance group.")
-
-					return
-				}
-
-				// Note: we will iterate through all projects to find the instance group. This means we are not dependent
-				// on project ID being present in the previous state, which allows us to be backwards-compatible with
-				// more versions.
-				instanceGroup, projectID, err := findInstanceGroup(ctx, r.client.APIClient, priorStateData.ID.ValueString())
-				if err != nil {
-					resp.Diagnostics.AddError("Failed to migrate instance group to current version",
-						fmt.Sprintf("There was an error migrating the instance group to the current version: %v",
-							err))
-
-					return
-				}
-
-				var state instanceGroupResourceModel
-				state.ProjectID = types.StringValue(projectID)
-				state.InstanceNamePrefix = types.StringValue(priorStateData.InstanceNamePrefix.ValueString())
-				instanceGroupToTerraformResourceModel(instanceGroup, &state)
-
-				resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
-				if resp.Diagnostics.HasError() {
-					resp.Diagnostics.AddError("Failed to migrate instance group to current version",
-						"There was an error migrating the instance group to the current version.")
-
-					return
-				}
-				resp.Diagnostics.AddWarning("Successfully migrated instance group to current version",
-					"Terraform State has been successfully migrated to a new version. Please refer to"+
-						" docs.crusoecloud.com for information about the updates.")
-			},
+			StateUpgrader: upgradeStateV0ToV1,
 		},
 	}
+}
+
+func upgradeStateV0ToV1(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+	var oldState instanceGroupResourceModelV0
+	resp.Diagnostics.Append(req.State.Get(ctx, &oldState)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Map v0 fields to v1 fields:
+	// - instance_template → instance_template_id
+	// - running_instance_count → desired_count (was user's requested count)
+	// - instance_name_prefix → dropped (no longer used)
+	// - instances → dropped (split into active/inactive, will be populated by Read)
+	// - New computed fields will be populated on next Read
+	newState := instanceGroupResourceModel{
+		ID:                   oldState.ID,
+		Name:                 oldState.Name,
+		InstanceTemplateID:   oldState.TemplateID,
+		ProjectID:            oldState.ProjectID,
+		DesiredCount:         oldState.RunningInstanceCount,
+		ActiveInstanceIDs:    types.ListNull(types.StringType),
+		InactiveInstanceIDs:  types.ListNull(types.StringType),
+		RunningInstanceCount: types.Int64Null(),
+		State:                types.StringNull(),
+		CreatedAt:            types.StringNull(),
+		UpdatedAt:            types.StringNull(),
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, newState)...)
 }

@@ -4,11 +4,14 @@ page_title: "crusoe_compute_instance_group Resource - terraform-provider-crusoe"
 subcategory: ""
 description: |-
   This feature is currently in development. Reach out to support@crusoecloud.com with any questions.
+  Manages a Crusoe compute instance group resource.
 ---
 
 # crusoe_compute_instance_group (Resource)
 
 This feature is currently in development. Reach out to support@crusoecloud.com with any questions.
+
+Manages a Crusoe compute instance group resource.
 
 
 
@@ -17,16 +20,20 @@ This feature is currently in development. Reach out to support@crusoecloud.com w
 
 ### Required
 
-- `instance_name_prefix` (String)
-- `instance_template` (String)
-- `name` (String)
-- `running_instance_count` (Number)
+- `desired_count` (Number) The desired number of VMs for the instance group.
+- `instance_template_id` (String) The ID of the instance template used for creating instances in this group.
+- `name` (String) The name of the instance group.
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) The ID of the project this instance group belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `instances` (List of String)
+- `active_instance_ids` (List of String) A list of IDs of running instances in the instance group.
+- `created_at` (String) The timestamp when the instance group was created.
+- `id` (String) The unique identifier of the instance group.
+- `inactive_instance_ids` (List of String) A list of IDs of non-running instances in the instance group.
+- `running_instance_count` (Number) The number of running instances currently in the instance group.
+- `state` (String) The current state of the instance group. Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count).
+- `updated_at` (String) The timestamp when the instance group was most recently updated.
