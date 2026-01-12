@@ -37,6 +37,7 @@ type kubernetesNodePoolDataSourceModel struct {
 	State                         types.String `tfsdk:"state"`
 	Name                          types.String `tfsdk:"name"`
 	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
+	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
 }
 
 func (e *kubernetesNodePoolDataSource) Metadata(_ context.Context,
@@ -88,6 +89,9 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 				Optional: true,
 			},
 			"ephemeral_storage_for_containerd": schema.BoolAttribute{
+				Optional: true,
+			},
+			"nvlink_domain_id": schema.StringAttribute{
 				Optional: true,
 			},
 		},
@@ -151,6 +155,7 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
+	state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

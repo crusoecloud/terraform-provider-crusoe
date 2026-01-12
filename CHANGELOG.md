@@ -10,6 +10,7 @@ ENHANCEMENTS:
   - Added schema v0 → v1 state upgrade for existing users
 - Support specifying project ID in config
 - Improve handling of storage disk type
+- Support NVlink domain for kubernetes nodepools
 
 BUG FIXES:
 

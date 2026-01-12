@@ -24,6 +24,7 @@ description: |-
 - `instance_ids` (List of String)
 - `name` (String)
 - `node_labels` (Map of String)
+- `nvlink_domain_id` (String)
 - `project_id` (String)
 - `state` (String)
 - `subnet_id` (String)

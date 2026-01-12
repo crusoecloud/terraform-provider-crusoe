@@ -52,6 +52,7 @@ type kubernetesNodePoolResourceModel struct {
 	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
 	BatchSize                     types.Int64  `tfsdk:"batch_size"`
 	BatchPercentage               types.Int64  `tfsdk:"batch_percentage"`
+	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
 }
 
 func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -163,6 +164,10 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 					int64validator.Between(1, 100),
 				},
 			},
+			"nvlink_domain_id": schema.StringAttribute{
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place & maintain across updates
+			},
 		},
 	}
 }
@@ -200,6 +205,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		SshPublicKey:                  plan.SSHKey.ValueString(),
 		SubnetId:                      plan.SubnetID.ValueString(),
 		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
+		NvlinkDomainId:                plan.NvlinkDomainID.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
@@ -241,6 +247,12 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
 	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePoolResponse.NodePool.EphemeralStorageForContainerd)
+
+	if kubernetesNodePoolResponse.NodePool.NvlinkDomainId != "" {
+		state.NvlinkDomainID = types.StringValue(kubernetesNodePoolResponse.NodePool.NvlinkDomainId)
+	} else {
+		state.NvlinkDomainID = types.StringNull()
+	}
 
 	// Preserve Terraform-only fields from prior state (not in API)
 	state.IBPartitionID = plan.IBPartitionID
@@ -308,6 +320,12 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
+
+	if kubernetesNodePool.NvlinkDomainId != "" {
+		state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
+	} else {
+		state.NvlinkDomainID = types.StringNull()
+	}
 
 	// Preserve Terraform-only fields from prior state (not in API)
 	state.IBPartitionID = stored.IBPartitionID
@@ -533,6 +551,12 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	state.State = types.StringValue(updatedNodePool.State)
 	state.Name = types.StringValue(updatedNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(updatedNodePool.EphemeralStorageForContainerd)
+
+	if updatedNodePool.NvlinkDomainId != "" {
+		state.NvlinkDomainID = types.StringValue(updatedNodePool.NvlinkDomainId)
+	} else {
+		state.NvlinkDomainID = types.StringNull()
+	}
 
 	// Preserve fields not returned by API
 	if plan.RequestedNodeLabels.IsUnknown() {
