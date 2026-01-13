@@ -225,7 +225,7 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 			"reservation_id": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+				Description:   "(Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
 			},
 			"nvlink_domain_id": schema.StringAttribute{
 				Optional:      true,
@@ -249,19 +249,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	var reservationSpecification *swagger.ReservationSpecification
-	if plan.ReservationID.IsNull() || plan.ReservationID.IsUnknown() {
-		reservationSpecification = &swagger.ReservationSpecification{} // defaults to lowest-cost
-	} else if plan.ReservationID.ValueString() != "" {
-		reservationSpecification = &swagger.ReservationSpecification{
-			Id: plan.ReservationID.ValueString(),
-		}
-	} else {
-		// on-demand
-		reservationSpecification = &swagger.ReservationSpecification{
-			SelectionStrategy: "on_demand",
-		}
-	}
+
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 	instanceTemplateID := plan.InstanceTemplateID.ValueString()
 	if _, err := uuid.Parse(instanceTemplateID); err != nil {
@@ -280,10 +268,9 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	defer httpResp.Body.Close()
 
 	dataResp, httpResp, err := r.client.APIClient.VMsApi.BulkCreateInstance(ctx, swagger.BulkInstancePostRequestV1Alpha5{
-		NamePrefix:               plan.NamePrefix.ValueString(),
-		Count:                    1,
-		InstanceTemplateId:       instanceTemplateID,
-		ReservationSpecification: reservationSpecification,
+		NamePrefix:         plan.NamePrefix.ValueString(),
+		Count:              1,
+		InstanceTemplateId: instanceTemplateID,
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -315,7 +302,16 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	plan.ProjectID = types.StringValue(projectID)
 	plan.Type = types.StringValue(instance.Type_)
 	plan.Location = types.StringValue(instance.Location)
-	plan.ReservationID = types.StringValue(instance.ReservationId)
+
+	if instance.ReservationId != "" {
+		plan.ReservationID = types.StringValue(instance.ReservationId)
+	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+			"Reservation assignment during VM creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
+	} else {
+		plan.ReservationID = types.StringNull()
+	}
+
 	plan.Image = types.StringValue(instanceTemplateResp.ImageName)
 	plan.SSHKey = types.StringValue(instanceTemplateResp.SshPublicKey)
 	plan.StartupScript = types.StringValue(instanceTemplateResp.StartupScript)
@@ -559,12 +555,17 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 		defer httpResp.Body.Close()
 
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+		instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update reservation ID",
 				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
 
 			return
+		}
+
+		if instance.ReservationId == "" && plan.ReservationID.ValueString() != "" {
+			resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+				"Reservation assignment during VM update is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
 		}
 
 		state.ReservationID = plan.ReservationID

@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -256,10 +257,11 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 			},
 			"reservation_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+				Optional:           true,
+				Computed:           true,
+				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Description:        "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+				DeprecationMessage: "This field is deprecated and will be removed in a future release. Please remove it from your configuration.",
 			},
 			"nvlink_domain_id": schema.StringAttribute{
 				Optional:      true,
@@ -282,19 +284,6 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-	var reservationSpecification *swagger.ReservationSpecification
-	if plan.ReservationID.IsNull() || plan.ReservationID.IsUnknown() {
-		reservationSpecification = &swagger.ReservationSpecification{} // defaults to lowest-cost
-	} else if plan.ReservationID.ValueString() != "" {
-		reservationSpecification = &swagger.ReservationSpecification{
-			Id: plan.ReservationID.ValueString(),
-		}
-	} else {
-		// on-demand
-		reservationSpecification = &swagger.ReservationSpecification{
-			SelectionStrategy: "on_demand",
-		}
 	}
 
 	tDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
@@ -353,19 +342,18 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
-		Name:                     plan.Name.ValueString(),
-		Type_:                    plan.Type.ValueString(),
-		Location:                 plan.Location.ValueString(),
-		Image:                    plan.Image.ValueString(),
-		CustomImage:              plan.CustomImage.ValueString(),
-		SshPublicKey:             plan.SSHKey.ValueString(),
-		StartupScript:            plan.StartupScript.ValueString(),
-		ShutdownScript:           plan.ShutdownScript.ValueString(),
-		NetworkInterfaces:        newNetworkInterfaces,
-		Disks:                    diskIds,
-		HostChannelAdapters:      hostChannelAdapters,
-		ReservationSpecification: reservationSpecification,
-		NvlinkDomainId:           plan.NvlinkDomainID.ValueString(),
+		Name:                plan.Name.ValueString(),
+		Type_:               plan.Type.ValueString(),
+		Location:            plan.Location.ValueString(),
+		Image:               plan.Image.ValueString(),
+		CustomImage:         plan.CustomImage.ValueString(),
+		SshPublicKey:        plan.SSHKey.ValueString(),
+		StartupScript:       plan.StartupScript.ValueString(),
+		ShutdownScript:      plan.ShutdownScript.ValueString(),
+		NetworkInterfaces:   newNetworkInterfaces,
+		Disks:               diskIds,
+		HostChannelAdapters: hostChannelAdapters,
+		NvlinkDomainId:      plan.NvlinkDomainID.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -385,7 +373,16 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	plan.ID = types.StringValue(instance.Id)
-	plan.ReservationID = types.StringValue(instance.ReservationId)
+
+	if instance.ReservationId != "" {
+		plan.ReservationID = types.StringValue(instance.ReservationId)
+	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+			"Reservation assignment during VM creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
+	} else {
+		plan.ReservationID = types.StringNull()
+	}
+
 	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.InternalDNSName = internalDNSName
 	plan.FQDN = internalDNSName // fqdn is deprecated but kept for backward compatibility
@@ -596,101 +593,16 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		resp.Diagnostics.Append(diags...)
 	}
 
-	// add a reservation ID
-	if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() == "" {
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action:        "RESERVE",
-			ReservationId: plan.ReservationID.ValueString(),
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to add vm to reservation",
-				fmt.Sprintf("There was an error requesting add vm to reservation: %v", err))
-
-			return
-		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-
-		state.ReservationID = plan.ReservationID
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-	} else if plan.ReservationID.ValueString() == "" && state.ReservationID.ValueString() != "" {
-		// remove reservation ID
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action: "UNRESERVE",
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to remove vm from reservation",
-				fmt.Sprintf("There was an error requesting remove vm from reservation: %v", err))
-
-			return
-		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error unreserving the vm: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-
-		state.ReservationID = plan.ReservationID
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-	} else if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() != "" && plan.ReservationID.String() != state.ReservationID.String() {
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action: "UNRESERVE",
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to remove vm from reservation",
-				fmt.Sprintf("There was an error requesting remove vm from its current reservation: %v", err))
-		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error unreserving the vm: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-		// update state to reflect the unreserved state
-		state.ReservationID = types.StringValue("")
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-
-		patchResp, httpResp, err = r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action:        "RESERVE",
-			ReservationId: plan.ReservationID.String(),
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to add vm to reservation",
-				fmt.Sprintf("There was an error requesting add vm to new reservation: %v", err))
-		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-		// update state to reflect the new reservation
-		state.ReservationID = plan.ReservationID
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-
-		return
+	//  Reservation ID is deprecated
+	if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+			"Reservation assignment during VM creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
 	}
+
+	debugMsg := "Setting state Reservation ID equal to plan Reservation ID, since the field is deprecated"
+	tflog.Debug(ctx, debugMsg, map[string]interface{}{})
+	state.ReservationID = plan.ReservationID
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface

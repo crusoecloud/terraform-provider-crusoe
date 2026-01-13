@@ -172,6 +172,7 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Description:   "(Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
 			},
 			"placement_policy": schema.StringAttribute{
 				Optional:      true,
@@ -232,7 +233,6 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		IbPartitionId:       plan.IBPartition.ValueString(),
 		Disks:               disksToCreate,
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
-		ReservationId:       plan.ReservationID.ValueString(),
 		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
 		NvlinkDomainId:      plan.NvlinkDomainID.ValueString(),
 	}, projectID)
@@ -250,7 +250,15 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	plan.Location = types.StringValue(dataResp.Location)
 	plan.Image = types.StringValue(dataResp.ImageName)
 	plan.PlacementPolicy = types.StringValue(dataResp.PlacementPolicy)
-	plan.ReservationID = types.StringValue(dataResp.ReservationId)
+
+	if dataResp.ReservationId != "" {
+		plan.ReservationID = types.StringValue(dataResp.ReservationId)
+	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+			"Reservation assignment during instance template creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
+	} else {
+		plan.ReservationID = types.StringNull()
+	}
 
 	if dataResp.NvlinkDomainId != "" {
 		plan.NvlinkDomainID = types.StringValue(dataResp.NvlinkDomainId)
