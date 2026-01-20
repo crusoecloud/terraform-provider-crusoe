@@ -33,3 +33,4 @@ description: |-
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `public_ip_type` (String)

@@ -105,6 +105,10 @@ resource "crusoe_kubernetes_cluster" "my_cluster" {
   # oidc_username_claim  = "sub"      # typically "sub" or "email"
   # oidc_groups_claim    = "groups"   # claim used to identify user groups
   # oidc_username_prefix = ""         # prefix prepended to username claim
+
+  # Optional: Enable private cluster creation
+  # private = true
+
   depends_on = [crusoe_vpc_firewall_rule.my_egress_rule]
 }
 
@@ -132,6 +136,9 @@ resource "crusoe_kubernetes_node_pool" "my_node_pool" {
   # If omitted, any existing nodes will not be updated, but future ones will use the new config.
   # batch_size       = 10  # The number of nodes to replace at a time
   # batch_percentage = 100 # The percentage of nodes to replace at a time
+
+  # Optional: Select the public IP type for the node_pool
+  # public_ip_type = "dynamic"
 
   lifecycle {
     ignore_changes = [

@@ -13,6 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
@@ -59,6 +61,7 @@ type kubernetesClusterResourceModel struct {
 	OIDCUsernamePrefix    types.String `tfsdk:"oidc_username_prefix"`
 	OIDCGroupsClaim       types.String `tfsdk:"oidc_groups_claim"`
 	OIDCCACert            types.String `tfsdk:"oidc_ca_cert"`
+	Private               types.Bool   `tfsdk:"private"`
 }
 
 func (r *kubernetesClusterResource) Configure(_ context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -176,6 +179,15 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Description:   "CA certificate used to verify the OIDC server (optional).",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"private": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+					common.NewPrivateControlPlaneWarningModifier(),
+				},
+				Default: booldefault.StaticBool(false), // Default to false
+			},
 		},
 	}
 }
@@ -207,6 +219,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		ServiceClusterIpRange: plan.ServiceClusterIpRange.ValueString(),
 		SubnetId:              plan.SubnetID.ValueString(),
 		Version:               plan.Version.ValueString(),
+		Private:               plan.Private.ValueBool(),
 	}
 
 	authConfig, diagErr := buildOIDCAuthConfig(ctx, &plan)
@@ -258,6 +271,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	state.OIDCUsernamePrefix = plan.OIDCUsernamePrefix
 	state.OIDCGroupsClaim = plan.OIDCGroupsClaim
 	state.OIDCCACert = plan.OIDCCACert
+	state.Private = types.BoolValue(kubernetesCluster.Private)
 	resp.Diagnostics.Append(diags...)
 
 	diags = resp.State.Set(ctx, &state)
@@ -321,6 +335,7 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 	state.OIDCUsernamePrefix = stored.OIDCUsernamePrefix
 	state.OIDCGroupsClaim = stored.OIDCGroupsClaim
 	state.OIDCCACert = stored.OIDCCACert
+	state.Private = types.BoolValue(kubernetesCluster.Private)
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

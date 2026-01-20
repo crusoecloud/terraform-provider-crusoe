@@ -32,3 +32,4 @@ description: |-
 - `dns_name` (String)
 - `id` (String) The ID of this resource.
 - `nodepool_ids` (List of String)
+- `private` (Boolean)

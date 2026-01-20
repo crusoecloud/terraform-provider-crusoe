@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -53,6 +54,7 @@ type kubernetesNodePoolResourceModel struct {
 	BatchSize                     types.Int64  `tfsdk:"batch_size"`
 	BatchPercentage               types.Int64  `tfsdk:"batch_percentage"`
 	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
+	PublicIPType                  types.String `tfsdk:"public_ip_type"`
 }
 
 func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -168,6 +170,15 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place & maintain across updates
 			},
+			"public_ip_type": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  stringdefault.StaticString("dynamic"), // Default to dynamic
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					common.NewPrivateNodePoolsWarningModifier(),
+				}, // maintain across updates
+			},
 		},
 	}
 }
@@ -206,6 +217,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		SubnetId:                      plan.SubnetID.ValueString(),
 		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 		NvlinkDomainId:                plan.NvlinkDomainID.ValueString(),
+		PublicIpType:                  plan.PublicIPType.ValueString(),
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
@@ -247,6 +259,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
 	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePoolResponse.NodePool.EphemeralStorageForContainerd)
+	state.PublicIPType = types.StringValue(kubernetesNodePoolResponse.NodePool.PublicIpType)
 
 	if kubernetesNodePoolResponse.NodePool.NvlinkDomainId != "" {
 		state.NvlinkDomainID = types.StringValue(kubernetesNodePoolResponse.NodePool.NvlinkDomainId)
@@ -320,6 +333,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
+	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
 
 	if kubernetesNodePool.NvlinkDomainId != "" {
 		state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
@@ -551,6 +565,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	state.State = types.StringValue(updatedNodePool.State)
 	state.Name = types.StringValue(updatedNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(updatedNodePool.EphemeralStorageForContainerd)
+	state.PublicIPType = types.StringValue(updatedNodePool.PublicIpType)
 
 	if updatedNodePool.NvlinkDomainId != "" {
 		state.NvlinkDomainID = types.StringValue(updatedNodePool.NvlinkDomainId)

@@ -31,6 +31,7 @@ description: |-
 - `ib_partition_id` (String)
 - `nvlink_domain_id` (String)
 - `project_id` (String)
+- `public_ip_type` (String)
 - `requested_node_labels` (Map of String)
 - `subnet_id` (String)
 - `version` (String)

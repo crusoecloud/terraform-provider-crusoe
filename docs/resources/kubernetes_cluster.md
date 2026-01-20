@@ -32,6 +32,7 @@ description: |-
 - `oidc_issuer_url` (String)
 - `oidc_username_claim` (String)
 - `oidc_username_prefix` (String)
+- `private` (Boolean)
 - `project_id` (String)
 - `service_cluster_ip_range` (String)
 - `subnet_id` (String)

@@ -38,6 +38,7 @@ type kubernetesNodePoolDataSourceModel struct {
 	Name                          types.String `tfsdk:"name"`
 	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
 	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
+	PublicIPType                  types.String `tfsdk:"public_ip_type"`
 }
 
 func (e *kubernetesNodePoolDataSource) Metadata(_ context.Context,
@@ -93,6 +94,9 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 			},
 			"nvlink_domain_id": schema.StringAttribute{
 				Optional: true,
+			},
+			"public_ip_type": schema.StringAttribute{
+				Computed: true,
 			},
 		},
 	}
@@ -156,6 +160,7 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
 	state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
+	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

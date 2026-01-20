@@ -39,6 +39,7 @@ type kubernetesClusterDataSourceModel struct {
 	Location              types.String `tfsdk:"location"`
 	DNSName               types.String `tfsdk:"dns_name"`
 	NodePoolIds           types.List   `tfsdk:"nodepool_ids"`
+	Private               types.Bool   `tfsdk:"private"`
 }
 
 func (ds *kubernetesClusterDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -103,6 +104,9 @@ func (ds *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sc
 				ElementType: types.StringType,
 				Computed:    true,
 			},
+			"private": schema.BoolAttribute{
+				Computed: true,
+			},
 		},
 	}
 }
@@ -148,6 +152,7 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 	state.Location = types.StringValue(kubernetesCluster.Location)
 	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
 	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	state.Private = types.BoolValue(kubernetesCluster.Private)
 	resp.Diagnostics.Append(diags...)
 
 	diags = resp.State.Set(ctx, &state)
