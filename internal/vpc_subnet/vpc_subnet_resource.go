@@ -156,13 +156,15 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 		VpcNetworkId:      plan.Network.ValueString(),
 		NatGatewayEnabled: plan.NATGatewayEnabled.ValueBool(),
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VPC Subnet",
 			fmt.Sprintf("There was an error starting a create VPC Subnet operation (%s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Subnet.Id)
 	plan.Name = types.StringValue(dataResp.Subnet.Name)
@@ -196,13 +198,15 @@ func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, 
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	vpcSubnet, httpResp, err := r.client.APIClient.VPCSubnetsApi.GetVPCSubnet(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get VPC Subnet",
 			fmt.Sprintf("Fetching Crusoe VPC Subnets failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode == http.StatusNotFound {
 		// VPC Subnet has most likely been deleted out of band, so we update Terraform state to match
@@ -247,13 +251,15 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 
 	dataResp, httpResp, err := r.client.APIClient.VPCSubnetsApi.PatchVPCSubnet(ctx, patchReq,
 		plan.ProjectID.ValueString(), plan.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Subnet",
 			fmt.Sprintf("There was an error starting an update VPC Subnet operation: %s.\n\n", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.VpcSubnet](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID)
@@ -281,13 +287,15 @@ func (r *vpcSubnetResource) Delete(ctx context.Context, req resource.DeleteReque
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	dataResp, httpResp, err := r.client.APIClient.VPCSubnetsApi.DeleteVPCSubnet(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VPC Subnet",
 			fmt.Sprintf("There was an error starting a delete VPC Subnet operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, projectID, func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID)

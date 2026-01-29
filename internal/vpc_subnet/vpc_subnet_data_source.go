@@ -94,12 +94,14 @@ func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadReq
 	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
 	dataResp, httpResp, err := ds.client.APIClient.VPCSubnetsApi.ListVPCSubnets(ctx, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch VPC Subnets", "Could not fetch VPC Subnet data at this time.")
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	var state vpcSubnetsDataSourceModel
 	for i := range dataResp.Items {

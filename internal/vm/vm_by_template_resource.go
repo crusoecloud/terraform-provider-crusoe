@@ -259,26 +259,30 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 	instanceTemplateResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.GetInstanceTemplate(ctx, instanceTemplateID, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error fetching the instance template: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	dataResp, httpResp, err := r.client.APIClient.VMsApi.BulkCreateInstance(ctx, swagger.BulkInstancePostRequestV1Alpha5{
 		NamePrefix:         plan.NamePrefix.ValueString(),
 		Count:              1,
 		InstanceTemplateId: instanceTemplateID,
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error starting a create instance operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	instances, _, err := common.AwaitOperationAndResolve[[]swagger.InstanceV1Alpha5](
 		ctx, dataResp.Operation, projectID, r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
@@ -429,11 +433,15 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		detachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
 			DetachDisks: removedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
 				fmt.Sprintf("There was an error starting a detach disk operation: %s", common.UnpackAPIError(err)))
+
+			return
 		}
-		defer httpResp.Body.Close()
 
 		_, err = common.AwaitOperation(ctx, detachResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -448,13 +456,15 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		attachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha5{
 			AttachDisks: addedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
 				fmt.Sprintf("There was an error starting an attach disk operation: %s", common.UnpackAPIError(err)))
 
 			return
 		}
-		defer httpResp.Body.Close()
 
 		_, err = common.AwaitOperation(ctx, attachResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -477,13 +487,15 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
 		// instances must be running to change public IP type
 		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error fetching the instance's current state: %v", err))
 
 			return
 		}
-		defer httpResp.Body.Close()
 		if instance.State != StateRunning {
 			resp.Diagnostics.AddError("Cannot update instance network interface",
 				"The instance needs to be running before updating its public IP address.")
@@ -521,13 +533,15 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 			}},
 			HostChannelAdapters: hostChannelAdapters,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error requesting to update the instance's network interface: %v", err))
 
 			return
 		}
-		defer httpResp.Body.Close()
 
 		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -547,13 +561,15 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 			Action:        "RESERVE",
 			ReservationId: plan.ReservationID.String(),
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to add vm to reservation",
 				fmt.Sprintf("There was an error requesting add vm to reservation: %v", err))
 
 			return
 		}
-		defer httpResp.Body.Close()
 
 		instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -576,13 +592,15 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
 			Action: "UNRESERVE",
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to remove vm from reservation",
 				fmt.Sprintf("There was an error requesting remove vm from reservation: %v", err))
 
 			return
 		}
-		defer httpResp.Body.Close()
 
 		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -620,13 +638,15 @@ func (r *vmByTemplateResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	delDataResp, delHttpResp, err := r.client.APIClient.VMsApi.DeleteInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if delHttpResp != nil {
+		defer delHttpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
 			fmt.Sprintf("There was an error starting a delete instance operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer delHttpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, state.ProjectID.ValueString(),
 		r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)

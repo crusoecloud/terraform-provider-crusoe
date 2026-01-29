@@ -88,13 +88,15 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		Name:           plan.Name.ValueString(),
 		OrganizationId: orgID,
 	})
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create project",
 			fmt.Sprintf("There was an error starting a create project operation: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	project := dataResp.Project
 
@@ -115,13 +117,15 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	project, httpResp, err := r.client.APIClient.ProjectsApi.GetProject(ctx, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get projects",
 			fmt.Sprintf("Fetching Crusoe projects failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	state.Name = types.StringValue(project.Name)
 	state.ID = types.StringValue(project.Id)
@@ -150,13 +154,15 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		swagger.ProjectsPutRequest{Name: plan.Name.ValueString()},
 		plan.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update project",
 			fmt.Sprintf("There was an error updating the project: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -174,11 +180,13 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	httpResp, err := r.client.APIClient.ProjectsApi.DeleteProject(ctx,
 		state.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete project",
 			fmt.Sprintf("There was an error deleting the project: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }

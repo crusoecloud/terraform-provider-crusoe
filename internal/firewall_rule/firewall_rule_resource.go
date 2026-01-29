@@ -151,13 +151,15 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		Destinations:     []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Destination.ValueString())},
 		DestinationPorts: stringToSlice(destPortsStr, ","),
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create firewall rule",
 			fmt.Sprintf("There was an error starting a create firewall rule operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	firewallRule, _, err := common.AwaitOperationAndResolve[swagger.VpcFirewallRule](
 		ctx, dataResp.Operation, projectID,
@@ -190,13 +192,12 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	rule, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.GetVPCFirewallRule(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		// fw rule has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
-
-		if err != nil {
-			httpResp.Body.Close()
-		}
 
 		return
 	}
@@ -248,14 +249,15 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to patch firewall rule",
 			fmt.Sprintf("There was an error updating the firewall rule: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
-
-	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.VpcFirewallRule](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
@@ -279,13 +281,15 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.DeleteVPCFirewallRule(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete firewall rule",
 			fmt.Sprintf("There was an error starting a delete firewall rule operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {

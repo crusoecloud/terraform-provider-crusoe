@@ -10,10 +10,12 @@ import (
 // getUserOrg returns the organization id for the authenticated user.
 func getUserOrg(ctx context.Context, apiClient *swagger.APIClient) (string, error) {
 	dataResp, httpResp, err := apiClient.EntitiesApi.GetOrganizations(ctx)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		return "", err
 	}
-	defer httpResp.Body.Close()
 
 	entities := dataResp.Items
 	switch len(entities) {

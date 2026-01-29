@@ -107,12 +107,14 @@ func (ds *customImageDataSource) Read(ctx context.Context, req datasource.ReadRe
 	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
 	apiResp, httpResp, err := ds.client.APIClient.CustomImagesApi.ListCustomImages(ctx, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch custom images", err.Error())
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	filteredImages := filterCustomImagesListResponse(&apiResp, config)
 

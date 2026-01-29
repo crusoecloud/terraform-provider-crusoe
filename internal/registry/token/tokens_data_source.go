@@ -103,12 +103,14 @@ func (ds *tokensDataSource) Read(ctx context.Context, request datasource.ReadReq
 	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
 	tokens, httpResp, err := ds.client.APIClient.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list tokens", fmt.Sprintf("Error listing tokens: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	for _, token := range tokens.Items {
 		if token.Usage != keyUsageRegistry {

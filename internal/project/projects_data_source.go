@@ -76,13 +76,15 @@ func (ds *projectsDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	dataResp, httpResp, err := ds.client.APIClient.ProjectsApi.ListProjects(ctx, opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Projects",
 			fmt.Sprintf("Could not fetch Project data at this time: %v.", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	var state projectsDataSourceModel
 	for i := range dataResp.Items {

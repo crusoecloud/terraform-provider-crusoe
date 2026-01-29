@@ -96,12 +96,14 @@ func (ds *vpcNetworksDataSource) Read(ctx context.Context, req datasource.ReadRe
 	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
 
 	dataResp, httpResp, err := ds.client.APIClient.VPCNetworksApi.ListVPCNetworks(ctx, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch VPC Networks", "Could not fetch VPC Network data at this time.")
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	var state vpcNetworksDataSourceModel
 	for i := range dataResp.Items {

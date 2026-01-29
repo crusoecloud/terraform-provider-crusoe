@@ -174,13 +174,15 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 		Body: optional.NewInterface(createRequest),
 	}
 	repository, httpResp, err := r.client.APIClient.CcrApi.CreateCcrRepository(ctx, projectID, opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to create repository",
 			fmt.Sprintf("Error creating the repository: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	var state repositoryResourceModel
 	state.Location = types.StringValue(repository.Location)
@@ -207,6 +209,9 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 		Location: optional.NewString(stored.Location.ValueString()),
 	}
 	repository, httpResp, err := r.client.APIClient.CcrApi.GetCcrRepository(ctx, projectID, stored.Name.ValueString(), opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			response.State.RemoveResource(ctx)
@@ -271,13 +276,15 @@ func (r *repositoryResource) Delete(ctx context.Context, request resource.Delete
 		Location: optional.NewString(stored.Location.ValueString()),
 	}
 	httpResp, err := r.client.APIClient.CcrApi.DeleteCcrRepository(ctx, projectID, stored.Name.ValueString(), opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete repository",
 			fmt.Sprintf("Error deleting repository: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }
 
 func (r *repositoryResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

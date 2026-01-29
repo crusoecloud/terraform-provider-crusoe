@@ -172,13 +172,15 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Size:      plan.Size.ValueString(),
 		BlockSize: blockSize,
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error starting a create disk operation (%s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, projectID, r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
@@ -214,13 +216,15 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	disk, httpResp, err := r.client.APIClient.DisksApi.GetDisk(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
 			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode == 404 {
 		// disk has most likely been deleted out of band, so we update Terraform state to match
@@ -254,6 +258,9 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error starting a resize operation: %s.\n\n"+
@@ -262,7 +269,6 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
@@ -288,13 +294,15 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.DisksApi.DeleteDisk(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
 			fmt.Sprintf("There was an error starting a delete disk operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {

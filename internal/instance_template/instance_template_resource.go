@@ -236,13 +236,15 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
 		NvlinkDomainId:      plan.NvlinkDomainID.ValueString(),
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",
 			fmt.Sprintf("There was an error creating the instance template (project %s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Id)
 	plan.ProjectID = types.StringValue(dataResp.ProjectId)
@@ -293,13 +295,15 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	instanceTemplate, httpResp, err := r.client.APIClient.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get instance template",
 			fmt.Sprintf("Fetching Crusoe instance templates failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode == http.StatusNotFound {
 		// instance template has most likely been deleted out of band, so we update Terraform state to match
@@ -379,11 +383,13 @@ func (r *instanceTemplateResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	httpResp, err := r.client.APIClient.InstanceTemplatesApi.DeleteInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance template",
 			fmt.Sprintf("There was an error starting a delete instance template operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }

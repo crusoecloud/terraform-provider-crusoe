@@ -112,13 +112,15 @@ func (r *vpcNetworkResource) Create(ctx context.Context, req resource.CreateRequ
 		Name: plan.Name.ValueString(),
 		Cidr: plan.CIDR.ValueString(),
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VPC Network",
 			fmt.Sprintf("There was an error starting a create VPC Network operation (%s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Network.Id)
 	plan.Name = types.StringValue(dataResp.Network.Name)
@@ -145,13 +147,15 @@ func (r *vpcNetworkResource) Read(ctx context.Context, req resource.ReadRequest,
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	vpcNetwork, httpResp, err := r.client.APIClient.VPCNetworksApi.GetVPCNetwork(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get VPC Network",
 			fmt.Sprintf("Fetching Crusoe VPC Networks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode == http.StatusNotFound {
 		// VPC Network has most likely been deleted out of band, so we update Terraform state to match
@@ -192,13 +196,15 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Network",
 			fmt.Sprintf("There was an error starting an update VPC Network operation: %s.\n\n", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
@@ -226,13 +232,15 @@ func (r *vpcNetworkResource) Delete(ctx context.Context, req resource.DeleteRequ
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	dataResp, httpResp, err := r.client.APIClient.VPCNetworksApi.DeleteVPCNetwork(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete VPC Network",
 			fmt.Sprintf("There was an error starting a delete VPC Network operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, projectID, func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)

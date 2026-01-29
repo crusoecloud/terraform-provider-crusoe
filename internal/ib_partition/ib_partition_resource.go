@@ -99,13 +99,15 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		Name:        plan.Name.ValueString(),
 		IbNetworkId: plan.IBNetworkID.ValueString(),
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create partition",
 			fmt.Sprintf("There was an error creating an Infiniband partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Id)
 	plan.ProjectID = types.StringValue(projectID)
@@ -127,6 +129,9 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	partition, httpResp, err := r.client.APIClient.IBPartitionsApi.GetIBPartition(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		if err.Error() == notFoundMessage {
 			// partition has most likely been deleted out of band, so we update Terraform state to match
@@ -140,7 +145,6 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	state.ProjectID = types.StringValue(projectID)
 	ibPartitionToTerraformResourceModel(&partition, &state)
@@ -166,11 +170,13 @@ func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	httpResp, err := r.client.APIClient.IBPartitionsApi.DeleteIBPartition(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete partition",
 			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }

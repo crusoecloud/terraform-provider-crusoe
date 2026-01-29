@@ -304,6 +304,9 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
 	kubernetesNodePool, httpResp, err := r.client.APIClient.KubernetesNodePoolsApi.GetNodePool(ctx, projectID, stored.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -536,6 +539,9 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 
 	// the async operation is returning the previous version of the node pool. query for the latest node pool.
 	updatedNodePool, httpResp, err := r.client.APIClient.KubernetesNodePoolsApi.GetNodePool(ctx, projectID, kubernetesNodePoolResponse.NodePool.Id)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)

@@ -91,12 +91,14 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	dataResp, httpResp, err := ds.client.APIClient.DisksApi.ListDisks(ctx, ds.client.ProjectID, &swagger.DisksApiListDisksOpts{})
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Disks", "Could not fetch Disk data at this time.")
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	var state disksDataSourceModel
 	for i := range dataResp.Items {

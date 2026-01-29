@@ -91,13 +91,15 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 
 func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	dataResp, httpResp, err := ds.client.APIClient.IBNetworksApi.ListIBNetworks(ctx, ds.client.ProjectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch IB Networks",
 			fmt.Sprintf("Could not fetch Infiniband network data at this time: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	var state ibNetworksDataSourceModel
 	for i := range dataResp.Items {

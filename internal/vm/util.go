@@ -96,10 +96,12 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 
 func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID string) (*swagger.InstanceV1Alpha5, error) {
 	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, projectID, vmID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find VM: %w", common.UnpackAPIError(err))
 	}
-	defer httpResp.Body.Close()
 
 	return &dataResp, nil
 }
@@ -212,9 +214,9 @@ func findInstance(ctx context.Context, client *swagger.APIClient, instanceID str
 	}
 
 	projectsResp, projectHttpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
-
-	defer projectHttpResp.Body.Close()
-
+	if projectHttpResp != nil {
+		defer projectHttpResp.Body.Close()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query for projects: %w", err)
 	}

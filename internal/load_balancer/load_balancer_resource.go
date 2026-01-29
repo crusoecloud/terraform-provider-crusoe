@@ -312,13 +312,15 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.CreateLoadBalancer(ctx, postReq, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create load balancer",
 			fmt.Sprintf("There was an error starting a create load balancer operation (%s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](
 		ctx, dataResp.Operation, projectID, r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation)
@@ -354,13 +356,15 @@ func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	loadBalancer, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.GetLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get load balancer",
 			fmt.Sprintf("Fetching load balancer failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode == http.StatusNotFound {
 		// Load balancer has most likely been deleted out of band, so we update Terraform state to match
@@ -437,13 +441,15 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update load balancer",
 			fmt.Sprintf("There was an error starting an update load balancer operation: %s.\n\n", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
@@ -469,13 +475,15 @@ func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.DeleteLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete load balancer",
 			fmt.Sprintf("There was an error starting a delete load balancer operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)

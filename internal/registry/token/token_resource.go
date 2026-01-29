@@ -117,23 +117,27 @@ func (r *tokenResource) Create(ctx context.Context, request resource.CreateReque
 	}
 
 	token, httpResp, err := r.client.APIClient.CcrApi.CreateCcrToken(ctx, tokenReq)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to create token",
 			fmt.Sprintf("Error creating token: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	// After creating the token, fetch the token ID from the list API
 	tokens, listResp, err := r.client.APIClient.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
+	if listResp != nil {
+		defer listResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to fetch token ID after creation",
 			fmt.Sprintf("Error fetching token list: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer listResp.Body.Close()
 
 	var tokenID string
 	for _, listToken := range tokens.Items {
@@ -195,13 +199,15 @@ func (r *tokenResource) Delete(ctx context.Context, request resource.DeleteReque
 	}
 
 	httpResp, err := r.client.APIClient.LimitedUsageAPIKeyApi.DeleteLimitedUsageAPIKey(ctx, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete token",
 			fmt.Sprintf("Error deleting token: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }
 
 func (r *tokenResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

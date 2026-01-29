@@ -107,12 +107,14 @@ func (ds *imagesDataSource) Read(ctx context.Context, request datasource.ReadReq
 	}
 
 	images, httpResp, err := ds.client.APIClient.CcrApi.ListCcrImages(ctx, projectID, state.RepoName.ValueString(), imageOpts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list images", fmt.Sprintf("Error listing images: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 	for _, image := range images.Items {
 		state.Images = append(state.Images, imageDataSourceModel{
 			ManifestCount: types.Int64Value(image.ManifestCount),

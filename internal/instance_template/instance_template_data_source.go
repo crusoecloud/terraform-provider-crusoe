@@ -143,12 +143,14 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	dataResp, httpResp, err := ds.client.APIClient.InstanceTemplatesApi.ListInstanceTemplates(ctx, ds.client.ProjectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to Fetch Instance Templates", "Could not fetch Instance Template data at this time.")
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	disks := make([]diskModel, 0)
 	for i := range dataResp.Items {

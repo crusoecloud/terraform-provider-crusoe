@@ -117,12 +117,14 @@ func (ds *manifestsDataSource) Read(ctx context.Context, request datasource.Read
 	}
 
 	manifests, httpResp, err := ds.client.APIClient.CcrApi.ListCcrManifests(ctx, projectID, state.RepoName.ValueString(), state.ImageName.ValueString(), opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list manifests", fmt.Sprintf("Error listing manifests: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	for _, manifest := range manifests.Items {
 		// Convert tags slice to types.String slice

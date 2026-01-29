@@ -377,9 +377,9 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 	}
 
 	projectsResp, projectHttpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
-
-	defer projectHttpResp.Body.Close()
-
+	if projectHttpResp != nil {
+		defer projectHttpResp.Body.Close()
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to query for projects: %w", err)
 	}
@@ -387,12 +387,22 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 	for _, project := range projectsResp.Items {
 		resource, getResourceHttpResp, getResourceErr := args.GetResource(ctx, project.Id, args.ResourceID)
 		if getResourceErr != nil {
+			if getResourceHttpResp != nil {
+				getResourceHttpResp.Body.Close()
+			}
+
 			continue
 		}
 		if args.IsResource(resource, args.ResourceID) {
+			if getResourceHttpResp != nil {
+				getResourceHttpResp.Body.Close()
+			}
+
 			return &resource, project.Id, nil
 		}
-		getResourceHttpResp.Body.Close()
+		if getResourceHttpResp != nil {
+			getResourceHttpResp.Body.Close()
+		}
 	}
 
 	return nil, "", errors.New("failed to find resource")
