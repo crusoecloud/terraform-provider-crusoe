@@ -17,7 +17,7 @@ Fetches a list of container registry tokens.
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String, Deprecated)
 
 ### Read-Only
 

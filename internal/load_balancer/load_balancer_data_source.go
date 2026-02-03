@@ -15,7 +15,7 @@ type loadBalancerDataSource struct {
 }
 
 type loadBalancerDataSourceModel struct {
-	ProjectID     *string             `tfsdk:"project_id"`
+	ProjectID     types.String        `tfsdk:"project_id"`
 	LoadBalancers []loadBalancerModel `tfsdk:"load_balancers"`
 }
 
@@ -201,7 +201,7 @@ func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
 	dataResp, httpResp, err := ds.client.APIClient.InternalLoadBalancersApi.ListLoadBalancers(ctx, projectID)
 	if httpResp != nil {

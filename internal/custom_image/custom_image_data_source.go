@@ -15,7 +15,7 @@ type customImageDataSource struct {
 }
 
 type customImageDataSourceModel struct {
-	ProjectID    *string            `tfsdk:"project_id"`
+	ProjectID    types.String       `tfsdk:"project_id"`
 	Name         *string            `tfsdk:"name"`
 	NamePrefix   *string            `tfsdk:"name_prefix"`
 	CustomImages []customImageModel `tfsdk:"custom_images"`
@@ -104,7 +104,7 @@ func (ds *customImageDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
 	apiResp, httpResp, err := ds.client.APIClient.CustomImagesApi.ListCustomImages(ctx, projectID)
 	if httpResp != nil {

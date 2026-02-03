@@ -17,7 +17,7 @@ type instanceGroupsDataSource struct {
 }
 
 type instanceGroupsDataSourceModel struct {
-	ProjectID      *string                        `tfsdk:"project_id"`
+	ProjectID      types.String                   `tfsdk:"project_id"`
 	InstanceGroups []instanceGroupDataSourceModel `tfsdk:"instance_groups"`
 }
 
@@ -136,7 +136,7 @@ func (ds *instanceGroupsDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
 	dataResp, httpResp, err := ds.client.APIClient.InstanceGroupsApi.ListInstanceGroups(ctx, projectID)
 	if httpResp != nil {
@@ -156,7 +156,7 @@ func (ds *instanceGroupsDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	var state instanceGroupsDataSourceModel
-	state.ProjectID = &projectID
+	state.ProjectID = types.StringValue(projectID)
 	state.InstanceGroups = make([]instanceGroupDataSourceModel, 0, len(dataResp.Items))
 
 	for i := range dataResp.Items {

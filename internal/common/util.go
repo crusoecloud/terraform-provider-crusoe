@@ -153,15 +153,6 @@ func GetProjectIDOrFallback(client *CrusoeClient, projectId string) string {
 	return client.ProjectID
 }
 
-func GetProjectIDFromPointerOrFallback(client *CrusoeClient, projectId *string) string {
-	projectIdStr := ""
-	if projectId != nil {
-		projectIdStr = *projectId
-	}
-
-	return GetProjectIDOrFallback(client, projectIdStr)
-}
-
 func ParseResourceIdentifiers(req tfResource.ImportStateRequest, client *CrusoeClient, resourceIDFieldName string) (resourceID, projectID, err string) {
 	// We allow "{resourceIDFieldName}" (implicit project_id via env variable) or "{resourceIDFieldName},project_id" (explicit project_id)
 	resourceIdentifiers := strings.Split(req.ID, ",")

@@ -400,37 +400,46 @@ Use Claude Code to generate comprehensive MR descriptions based on branch change
 
 ### MR Template
 
-The MR template is located at `.claude/mr-template.md` and includes sections for:
+```markdown
+# MR Title
 
-- MR Title (for GitLab title field, keep under 72 characters)
-- Recommended Squashed Commit Message
-- TL;DR with breaking changes table
-- Change Description
-- Testing Done
-- Risks / Follow Ups
-- AI Code Generation disclosure
-- Recommended Prompt for similar changes
+Short descriptive title (under 72 characters)
+
+# MR Description
+
+## Change description
+
+Description here
+
+## Linked JIRA issue
+
+Link to JIRA issue
+
+## Related / blocking changes
+
+MRs related to this change
+
+## Testing Done
+
+What testing have you done?
+
+## Risks / Follow Ups / Relevant subsequent tickets
+
+Any follow up issues to address? Potential security issues?
+
+## AI Code Generation
+
+Did you use any AI code generation tools? Please describe (which tool, model, and any other helpful context)
+
+Closes <TICKET-ID>
+```
 
 ### Generating an MR Description
 
-Use this prompt with Claude Code to generate an MR description for the current branch:
+Ask Claude Code to fill out the MR template for the current branch:
 
 ```
-Generate an MR description for this branch. Use the template at .claude/mr-template.md and:
-
-1. Compare all changes between main and HEAD (git diff main..HEAD, git log main..HEAD)
-2. List all files changed with their status (Added/Modified/Deleted)
-3. Fill out every section of the template with detailed information
-4. Include a breaking changes table if there are any breaking changes
-5. Add a files changed summary table in the TL;DR section
-6. Write a recommended prompt that would achieve these changes efficiently
-
-Save the output to .claude/MR Output/<branch-name>.md
+Fill out the MR template for the changes in this branch.
 ```
 
-### Output Location
-
-MR descriptions are saved to `.claude/MR Output/` which is gitignored. Copy the content to GitLab when creating your MR:
-
-- Use the **MR Title** section for the GitLab title field
-- Use everything from **TL;DR** onwards for the description body
+Claude will analyze `git diff main..HEAD` and `git log main..HEAD` and save the output to `.claude/MR Output/<branch-name>.md`, ready to paste into GitLab.

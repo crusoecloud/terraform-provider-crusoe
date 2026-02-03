@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
@@ -14,7 +15,7 @@ type vpcSubnetsDataSource struct {
 }
 
 type vpcSubnetsDataSourceModel struct {
-	ProjectID  *string           `tfsdk:"project_id"`
+	ProjectID  types.String      `tfsdk:"project_id"`
 	VPCSubnets []vpcSubnetsModel `tfsdk:"vpc_subnets"`
 }
 
@@ -91,7 +92,7 @@ func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
 	dataResp, httpResp, err := ds.client.APIClient.VPCSubnetsApi.ListVPCSubnets(ctx, projectID)
 	if httpResp != nil {

@@ -15,7 +15,7 @@ type vpcNetworksDataSource struct {
 }
 
 type vpcNetworksDataSourceModel struct {
-	ProjectID   *string            `tfsdk:"project_id"`
+	ProjectID   types.String       `tfsdk:"project_id"`
 	VPCNetworks []vpcNetworksModel `tfsdk:"vpc_networks"`
 }
 
@@ -93,7 +93,7 @@ func (ds *vpcNetworksDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
 	dataResp, httpResp, err := ds.client.APIClient.VPCNetworksApi.ListVPCNetworks(ctx, projectID)
 	if httpResp != nil {
