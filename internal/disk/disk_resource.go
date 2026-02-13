@@ -3,8 +3,6 @@ package disk
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -27,7 +25,6 @@ const (
 	defaultDiskType    = "<tf-default-disk-type>" // this is not a real value, used for validation logic to determine correct value
 	persistentSSD      = "persistent-ssd"
 	sharedVolume       = "shared-volume"
-	gibInTib           = 1024
 	alternateBlockSize = 512
 	defaultBlockSize   = 4096
 )
@@ -78,49 +75,57 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 		Version: 1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: descID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: descProjectID + " " + descProjectIDInference,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: descLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: descName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"type": schema.StringAttribute{
-				Optional:   true,
-				Computed:   true,
-				Default:    stringdefault.StaticString(defaultDiskType),
-				Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: descType + " " + descTypeRequired,
+				Default:             stringdefault.StaticString(defaultDiskType),
+				Validators:          []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 				PlanModifiers: []planmodifier.String{
 					diskTypeModifier{},
-					stringplanmodifier.RequiresReplace(), // cannot be updated in place
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"size": schema.StringAttribute{
-				Required:   true,
-				Validators: []validator.String{validators.StorageSizeValidator{}},
+				Required:            true,
+				MarkdownDescription: descSize,
+				Validators:          []validator.String{validators.StorageSizeValidator{}},
 			},
 			"serial_number": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: descSerialNumber,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"block_size": schema.Int64Attribute{
-				Optional:   true,
-				Computed:   true,
-				Validators: []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)}, // we support either 512 or 4096 bits
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: descBlockSize,
+				Validators:          []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)},
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplaceIfConfigured(), // cannot be updated in place
+					int64planmodifier.RequiresReplaceIfConfigured(),
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
@@ -144,9 +149,7 @@ func (r *diskResource) ImportState(ctx context.Context, req resource.ImportState
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan diskResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -190,24 +193,17 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	plan.ID = types.StringValue(disk.Id)
-	plan.Type = types.StringValue(disk.Type_)
-	plan.Location = types.StringValue(disk.Location)
-	plan.SerialNumber = types.StringValue(disk.SerialNumber)
-	plan.Size = types.StringValue(formatSize(plan.Size.ValueString(), disk.Size))
-	plan.ProjectID = types.StringValue(projectID)
-	plan.BlockSize = types.Int64Value(disk.BlockSize)
+	var state diskResourceModel
+	state.ProjectID = types.StringValue(projectID)
+	diskToTerraformResourceModel(disk, &state, plan.Size.ValueString())
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state diskResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -233,23 +229,19 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	diskToTerraformResourceModel(&disk, &state)
+	diskToTerraformResourceModel(&disk, &state, state.Size.ValueString())
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state diskResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan diskResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -280,16 +272,13 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state diskResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -311,29 +300,4 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 		return
 	}
-}
-
-// formatSize takes a format size to use as a pattern and converts the sizeStr to match it.
-func formatSize(format, sizeStr string) string {
-	lowerFormatSize := strings.ToLower(format)
-	lowerSize := strings.ToLower(sizeStr)
-	if strings.HasSuffix(lowerFormatSize, "tib") && strings.HasSuffix(lowerSize, "gib") {
-		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil &&
-			size >= gibInTib && size%gibInTib == 0 {
-
-			return strconv.Itoa(size/gibInTib) + "TiB"
-		}
-
-		return sizeStr
-	}
-
-	if strings.HasSuffix(lowerFormatSize, "gib") && strings.HasSuffix(lowerSize, "tib") {
-		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil {
-			return strconv.Itoa(size*gibInTib) + "GiB"
-		}
-
-		return sizeStr
-	}
-
-	return sizeStr
 }

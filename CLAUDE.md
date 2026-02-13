@@ -175,6 +175,30 @@ Always use `common.UnpackAPIError(err)` for API errors (not `err.Error()`).
 
 Extract shared descriptions to constants in `util.go` when the same description is used in both resource and data source schemas.
 
+**Style guidelines** (following patterns from popular Terraform providers):
+
+- Start directly with the noun, not "The" (e.g., "Name of the disk." not "The name of the disk.")
+- Use "of the [resource]" pattern for clarity
+- Keep descriptions concise - one sentence when possible
+- List possible values inline with backticks: `Possible values: \`value1\`, \`value2\`.`
+- Split default/inference behavior into separate constants that can be appended
+
+```go
+const (
+    descID                 = "Unique identifier of the disk."
+    descName               = "Name of the disk."
+    descProjectID          = "ID of the project the disk belongs to."
+    descProjectIDInference = "If not specified, the project ID will be inferred from the Crusoe configuration."
+    descType               = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
+    descSize               = "Storage capacity of the disk (e.g., `100GiB`, `1TiB`)."
+)
+
+// Usage in schema - combine base description with inference note
+"project_id": schema.StringAttribute{
+    MarkdownDescription: descProjectID + " " + descProjectIDInference,
+}
+```
+
 ### Deprecated Fields
 
 See [Breaking Changes Policy](#breaking-changes-policy) for when to use deprecation vs removal.

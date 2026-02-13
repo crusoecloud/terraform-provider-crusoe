@@ -17,17 +17,17 @@ description: |-
 
 ### Required
 
-- `location` (String)
-- `name` (String)
-- `size` (String)
+- `location` (String) Location where the disk is deployed.
+- `name` (String) Name of the disk.
+- `size` (String) Storage capacity of the disk (e.g., `100GiB`, `1TiB`).
 
 ### Optional
 
-- `block_size` (Number)
-- `project_id` (String)
-- `type` (String)
+- `block_size` (Number) Block size of the disk in bytes. Possible values: `512`, `4096`.
+- `project_id` (String) ID of the project the disk belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `type` (String) Type of the disk. Possible values: `persistent-ssd`, `shared-volume`. This field will be required in a future release.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `serial_number` (String)
+- `id` (String) Unique identifier of the disk.
+- `serial_number` (String) Serial number assigned to the disk.

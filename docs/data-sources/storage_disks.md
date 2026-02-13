@@ -17,20 +17,17 @@ description: |-
 
 ### Read-Only
 
-- `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
+- `disks` (Attributes List) List of disks in the project. (see [below for nested schema](#nestedatt--disks))
 
 <a id="nestedatt--disks"></a>
 ### Nested Schema for `disks`
 
-Required:
-
-- `location` (String)
-- `name` (String)
-- `size` (String)
-- `type` (String)
-
 Read-Only:
 
-- `block_size` (Number)
-- `id` (String)
-- `serial_number` (String)
+- `block_size` (Number) Block size of the disk in bytes. Possible values: `512`, `4096`.
+- `id` (String) Unique identifier of the disk.
+- `location` (String) Location where the disk is deployed.
+- `name` (String) Name of the disk.
+- `serial_number` (String) Serial number assigned to the disk.
+- `size` (String) Storage capacity of the disk (e.g., `100GiB`, `1TiB`).
+- `type` (String) Type of the disk. Possible values: `persistent-ssd`, `shared-volume`.

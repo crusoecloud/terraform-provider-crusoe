@@ -56,36 +56,46 @@ func (ds *disksDataSource) Metadata(ctx context.Context, request datasource.Meta
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *disksDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"disks": schema.ListNestedAttribute{
-			Computed: true,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: map[string]schema.Attribute{
-					"id": schema.StringAttribute{
-						Computed: true,
-					},
-					"name": schema.StringAttribute{
-						Required: true,
-					},
-					"location": schema.StringAttribute{
-						Required: true,
-					},
-					"type": schema.StringAttribute{
-						Required: true,
-					},
-					"size": schema.StringAttribute{
-						Required: true,
-					},
-					"serial_number": schema.StringAttribute{
-						Computed: true,
-					},
-					"block_size": schema.Int64Attribute{
-						Computed: true,
+	response.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"disks": schema.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "List of disks in the project.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: descID,
+						},
+						"name": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: descName,
+						},
+						"location": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: descLocation,
+						},
+						"type": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: descType,
+						},
+						"size": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: descSize,
+						},
+						"serial_number": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: descSerialNumber,
+						},
+						"block_size": schema.Int64Attribute{
+							Computed:            true,
+							MarkdownDescription: descBlockSize,
+						},
 					},
 				},
 			},
 		},
-	}}
+	}
 }
 
 //nolint:gocritic // Implements Terraform defined interface
