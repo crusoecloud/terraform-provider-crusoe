@@ -1,3 +1,38 @@
+## 0.5.46
+
+Re-release of v0.5.45 to fix Terraform registry caching issues.
+
+## 0.5.45
+
+ENHANCEMENTS:
+
+- Consolidated project ID fallback helpers across data sources for improved code consistency
+
+BUG FIXES:
+
+- Fixed disk resource to preserve user's size format (TiB vs GiB) instead of normalizing to GiB
+- Fixed potential HTTP response body memory leaks with nil-safe close pattern across all resources
+
+## 0.5.44
+
+ENHANCEMENTS:
+
+- Added support for public and private IP types in Kubernetes clusters and node pools
+
+BUG FIXES:
+
+- N/A
+
+## 0.5.43
+
+ENHANCEMENTS:
+
+- N/A
+
+BUG FIXES:
+
+- **Deprecated:** The `reservation_id` field for VM and instance template resources is now deprecated
+
 ## 0.5.42
 
 ENHANCEMENTS:
@@ -52,6 +87,44 @@ BUG FIXES:
 - Fix config file parsing issue when decoding top-level `profile=` separately from the rest of the config struct
 - Add `ImmutableStringModifier` plan modifier for Kubernetes cluster `version` attribute to block in-place version changes with a clear error message instead of silently destroying and recreating clusters
 - Make container registry `project_id` attribute computed
+
+## 0.5.38
+
+- Release pipeline fix
+
+## 0.5.37
+
+- Documentation updates
+
+## 0.5.36
+
+ENHANCEMENTS:
+
+- Add NVLink domain support for VMs, instance templates, and VMs created by template
+
+BUG FIXES:
+
+- N/A
+
+## 0.5.35
+
+ENHANCEMENTS:
+
+- Add support for containerd ephemeral storage with configurable NVMe disk usage for Kubernetes node pools
+
+BUG FIXES:
+
+- N/A
+
+## 0.5.34
+
+ENHANCEMENTS:
+
+- Add project ID fallback support for VPC subnet read/delete and VPC network delete operations
+
+BUG FIXES:
+
+- N/A
 
 ## 0.5.33
 

@@ -104,11 +104,29 @@ We welcome (and have already had several!) open-source contributions to the Crus
 Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 1. Make a branch off `main` and open a pull request from your branch into `main`.
 2. A Crusoe Cloud maintainer will review the pull request and, once approved, merge it into the `main` branch.
-3. Once your pull request has been approved, make a separate pull request to add your changes to the changelog into the `main` branch. There will be an (Unreleased) version that you can add your changes to.
-4. To release your changes, you can make a separate pull request from the `main` branch into the `release` branch. Merges into the release branch trigger our `goreleaser` job which handles distributing a new version.
-5. Once the pull request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits. It will cause the `main` branch and `release` branch to diverge.
-6. A separate pull request will be made by a Crusoe Cloud maintainer to update the changelog with the date the newest version has been released.
+3. To release: open a pull request from `main` into `release`. This PR must include a changelog entry for the new version (see Maintaining Changelog below).
+4. Once the pull request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
 
 ## Maintaining Changelog
 
 The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
+
+**Every merge to the `release` branch must include a changelog entry.** To add an entry:
+
+1. Open `CHANGELOG.md` and add a new version section at the top
+2. Increment the version number from the previous release (e.g., `0.5.45` → `0.5.46`)
+3. Use the following format:
+
+```markdown
+## X.Y.Z
+
+ENHANCEMENTS:
+
+- Description of new features or improvements
+
+BUG FIXES:
+
+- Description of bug fixes
+```
+
+Use `- N/A` if there are no enhancements or bug fixes for that category. Keep descriptions concise but informative.
