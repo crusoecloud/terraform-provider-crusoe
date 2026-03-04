@@ -1,2 +1,5 @@
 .gitlab/CODEOWNERS @crusoeenergy/squads/ccx
-/* @crusoeenergy/squads/ccx
+.gitlab-ci.yml @crusoeenergy/squads/ccx
+.golangci-lint.yml @crusoeenergy/squads/ccx
+Makefile @crusoeenergy/squads/ccx
+Dockerfile* @crusoeenergy/squads/ccx
