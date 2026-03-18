@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
@@ -16,6 +17,7 @@ type ibNetworksDataSource struct {
 }
 
 type ibNetworksDataSourceModel struct {
+	ProjectID  types.String     `tfsdk:"project_id"`
 	IBNetworks []ibNetworkModel `tfsdk:"ib_networks"`
 }
 
@@ -57,6 +59,9 @@ func (ds *ibNetworksDataSource) Metadata(ctx context.Context, request datasource
 
 func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
+		"project_id": schema.StringAttribute{
+			Optional: true,
+		},
 		"ib_networks": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
@@ -90,7 +95,16 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 }
 
 func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	dataResp, httpResp, err := ds.client.APIClient.IBNetworksApi.ListIBNetworks(ctx, ds.client.ProjectID)
+	var config ibNetworksDataSourceModel
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
+
+	dataResp, httpResp, err := ds.client.APIClient.IBNetworksApi.ListIBNetworks(ctx, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
@@ -118,6 +132,6 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 		})
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

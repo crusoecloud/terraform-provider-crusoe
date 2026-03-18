@@ -36,6 +36,35 @@ In the above, we have specified two profiles, where profile1 will be used as the
 
 You may set which profile you use with the environment variable `CRUSOE_PROFILE` like `export CRUSOE_PROFILE=profile2`
 
+## Provider Configuration
+
+The provider block supports optional `profile` and `project` attributes:
+
+```hcl
+provider "crusoe" {
+  profile = "production"  # Optional: profile from ~/.crusoe/config
+  project = "my-project"  # Optional: project name or UUID
+}
+```
+
+### Project Precedence
+
+The project used for resources is determined by the following precedence (highest to lowest):
+
+1. `project_id` attribute on individual resource/data source (UUID)
+2. `project` argument in provider block (name or UUID)
+3. `CRUSOE_DEFAULT_PROJECT` environment variable (name or UUID)
+4. `default_project` from selected profile in `~/.crusoe/config`
+
+### Profile Precedence
+
+The profile used for credentials is determined by:
+
+1. `profile` argument in provider block
+2. `CRUSOE_PROFILE` environment variable
+3. `profile` key in config file (top-level)
+4. `"default"`
+
 Then, add the following to the start of your terraform file, for example `main.tf`:
 
 ```
@@ -93,10 +122,35 @@ Other common commands are: `terraform init` to initialize your working directory
 
 ## Versioning
 
-A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub. 
+A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub.
 This generates a new tag and triggers our `goreleaser` pipeline which will handle distributing the new Terraform version.
 
-Our `main` branch is primarily used for development. Once features are ready to be deployed, a Crusoe Cloud maintainer will merge the changes from `main` into `release` to deploy a new version. 
+Our `main` branch is primarily used for development. Once features are ready to be deployed, a Crusoe Cloud maintainer will merge the changes from `main` into `release` to deploy a new version.
+
+### Semantic Versioning
+
+This provider follows semantic versioning (MAJOR.MINOR.PATCH):
+
+- **MAJOR** (1.0.0 → 2.0.0): Breaking changes that require user action
+- **MINOR** (0.5.0 → 0.6.0): New features, new resources/data sources, new attributes
+- **PATCH** (0.5.42 → 0.5.43): Bug fixes, documentation updates, internal refactoring
+
+Examples:
+- New provider attribute → minor bump (0.5.42 → 0.6.0)
+- New resource or data source → minor bump
+- Bug fix → patch bump
+- Breaking schema change → major bump (with UPGRADE NOTES in changelog)
+
+### `versions.env`
+
+The `versions.env` file at the repository root defines the current major and minor version numbers:
+
+```bash
+export MAJOR_VERSION=0
+export MINOR_VERSION=6
+```
+
+Update this file **only for major or minor version bumps** when merging to `release`. Patch versions are auto-incremented by the release pipeline.
 
 ## Contributing
 
@@ -115,18 +169,30 @@ The Crusoe Cloud changelog follows [Hashicorp's best practices](https://develope
 
 1. Open `CHANGELOG.md` and add a new version section at the top
 2. Increment the version number from the previous release (e.g., `0.5.45` → `0.5.46`)
-3. Use the following format:
+3. Follow the category and format guidelines below
+
+### Changelog Categories
+
+Only include categories that have entries. Use dash-prefixed bullets. Keep descriptions concise but informative.
+
+- `ENHANCEMENTS:` - Smaller features added to an existing resource or data source, such as a new attribute.
+- `BUG FIXES:` - Any bugs that were fixed.
+- `NEW FEATURES:` - Major new improvements such as a new resource or data source.
+- `UPGRADE NOTES:` - Breaking or incompatible changes and how to handle them.
+
+### Example
 
 ```markdown
-## X.Y.Z
+## 0.6.0
 
 ENHANCEMENTS:
 
-- Description of new features or improvements
-
-BUG FIXES:
-
-- Description of bug fixes
+- Added `profile` attribute to provider block for config file profile selection
 ```
 
-Use `- N/A` if there are no enhancements or bug fixes for that category. Keep descriptions concise but informative.
+### When a Changelog Entry is Needed
+
+- New provider/resource/data source attributes
+- Behavioral changes
+- Bug fixes
+- Breaking changes (always include UPGRADE NOTES)

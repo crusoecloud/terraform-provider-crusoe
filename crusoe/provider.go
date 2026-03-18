@@ -42,6 +42,8 @@ type crusoeProvider struct{}
 
 type crusoeProviderModel struct {
 	ApiEndpoint types.String `tfsdk:"api_endpoint"`
+	Profile     types.String `tfsdk:"profile"`
+	Project     types.String `tfsdk:"project"`
 }
 
 func New() provider.Provider {
@@ -56,9 +58,19 @@ func (p *crusoeProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 // Schema defines the provider-level schema for configuration data.
 func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		MarkdownDescription: "The Crusoe Cloud provider enables management of Crusoe Cloud resources.",
 		Attributes: map[string]schema.Attribute{
 			"api_endpoint": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.crusoecloud.com/v1alpha5`. Can also be set via `CRUSOE_API_ENDPOINT` environment variable.",
+			},
+			"profile": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "The name of the profile to use from `~/.crusoe/config`. When specified, credentials and default_project are loaded from this profile. Takes precedence over `CRUSOE_PROFILE` environment variable.",
+			},
+			"project": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "The default project for resources. Can be a project name or UUID (resolved to UUID internally). Can be overridden per-resource via `project_id`. Takes precedence over `CRUSOE_DEFAULT_PROJECT` environment variable.",
 			},
 		},
 	}
@@ -117,12 +129,28 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
+	// Warn if empty string explicitly provided (helps catch config mistakes)
+	if !config.Profile.IsNull() && config.Profile.ValueString() == "" {
+		resp.Diagnostics.AddWarning("Empty profile value",
+			"Empty string provided for 'profile' in provider block, falling back to CRUSOE_PROFILE env or config file default.")
+	}
+	if !config.Project.IsNull() && config.Project.ValueString() == "" {
+		resp.Diagnostics.AddWarning("Empty project value",
+			"Empty string provided for 'project' in provider block, falling back to CRUSOE_DEFAULT_PROJECT env or profile default.")
+	}
+
 	if updateMessage := common.GetUpdateMessageIfValid(context.Background()); updateMessage != "" {
 		resp.Diagnostics.AddWarning("Update Available",
 			fmt.Sprintf("There is a newer version available for the Crusoe Terraform Provider.\n%s", updateMessage))
 	}
 
-	clientConfig, err := common.GetConfig()
+	// Build config options from provider block
+	opts := common.ConfigOptions{
+		Profile: config.Profile.ValueString(),
+		Project: config.Project.ValueString(),
+	}
+
+	clientConfig, err := common.GetConfigWithOptions(opts)
 	if err != nil {
 		// only show a warning, since it's possible that we can't read their home dir (which is unexpected) but
 		// they have everything set via env variables, so we can still proceed.
@@ -133,21 +161,21 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	if clientConfig.AccessKeyID == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("access_key"),
+			path.Root("profile"),
 			"Missing Crusoe API Key",
 			"The provider cannot create the Crusoe API client as there is a missing or empty value for the Crusoe API key. "+
-				"Set the value in ~/.crusoe/config or use the CRUSOE_ACCESS_KEY_ID environment variable. "+
-				"If either is already set, ensure the value is not empty.",
+				"Set the value in ~/.crusoe/config, use the CRUSOE_ACCESS_KEY_ID environment variable, "+
+				"or specify a profile in the provider block. If already set, ensure the value is not empty.",
 		)
 	}
 
 	if clientConfig.SecretKey == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("secret_key"),
+			path.Root("profile"),
 			"Missing Crusoe API Secret",
 			"The provider cannot create the Crusoe API client as there is a missing or empty value for the Crusoe API secret. "+
-				"Set the value in ~/.crusoe/config or use the CRUSOE_SECRET_KEY environment variable. "+
-				"If either is already set, ensure the value is not empty.",
+				"Set the value in ~/.crusoe/config, use the CRUSOE_SECRET_KEY environment variable, "+
+				"or specify a profile in the provider block. If already set, ensure the value is not empty.",
 		)
 	}
 
@@ -178,9 +206,9 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 		if getError == nil {
 			resp.Diagnostics.AddAttributeWarning(
-				path.Root("default_project"),
+				path.Root("project"),
 				"Using Fallback Project",
-				fmt.Sprintf("The provider did not find a default project specified in the configuration file and will use %s as the fallback project.\n\nSet default_project=%q in ~/.crusoe/config.", projectName, projectName),
+				fmt.Sprintf("The provider did not find a default project specified and will use %q as the fallback project.\n\nSet 'project' in the provider block, CRUSOE_DEFAULT_PROJECT env, or default_project in ~/.crusoe/config.", projectName),
 			)
 		}
 	}
@@ -191,24 +219,24 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 		if err != nil {
 			resp.Diagnostics.AddAttributeError(
-				path.Root("access_key_id"),
+				path.Root("profile"),
 				"Failed to auth user",
-				fmt.Sprintf("The provider failed to get the users identity for config profile %q. \n\nError: %s \n\nCheck config in ~/.crusoe/config.", clientConfig.ProfileName, err.Error()))
+				fmt.Sprintf("The provider failed to get the users identity for config profile %q. \n\nError: %s \n\nCheck config in ~/.crusoe/config or verify the profile in the provider block.", clientConfig.ProfileName, err.Error()))
 		} else {
 			userId = user.Identity.Email
 		}
 
 		if clientConfig.DefaultProject == "" {
 			resp.Diagnostics.AddAttributeError(
-				path.Root("default_project"),
-				fmt.Sprintf("The provider did not find a default project specified in the configuration file and failed to infer a fallback project for the authenticated user (%s)", userId),
-				fmt.Sprintf("Error: %s \n\nSet the value of default_project in ~/.crusoe/config.", getError.Error()),
+				path.Root("project"),
+				fmt.Sprintf("The provider did not find a default project specified and failed to infer a fallback project for the authenticated user (%s)", userId),
+				fmt.Sprintf("Error: %s \n\nSet 'project' in the provider block, CRUSOE_DEFAULT_PROJECT env, or default_project in ~/.crusoe/config.", getError.Error()),
 			)
 		} else {
 			resp.Diagnostics.AddAttributeError(
-				path.Root("default_project"),
+				path.Root("project"),
 				fmt.Sprintf("Failed to resolve the project for the authenticated user (%s)", userId),
-				fmt.Sprintf("Error: %s \n\nCheck the value of default_project in ~/.crusoe/config.", getError.Error()),
+				fmt.Sprintf("Error: %s \n\nCheck the value of 'project' in the provider block or default_project in ~/.crusoe/config.", getError.Error()),
 			)
 		}
 

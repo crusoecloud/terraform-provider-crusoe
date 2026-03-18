@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -15,7 +16,8 @@ type disksDataSource struct {
 }
 
 type disksDataSourceModel struct {
-	Disks []diskModel `tfsdk:"disks"`
+	ProjectID types.String `tfsdk:"project_id"`
+	Disks     []diskModel  `tfsdk:"disks"`
 }
 
 type diskModel struct {
@@ -58,6 +60,9 @@ func (ds *disksDataSource) Metadata(ctx context.Context, request datasource.Meta
 func (ds *disksDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"project_id": schema.StringAttribute{
+				Optional: true,
+			},
 			"disks": schema.ListNestedAttribute{
 				Computed:            true,
 				MarkdownDescription: "List of disks in the project.",
@@ -100,7 +105,16 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	dataResp, httpResp, err := ds.client.APIClient.DisksApi.ListDisks(ctx, ds.client.ProjectID, &swagger.DisksApiListDisksOpts{})
+	var config disksDataSourceModel
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
+
+	dataResp, httpResp, err := ds.client.APIClient.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
@@ -123,6 +137,6 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		})
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

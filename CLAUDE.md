@@ -41,7 +41,7 @@ This file provides guidance to Claude Code when working with this Terraform prov
     - [Terraform Integration Tests](#terraform-integration-tests)
   - [Code Style](#code-style)
     - [Common Lint Errors](#common-lint-errors)
-  - [Changelog](#changelog)
+  - [Changelog and Versioning](#changelog-and-versioning)
   - [Creating Merge Request Descriptions](#creating-merge-request-descriptions)
     - [MR Template](#mr-template)
     - [Generating an MR Description](#generating-an-mr-description)
@@ -419,31 +419,11 @@ Watch out for these frequently triggered lint errors:
 - **gofumpt**: Using `var x =` instead of `x :=` for short variable declarations
 - **gocritic/hugeParam**: Triggered when implementing Terraform Plugin Framework interfaces (e.g., validators) where the signature is fixed. Use `//nolint:gocritic // hugeParam: <param> signature required by <interface>`. Example: `//nolint:gocritic // hugeParam: req signature required by validator.String interface`
 
-## Changelog
+## Changelog and Versioning
 
-The changelog is maintained in `CHANGELOG.md` at the repository root.
+Update `CHANGELOG.md` and `versions.env` **only when merging to the `release` branch**, not when merging to `main`.
 
-**Update the changelog before every merge to the `release` branch.** To add an entry:
-
-1. Add a new version section at the top of `CHANGELOG.md`
-2. Increment the version number from the previous release
-3. Use this format:
-
-```markdown
-## X.Y.Z
-
-ENHANCEMENTS:
-
-- Description of new features or improvements
-
-BUG FIXES:
-
-- Description of bug fixes
-```
-
-- Use `- N/A` if there are no enhancements or bug fixes for that category
-- Keep descriptions concise but informative
-- Reference the [Hashicorp changelog best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning)
+See [readme.md](readme.md) (Versioning and Maintaining Changelog sections) for full details on semantic versioning rules, `versions.env` format, changelog categories, and examples.
 
 ## Creating Merge Request Descriptions
 
@@ -493,4 +473,4 @@ Ask Claude Code to fill out the MR template for the current branch:
 Fill out the MR template for the changes in this branch.
 ```
 
-Claude will analyze `git diff main..HEAD` and `git log main..HEAD` and save the output to `.claude/MR Output/<branch-name>.md`, ready to paste into GitLab.
+Claude will analyze `git diff main..HEAD` and `git log main..HEAD` and save the output to `.claude/mr-output/<branch-name>.md`, ready to paste into GitLab.

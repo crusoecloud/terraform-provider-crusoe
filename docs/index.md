@@ -3,12 +3,12 @@
 page_title: "crusoe Provider"
 subcategory: ""
 description: |-
-  
+  The Crusoe Cloud provider enables management of Crusoe Cloud resources.
 ---
 
 # crusoe Provider
 
-
+The Crusoe Cloud provider enables management of Crusoe Cloud resources.
 
 
 
@@ -17,4 +17,6 @@ description: |-
 
 ### Optional
 
-- `api_endpoint` (String)
+- `api_endpoint` (String) The Crusoe API endpoint. Defaults to `https://api.crusoecloud.com/v1alpha5`. Can also be set via `CRUSOE_API_ENDPOINT` environment variable.
+- `profile` (String) The name of the profile to use from `~/.crusoe/config`. When specified, credentials and default_project are loaded from this profile. Takes precedence over `CRUSOE_PROFILE` environment variable.
+- `project` (String) The default project for resources. Can be a project name or UUID (resolved to UUID internally). Can be overridden per-resource via `project_id`. Takes precedence over `CRUSOE_DEFAULT_PROJECT` environment variable.

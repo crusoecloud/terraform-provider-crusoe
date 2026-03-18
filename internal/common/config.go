@@ -23,18 +23,53 @@ type Config struct {
 	DefaultProject   string `toml:"default_project"`
 }
 
-// GetConfig populates a config struct based on default values, the user's Crusoe config file, and environment variables,
-// in ascending priority. The config file used is ~/.crusoe/config.
+// ConfigOptions allows overriding config defaults from the provider block.
+// Empty strings are treated as "not specified" and fall through to the next precedence level.
+type ConfigOptions struct {
+	// Profile specifies which profile to load from ~/.crusoe/config.
+	// Precedence: opts.Profile > CRUSOE_PROFILE env > config file "profile" key > "default"
+	Profile string
+
+	// Project specifies the default project (name or UUID).
+	// Precedence: opts.Project > CRUSOE_DEFAULT_PROJECT env > profile's default_project
+	Project string
+
+	// ConfigPath overrides the default ~/.crusoe/config path. Empty uses default.
+	ConfigPath string
+}
+
+// GetConfig populates a config struct based on default values, the user's Crusoe config file, and environment variables.
+// This is a convenience wrapper for GetConfigWithOptions with no options.
 func GetConfig() (*Config, error) {
+	return GetConfigWithOptions(ConfigOptions{})
+}
+
+// GetConfigWithOptions populates a config struct based on default values, the user's Crusoe config file,
+// provider options, and environment variables. The config file used is ~/.crusoe/config.
+//
+// Precedence for profile selection (highest to lowest):
+//  1. opts.Profile (from provider block)
+//  2. CRUSOE_PROFILE environment variable
+//  3. "profile" key in config file
+//  4. "default"
+//
+// Precedence for project selection (highest to lowest):
+//  1. opts.Project (from provider block)
+//  2. CRUSOE_DEFAULT_PROJECT environment variable
+//  3. default_project from selected profile
+func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 	config := Config{
 		ApiEndpoint: defaultApiEndpoint,
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to find home dir: %w", err)
+	configPath := opts.ConfigPath
+	if configPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to find home dir: %w", err)
+		}
+		configPath = homeDir + configFilePath
 	}
-	configPath := homeDir + configFilePath
 
 	var rawData map[string]interface{}
 	// Missing config/invalid config file is valid - credentials can come from env vars
@@ -81,12 +116,16 @@ func GetConfig() (*Config, error) {
 		profilesMap[key] = profileConfig
 	}
 
+	// Profile precedence: provider block > env var > config file > "default"
 	profileName := "default"
 	if topLevelProfile != "" {
 		profileName = topLevelProfile
 	}
 	if envProfile := os.Getenv("CRUSOE_PROFILE"); envProfile != "" {
 		profileName = envProfile
+	}
+	if opts.Profile != "" {
+		profileName = opts.Profile
 	}
 
 	config.ProfileName = profileName
@@ -109,22 +148,24 @@ func GetConfig() (*Config, error) {
 		}
 	}
 
-	accessKey := os.Getenv("CRUSOE_ACCESS_KEY_ID")
-	secretKey := os.Getenv("CRUSOE_SECRET_KEY")
-	apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT")
-	defaultProject := os.Getenv("CRUSOE_DEFAULT_PROJECT")
-
-	if accessKey != "" {
+	// Environment variables for credentials and API endpoint (always override profile)
+	if accessKey := os.Getenv("CRUSOE_ACCESS_KEY_ID"); accessKey != "" {
 		config.AccessKeyID = accessKey
 	}
-	if secretKey != "" {
+	if secretKey := os.Getenv("CRUSOE_SECRET_KEY"); secretKey != "" {
 		config.SecretKey = secretKey
 	}
-	if apiEndpoint != "" {
+	if apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT"); apiEndpoint != "" {
 		config.ApiEndpoint = apiEndpoint
 	}
-	if defaultProject != "" {
+
+	// Project precedence: provider block > CRUSOE_DEFAULT_PROJECT env > profile default
+	// At this point, config.DefaultProject contains the profile's default_project (if any)
+	if defaultProject := os.Getenv("CRUSOE_DEFAULT_PROJECT"); defaultProject != "" && opts.Project == "" {
 		config.DefaultProject = defaultProject
+	}
+	if opts.Project != "" {
+		config.DefaultProject = opts.Project
 	}
 
 	return &config, nil

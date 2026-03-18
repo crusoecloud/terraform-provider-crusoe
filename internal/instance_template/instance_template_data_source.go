@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
@@ -14,6 +15,7 @@ type instanceTemplatesDataSource struct {
 }
 
 type instanceTemplatesDataSourceModel struct {
+	ProjectID         types.String             `tfsdk:"project_id"`
 	InstanceTemplates []instanceTemplatesModel `tfsdk:"instance_templates"`
 }
 
@@ -68,6 +70,9 @@ func (ds *instanceTemplatesDataSource) Metadata(ctx context.Context, request dat
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
+		"project_id": schema.StringAttribute{
+			Optional: true,
+		},
 		"instance_templates": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
@@ -142,7 +147,16 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	dataResp, httpResp, err := ds.client.APIClient.InstanceTemplatesApi.ListInstanceTemplates(ctx, ds.client.ProjectID)
+	var config instanceTemplatesDataSourceModel
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
+
+	dataResp, httpResp, err := ds.client.APIClient.InstanceTemplatesApi.ListInstanceTemplates(ctx, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
@@ -182,6 +196,6 @@ func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.
 		})
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
