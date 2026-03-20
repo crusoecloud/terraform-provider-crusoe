@@ -148,7 +148,7 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"disks": schema.SetNestedAttribute{
-				Required: true,
+				Optional: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"size": schema.StringAttribute{
@@ -206,19 +206,22 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	tDisks := make([]diskToCreateResourceModel, 0, len(plan.DisksToCreate.Elements()))
-	diags = plan.DisksToCreate.ElementsAs(ctx, &tDisks, true)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	var disksToCreate []swagger.DiskTemplate
+	if !plan.DisksToCreate.IsNull() && !plan.DisksToCreate.IsUnknown() {
+		tDisks := make([]diskToCreateResourceModel, 0, len(plan.DisksToCreate.Elements()))
+		diags = plan.DisksToCreate.ElementsAs(ctx, &tDisks, true)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 
-	disksToCreate := make([]swagger.DiskTemplate, 0, len(tDisks))
-	for _, disk := range tDisks {
-		disksToCreate = append(disksToCreate, swagger.DiskTemplate{
-			Size:  disk.Size.ValueString(),
-			Type_: disk.Type.ValueString(),
-		})
+		disksToCreate = make([]swagger.DiskTemplate, 0, len(tDisks))
+		for _, disk := range tDisks {
+			disksToCreate = append(disksToCreate, swagger.DiskTemplate{
+				Size:  disk.Size.ValueString(),
+				Type_: disk.Type.ValueString(),
+			})
+		}
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
@@ -277,8 +280,10 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	}
 	if len(disksToCreateResource) > 0 {
 		plan.DisksToCreate, _ = types.SetValueFrom(ctx, diskToCreateSchema, disksToCreateResource)
-	} else {
+	} else if plan.DisksToCreate.IsNull() {
 		plan.DisksToCreate = types.SetNull(diskToCreateSchema)
+	} else {
+		plan.DisksToCreate, _ = types.SetValueFrom(ctx, diskToCreateSchema, []diskToCreateResourceModel{})
 	}
 
 	diags = resp.State.Set(ctx, &plan)
@@ -323,8 +328,10 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	if len(disks) > 0 {
 		tDisks, _ := types.SetValueFrom(context.Background(), diskToCreateSchema, disks)
 		state.DisksToCreate = tDisks
-	} else {
+	} else if state.DisksToCreate.IsNull() {
 		state.DisksToCreate = types.SetNull(diskToCreateSchema)
+	} else {
+		state.DisksToCreate, _ = types.SetValueFrom(context.Background(), diskToCreateSchema, []diskToCreateResourceModel{})
 	}
 
 	state.Name = types.StringValue(instanceTemplate.Name)
