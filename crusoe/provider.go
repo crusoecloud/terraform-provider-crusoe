@@ -33,6 +33,7 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/manifest"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/repository"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/token"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/s3_bucket"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_subnet"
@@ -95,6 +96,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		image.NewRegistryImagesDataSource,
 		manifest.NewRegistryManifestsDataSource,
 		token.NewRegistryTokensDataSource,
+		s3_bucket.NewS3BucketsDataSource,
 	}
 }
 
@@ -117,6 +119,7 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		kubernetes_node_pool.NewKubernetesNodePoolResource,
 		repository.NewRegistryRepositoryResource,
 		token.NewRegistryTokenResource,
+		s3_bucket.NewS3BucketResource,
 	}
 }
 

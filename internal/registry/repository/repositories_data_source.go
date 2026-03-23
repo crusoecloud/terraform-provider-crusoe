@@ -87,7 +87,7 @@ func (ds *registryRepositoriesDataSource) Read(ctx context.Context, request data
 
 	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-	repos, httpResp, err := ds.client.APIClient.CcrApi.ListCcrRepositories(ctx, projectID)
+	repos, httpResp, err := ds.client.APIClient.CcrApi.ListCcrRepositories(ctx, projectID, nil)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
