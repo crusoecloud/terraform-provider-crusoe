@@ -148,22 +148,30 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			},
 			"batch_size": schema.Int64Attribute{
 				Optional: true,
-				Description: "Number of nodes to update at a time during rollout (minimum 1, maximum 10). " +
+				MarkdownDescription: common.DevelopmentMessage + " " +
+					"Number of nodes to update at a time during rollout (minimum 1, maximum 10). " +
 					"Mutually exclusive with batch_percentage. " +
 					"If both this and batch_percentage are omitted, existing nodes will not be updated, " +
 					"but new nodes will use the new configuration.",
 				Validators: []validator.Int64{
 					int64validator.Between(1, 10),
 				},
+				PlanModifiers: []planmodifier.Int64{
+					common.NewDevelopmentWarningInt64Modifier("", "Node pool rollout is currently in development. "+common.DevelopmentSupportMessage),
+				},
 			},
 			"batch_percentage": schema.Int64Attribute{
 				Optional: true,
-				Description: "Percentage of nodes to update concurrently during rollout. " +
+				MarkdownDescription: common.DevelopmentMessage + " " +
+					"Percentage of nodes to update concurrently during rollout. " +
 					"The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. " +
 					"If both this and batch_size are omitted, existing nodes will not be updated, " +
 					"but new nodes will use the new configuration.",
 				Validators: []validator.Int64{
 					int64validator.Between(1, 100),
+				},
+				PlanModifiers: []planmodifier.Int64{
+					common.NewDevelopmentWarningInt64Modifier("", "Node pool rollout is currently in development. "+common.DevelopmentSupportMessage),
 				},
 			},
 			"nvlink_domain_id": schema.StringAttribute{
@@ -415,8 +423,7 @@ func (r *kubernetesNodePoolResource) ModifyPlan(ctx context.Context, req resourc
 	if plan.BatchSize.IsNull() && plan.BatchPercentage.IsNull() {
 		resp.Diagnostics.AddWarning(
 			"Existing nodes will not be updated",
-			"Neither batch_size nor batch_percentage is specified. "+
-				"Existing nodes will not be updated to the new configuration, "+
+			"Existing nodes will not be updated to the new configuration, "+
 				"but new nodes will use the new configuration.",
 		)
 
