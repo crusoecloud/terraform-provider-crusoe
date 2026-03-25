@@ -184,6 +184,203 @@ func TestImmutableStringModifier_ErrorMessageFormat(t *testing.T) {
 	}
 }
 
+func TestNewDevelopmentWarningInt64Modifier_Defaults(t *testing.T) {
+	tests := []struct {
+		name            string
+		summary         string
+		message         string
+		expectedSummary string
+		expectedMessage string
+	}{
+		{
+			name:            "uses defaults when empty strings provided",
+			summary:         "",
+			message:         "",
+			expectedSummary: defaultDevWarningSummary,
+			expectedMessage: DevelopmentMessage,
+		},
+		{
+			name:            "uses custom values when provided",
+			summary:         "Custom Summary",
+			message:         "Custom development message",
+			expectedSummary: "Custom Summary",
+			expectedMessage: "Custom development message",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			modifier := NewDevelopmentWarningInt64Modifier(tt.summary, tt.message)
+
+			if modifier.Summary != tt.expectedSummary {
+				t.Errorf("Summary = %q, want %q", modifier.Summary, tt.expectedSummary)
+			}
+			if modifier.Message != tt.expectedMessage {
+				t.Errorf("Message = %q, want %q", modifier.Message, tt.expectedMessage)
+			}
+		})
+	}
+}
+
+func TestDevelopmentWarningInt64Modifier_Description(t *testing.T) {
+	modifier := NewDevelopmentWarningInt64Modifier("", "")
+	ctx := context.Background()
+
+	desc := modifier.Description(ctx)
+	if desc != "Warns when a feature in development is used." {
+		t.Errorf("Description() = %q, want %q", desc, "Warns when a feature in development is used.")
+	}
+
+	mdDesc := modifier.MarkdownDescription(ctx)
+	if mdDesc != desc {
+		t.Errorf("MarkdownDescription() = %q, want %q", mdDesc, desc)
+	}
+}
+
+func TestDevelopmentWarningInt64Modifier_PlanModifyInt64(t *testing.T) {
+	tests := []struct {
+		name          string
+		stateValue    types.Int64
+		planValue     types.Int64
+		expectWarning bool
+	}{
+		{
+			name:          "warns on first set (null state)",
+			stateValue:    types.Int64Null(),
+			planValue:     types.Int64Value(5),
+			expectWarning: true,
+		},
+		{
+			name:          "no warning when value unchanged",
+			stateValue:    types.Int64Value(5),
+			planValue:     types.Int64Value(5),
+			expectWarning: false,
+		},
+		{
+			name:          "warns when value changes",
+			stateValue:    types.Int64Value(3),
+			planValue:     types.Int64Value(5),
+			expectWarning: true,
+		},
+		{
+			name:          "no warning when plan is null (field removed)",
+			stateValue:    types.Int64Value(5),
+			planValue:     types.Int64Null(),
+			expectWarning: false,
+		},
+		{
+			name:          "no warning when plan is unknown",
+			stateValue:    types.Int64Null(),
+			planValue:     types.Int64Unknown(),
+			expectWarning: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			modifier := NewDevelopmentWarningInt64Modifier("", "")
+
+			req := planmodifier.Int64Request{
+				StateValue: tt.stateValue,
+				PlanValue:  tt.planValue,
+			}
+			resp := &planmodifier.Int64Response{}
+
+			modifier.PlanModifyInt64(context.Background(), req, resp)
+
+			if tt.expectWarning {
+				if resp.Diagnostics.WarningsCount() == 0 {
+					t.Error("expected warning but got none")
+				}
+			} else if resp.Diagnostics.WarningsCount() > 0 {
+				t.Errorf("unexpected warning: %v", resp.Diagnostics)
+			}
+		})
+	}
+}
+
+func TestNewDevelopmentWarningStringModifier_Defaults(t *testing.T) {
+	modifier := NewDevelopmentWarningStringModifier("", "")
+
+	if modifier.Summary != defaultDevWarningSummary {
+		t.Errorf("Summary = %q, want %q", modifier.Summary, defaultDevWarningSummary)
+	}
+	if modifier.Message != DevelopmentMessage {
+		t.Errorf("Message = %q, want %q", modifier.Message, DevelopmentMessage)
+	}
+}
+
+func TestDevelopmentWarningStringModifier_PlanModifyString(t *testing.T) {
+	modifier := NewDevelopmentWarningStringModifier("", "")
+
+	// Warns on first set
+	req := planmodifier.StringRequest{
+		StateValue: types.StringNull(),
+		PlanValue:  types.StringValue("test"),
+	}
+	resp := &planmodifier.StringResponse{}
+
+	modifier.PlanModifyString(context.Background(), req, resp)
+
+	if resp.Diagnostics.WarningsCount() == 0 {
+		t.Error("expected warning on first set but got none")
+	}
+
+	// No warning when unchanged
+	req2 := planmodifier.StringRequest{
+		StateValue: types.StringValue("test"),
+		PlanValue:  types.StringValue("test"),
+	}
+	resp2 := &planmodifier.StringResponse{}
+
+	modifier.PlanModifyString(context.Background(), req2, resp2)
+
+	if resp2.Diagnostics.WarningsCount() > 0 {
+		t.Error("unexpected warning when value unchanged")
+	}
+}
+
+func TestNewDevelopmentWarningBoolModifier_Defaults(t *testing.T) {
+	modifier := NewDevelopmentWarningBoolModifier("", "")
+
+	if modifier.Summary != defaultDevWarningSummary {
+		t.Errorf("Summary = %q, want %q", modifier.Summary, defaultDevWarningSummary)
+	}
+	if modifier.Message != DevelopmentMessage {
+		t.Errorf("Message = %q, want %q", modifier.Message, DevelopmentMessage)
+	}
+}
+
+func TestDevelopmentWarningBoolModifier_PlanModifyBool(t *testing.T) {
+	modifier := NewDevelopmentWarningBoolModifier("", "")
+
+	// Warns on first set
+	req := planmodifier.BoolRequest{
+		StateValue: types.BoolNull(),
+		PlanValue:  types.BoolValue(true),
+	}
+	resp := &planmodifier.BoolResponse{}
+
+	modifier.PlanModifyBool(context.Background(), req, resp)
+
+	if resp.Diagnostics.WarningsCount() == 0 {
+		t.Error("expected warning on first set but got none")
+	}
+
+	// No warning when unchanged
+	req2 := planmodifier.BoolRequest{
+		StateValue: types.BoolValue(true),
+		PlanValue:  types.BoolValue(true),
+	}
+	resp2 := &planmodifier.BoolResponse{}
+
+	modifier.PlanModifyBool(context.Background(), req2, resp2)
+
+	if resp2.Diagnostics.WarningsCount() > 0 {
+		t.Error("unexpected warning when value unchanged")
+	}
+}
+
 // contains checks if substr is in s
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || substr == "" ||

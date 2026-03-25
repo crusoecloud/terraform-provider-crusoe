@@ -16,7 +16,8 @@ type s3BucketsDataSource struct {
 }
 
 type s3BucketsDataSourceModel struct {
-	Buckets []s3BucketModel `tfsdk:"buckets"`
+	ProjectID types.String    `tfsdk:"project_id"`
+	Buckets   []s3BucketModel `tfsdk:"buckets"`
 }
 
 type s3BucketModel struct {
@@ -63,6 +64,10 @@ func (ds *s3BucketsDataSource) Schema(ctx context.Context, request datasource.Sc
 	response.Schema = schema.Schema{
 		MarkdownDescription: common.DevelopmentMessage + "\n\nFetches the list of S3-compatible storage buckets.",
 		Attributes: map[string]schema.Attribute{
+			"project_id": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: descProjectID,
+			},
 			"buckets": schema.ListNestedAttribute{
 				Computed:            true,
 				MarkdownDescription: "List of S3 buckets.",
@@ -124,7 +129,16 @@ func (ds *s3BucketsDataSource) Schema(ctx context.Context, request datasource.Sc
 func (ds *s3BucketsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	resp.Diagnostics.AddWarning("Development Feature", common.DevelopmentMessage)
 
-	dataResp, httpResp, err := ds.client.APIClient.S3BucketsApi.ListS3Buckets(ctx, ds.client.ProjectID, nil)
+	var config s3BucketsDataSourceModel
+	diags := req.Config.Get(ctx, &config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
+
+	dataResp, httpResp, err := ds.client.APIClient.S3BucketsApi.ListS3Buckets(ctx, projectID, nil)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
@@ -135,11 +149,13 @@ func (ds *s3BucketsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	var state s3BucketsDataSourceModel
+	state := s3BucketsDataSourceModel{
+		ProjectID: types.StringValue(projectID),
+	}
 	for i := range dataResp.Items {
 		state.Buckets = append(state.Buckets, s3BucketAPIToDataSourceModel(&dataResp.Items[i]))
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

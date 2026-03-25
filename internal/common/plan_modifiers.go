@@ -8,6 +8,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+const (
+	defaultDevWarningSummary = "Feature In Development"
+)
+
 // ImmutableStringModifier prevents changes to a string attribute with a clear error message.
 // This is preferable to RequiresReplace() when you want to block changes entirely
 // rather than silently destroying and recreating the resource.
@@ -126,5 +130,137 @@ func (m PrivateNodePoolsWarningModifier) PlanModifyString(_ context.Context, req
 				"Private Node Pools require specific account access. To request access and enable public_ip_type = 'none', please contact support.",
 			)
 		}
+	}
+}
+
+// DevelopmentWarningInt64Modifier adds a warning when a field that is in development is used.
+// The warning only appears when the field is first set or its value changes, not on every plan/refresh.
+type DevelopmentWarningInt64Modifier struct {
+	Summary string
+	Message string
+}
+
+// NewDevelopmentWarningInt64Modifier creates a DevelopmentWarningInt64Modifier with the given summary and message.
+// Empty strings will use defaults:
+// - Summary: "Feature In Development"
+// - Message: DevelopmentMessage
+func NewDevelopmentWarningInt64Modifier(summary, message string) DevelopmentWarningInt64Modifier {
+	if summary == "" {
+		summary = defaultDevWarningSummary
+	}
+	if message == "" {
+		message = DevelopmentMessage
+	}
+
+	return DevelopmentWarningInt64Modifier{Summary: summary, Message: message}
+}
+
+func (m DevelopmentWarningInt64Modifier) Description(_ context.Context) string {
+	return "Warns when a feature in development is used."
+}
+
+func (m DevelopmentWarningInt64Modifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+//nolint:gocritic // hugeParam: req signature required by planmodifier.Int64 interface
+func (m DevelopmentWarningInt64Modifier) PlanModifyInt64(_ context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
+	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+
+	if req.StateValue.IsNull() || !req.StateValue.Equal(req.PlanValue) {
+		resp.Diagnostics.AddWarning(
+			fmt.Sprintf("%s: %s", m.Summary, req.Path),
+			m.Message,
+		)
+	}
+}
+
+// DevelopmentWarningStringModifier adds a warning when a string field that is in development is used.
+// The warning only appears when the field is first set or its value changes, not on every plan/refresh.
+type DevelopmentWarningStringModifier struct {
+	Summary string
+	Message string
+}
+
+// NewDevelopmentWarningStringModifier creates a DevelopmentWarningStringModifier with the given summary and message.
+// Empty strings will use defaults:
+// - Summary: "Feature In Development"
+// - Message: DevelopmentMessage
+func NewDevelopmentWarningStringModifier(summary, message string) DevelopmentWarningStringModifier {
+	if summary == "" {
+		summary = defaultDevWarningSummary
+	}
+	if message == "" {
+		message = DevelopmentMessage
+	}
+
+	return DevelopmentWarningStringModifier{Summary: summary, Message: message}
+}
+
+func (m DevelopmentWarningStringModifier) Description(_ context.Context) string {
+	return "Warns when a feature in development is used."
+}
+
+func (m DevelopmentWarningStringModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+//nolint:gocritic // hugeParam: req signature required by planmodifier.String interface
+func (m DevelopmentWarningStringModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+
+	if req.StateValue.IsNull() || !req.StateValue.Equal(req.PlanValue) {
+		resp.Diagnostics.AddWarning(
+			fmt.Sprintf("%s: %s", m.Summary, req.Path),
+			m.Message,
+		)
+	}
+}
+
+// DevelopmentWarningBoolModifier adds a warning when a bool field that is in development is used.
+// The warning only appears when the field is first set or its value changes, not on every plan/refresh.
+type DevelopmentWarningBoolModifier struct {
+	Summary string
+	Message string
+}
+
+// NewDevelopmentWarningBoolModifier creates a DevelopmentWarningBoolModifier with the given summary and message.
+// Empty strings will use defaults:
+// - Summary: "Feature In Development"
+// - Message: DevelopmentMessage
+func NewDevelopmentWarningBoolModifier(summary, message string) DevelopmentWarningBoolModifier {
+	if summary == "" {
+		summary = defaultDevWarningSummary
+	}
+	if message == "" {
+		message = DevelopmentMessage
+	}
+
+	return DevelopmentWarningBoolModifier{Summary: summary, Message: message}
+}
+
+func (m DevelopmentWarningBoolModifier) Description(_ context.Context) string {
+	return "Warns when a feature in development is used."
+}
+
+func (m DevelopmentWarningBoolModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+//nolint:gocritic // hugeParam: req signature required by planmodifier.Bool interface
+func (m DevelopmentWarningBoolModifier) PlanModifyBool(_ context.Context, req planmodifier.BoolRequest, resp *planmodifier.BoolResponse) {
+	if req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+
+	if req.StateValue.IsNull() || !req.StateValue.Equal(req.PlanValue) {
+		resp.Diagnostics.AddWarning(
+			fmt.Sprintf("%s: %s", m.Summary, req.Path),
+			m.Message,
+		)
 	}
 }
