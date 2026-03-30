@@ -1,3 +1,13 @@
+## 0.6.0
+
+FEATURES:
+
+- Added `profile` and `project` attributes to the provider block for configuring Crusoe CLI profiles and default project
+
+BUG FIXES:
+
+- Made instance template disks optional and fixed empty set handling
+
 ## 0.5.46
 
 Re-release of v0.5.45 to fix Terraform registry caching issues.
