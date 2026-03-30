@@ -1,3 +1,12 @@
+## 0.7.0
+
+FEATURES:
+
+- Added `crusoe_storage_s3_bucket` resource for managing S3-compatible storage buckets
+- Added `crusoe_storage_s3_buckets` data source for listing S3 buckets
+- Added `crusoe_storage_s3_key` resource for managing S3 access keys
+- Added `crusoe_storage_s3_keys` data source for listing S3 keys
+
 ## 0.6.0
 
 FEATURES:
