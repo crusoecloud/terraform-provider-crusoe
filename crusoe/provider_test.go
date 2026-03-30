@@ -68,6 +68,7 @@ func TestAllResourcesHaveProjectID(t *testing.T) {
 	resourceExclusions := []string{
 		"crusoe_project",        // crusoe_project - IS the project itself
 		"crusoe_registry_token", // crusoe_registry_token - org-scoped
+		"crusoe_storage_s3_key", // org-scoped
 	}
 
 	for _, resourceFunc := range p.Resources(ctx) {
@@ -97,6 +98,7 @@ func TestAllDataSourcesHaveProjectID(t *testing.T) {
 	dataSourceExclusions := []string{
 		"crusoe_projects",        // lists all projects
 		"crusoe_registry_tokens", // org-scoped
+		"crusoe_storage_s3_keys", // org-scoped
 	}
 
 	for _, dsFunc := range p.DataSources(ctx) {
