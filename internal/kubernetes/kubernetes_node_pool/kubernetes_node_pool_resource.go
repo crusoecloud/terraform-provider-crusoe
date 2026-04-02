@@ -46,6 +46,7 @@ type kubernetesNodePoolResourceModel struct {
 	IBPartitionID                 types.String `tfsdk:"ib_partition_id"`
 	RequestedNodeLabels           types.Map    `tfsdk:"requested_node_labels"`
 	AllNodeLabels                 types.Map    `tfsdk:"all_node_labels"`
+	NodeTaints                    types.List   `tfsdk:"node_taints"`
 	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
 	SSHKey                        types.String `tfsdk:"ssh_key"`
 	State                         types.String `tfsdk:"state"`
@@ -188,6 +189,31 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				}, // maintain across updates
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"node_taints": schema.ListNestedBlock{
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"key": schema.StringAttribute{
+							Required:            true,
+							MarkdownDescription: "Taint key. Must be at most 63 characters.",
+						},
+						"value": schema.StringAttribute{
+							Optional:            true,
+							Computed:            true,
+							Default:             stringdefault.StaticString(""),
+							MarkdownDescription: "Taint value. Must be at most 63 characters.",
+						},
+						"effect": schema.StringAttribute{
+							Required:            true,
+							MarkdownDescription: "Taint effect. Possible values: `Noschedule`, `PreferNoSchedule`, `NoExecute`.",
+							Validators: []validator.String{
+								stringvalidator.OneOf("NoSchedule", "PreferNoSchedule", "NoExecute"),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -213,12 +239,20 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		}
 	}
 
+	nodeTaints, err := tfListToNodeTaints(ctx, plan.NodeTaints)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create node pool", fmt.Sprintf("error when parsing node taints: %s", err))
+
+		return
+	}
+
 	asyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.CreateNodePool(ctx, swagger.KubernetesNodePoolPostRequest{
 		ClusterId:                     plan.ClusterID.ValueString(),
 		Count:                         plan.InstanceCount.ValueInt64(),
 		IbPartitionId:                 plan.IBPartitionID.ValueString(),
 		Name:                          plan.Name.ValueString(),
 		NodeLabels:                    nodeLabels,
+		NodeTaints:                    nodeTaints,
 		NodePoolVersion:               plan.Version.ValueString(),
 		ProductName:                   plan.Type.ValueString(),
 		SshPublicKey:                  plan.SSHKey.ValueString(),
@@ -261,6 +295,8 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	state.ClusterID = types.StringValue(kubernetesNodePoolResponse.NodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePoolResponse.NodePool.SubnetId)
 	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePoolResponse.NodePool.NodeLabels)
+	resp.Diagnostics.Append(diags...)
+	state.NodeTaints, diags = nodeTaintsToTFList(ctx, kubernetesNodePoolResponse.NodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
@@ -338,6 +374,8 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
 	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
+	resp.Diagnostics.Append(diags...)
+	state.NodeTaints, diags = nodeTaintsToTFList(ctx, kubernetesNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
@@ -474,9 +512,17 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		}
 	}
 
+	nodeTaints, err := tfListToNodeTaints(ctx, plan.NodeTaints)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update node pool", fmt.Sprintf("error when parsing node_taints: %s", err))
+
+		return
+	}
+
 	patchRequest := swagger.KubernetesNodePoolPatchRequest{
 		Count:                         plan.InstanceCount.ValueInt64(),
 		NodeLabels:                    nodeLabels,
+		NodeTaints:                    nodeTaints,
 		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 		NodePoolVersion:               plan.Version.ValueString(),
 	}
@@ -572,6 +618,8 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	state.ClusterID = types.StringValue(updatedNodePool.ClusterId)
 	state.SubnetID = types.StringValue(updatedNodePool.SubnetId)
 	state.AllNodeLabels, diags = common.StringMapToTFMap(updatedNodePool.NodeLabels)
+	resp.Diagnostics.Append(diags...)
+	state.NodeTaints, diags = nodeTaintsToTFList(ctx, updatedNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(updatedNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)

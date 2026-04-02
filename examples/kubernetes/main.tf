@@ -150,6 +150,19 @@ resource "crusoe_kubernetes_node_pool" "my_node_pool" {
   #   "labelkey" = "labelvalue"
   # }
 
+  # Optional: Apply taints to nodes in the pool                                                                                                                                                                     
+  # node_taints {                                                                                                                                                                                                   
+  #   key    = "dedicated"                                                                                                                                                                                          
+  #   value  = "gpu"                                                                                                                                                                                                
+  #   effect = "NoSchedule"                                                                                                                                                                                         
+  # }                                                                                                                                                                                                               
+  #                                                                                                                                                                                                                 
+  # node_taints {                       
+  #   key    = "team"
+  #   value  = "ml"                                                                                                                                                                                                 
+  #   effect = "PreferNoSchedule"
+  # } 
+
   # Optional: Use local ephemeral NVMe disks for containerd storage
   # ephemeral_storage_for_containerd = true
 

@@ -25,3 +25,35 @@ func TestKubernetesNodePoolResource_BatchFieldsHavePlanModifiers(t *testing.T) {
 		}
 	}
 }
+
+func TestKubernetesNodePoolResource_NodeTaintsBlockExists(t *testing.T) {
+	r := NewKubernetesNodePoolResource()
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	block, ok := schemaResp.Schema.Blocks["node_taints"]
+	if !ok {
+		t.Fatal("node_taints block not found in schema")
+	}
+
+	listBlock, ok := block.(schema.ListNestedBlock)
+	if !ok {
+		t.Fatal("node_taints is not a ListNestedBlock")
+	}
+
+	// verify key, value, effect attributes exist
+	for _, field := range []string{"key", "value", "effect"} {
+		if _, exists := listBlock.NestedObject.Attributes[field]; !exists {
+			t.Errorf("node_taints block missing %s attribute", field)
+		}
+	}
+
+	// verify effect has validators
+	effectAttr, ok := listBlock.NestedObject.Attributes["effect"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("effect attribute is not a StringAttribute")
+	}
+	if len(effectAttr.Validators) == 0 {
+		t.Error("effect attribute should have validators")
+	}
+}

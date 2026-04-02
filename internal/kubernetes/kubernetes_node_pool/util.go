@@ -7,7 +7,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -91,6 +94,7 @@ func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operati
 func nodePoolNeedsRollout(plan, state *kubernetesNodePoolResourceModel) bool {
 	return !plan.Version.Equal(state.Version) ||
 		!plan.RequestedNodeLabels.Equal(state.RequestedNodeLabels) ||
+		!plan.NodeTaints.Equal(state.NodeTaints) ||
 		!plan.EphemeralStorageForContainerd.Equal(state.EphemeralStorageForContainerd) ||
 		!plan.BatchPercentage.Equal(state.BatchPercentage) ||
 		!plan.BatchSize.Equal(state.BatchSize)
@@ -124,4 +128,59 @@ func ModifyPlanNodePoolNeedsRollout(ctx context.Context, req *resource.ModifyPla
 	}
 
 	return nodePoolNeedsRollout(&plan, &state)
+}
+
+type nodeTaintModel struct {
+	Key    types.String `tfsdk:"key"`
+	Value  types.String `tfsdk:"value"`
+	Effect types.String `tfsdk:"effect"`
+}
+
+// tfListToNodeTaints converts a Teffaform List to swagger node taints.
+func tfListToNodeTaints(ctx context.Context, tfList types.List) ([]swagger.KubernetesNodeTaint, error) {
+	if tfList.IsNull() || tfList.IsUnknown() {
+		return nil, nil
+	}
+	var models []nodeTaintModel
+	diags := tfList.ElementsAs(ctx, &models, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse node taints")
+	}
+	taints := make([]swagger.KubernetesNodeTaint, 0, len(models))
+	for _, m := range models {
+		taints = append(taints, swagger.KubernetesNodeTaint{
+			Key:    m.Key.ValueString(),
+			Value:  m.Value.ValueString(),
+			Effect: m.Effect.ValueString(),
+		})
+	}
+
+	return taints, nil
+}
+
+// nodeTaintsToTFList converts swagger node taints to a Terraform List
+func nodeTaintsToTFList(ctx context.Context, taints []swagger.KubernetesNodeTaint) (types.List, diag.Diagnostics) {
+	if len(taints) == 0 {
+		return types.ListNull(types.ObjectType{
+			AttrTypes: nodeTaintAttrTypes(),
+		}), nil
+	}
+	models := make([]nodeTaintModel, 0, len(taints))
+	for _, t := range taints {
+		models = append(models, nodeTaintModel{
+			Key:    types.StringValue(t.Key),
+			Value:  types.StringValue(t.Value),
+			Effect: types.StringValue(t.Effect),
+		})
+	}
+
+	return types.ListValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, models)
+}
+
+func nodeTaintAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"key":    types.StringType,
+		"value":  types.StringType,
+		"effect": types.StringType,
+	}
 }
