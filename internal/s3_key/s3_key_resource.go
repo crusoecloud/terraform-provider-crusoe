@@ -312,9 +312,7 @@ func (r *s3KeyResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 
 	accessKeyID := state.AccessKeyID.ValueString()
 
-	httpResp, err := r.client.APIClient.S3KeysApi.DeleteS3Key(ctx, swagger.DeleteS3KeyRequest{
-		AccessKeyId: accessKeyID,
-	}, orgID, accessKeyID)
+	httpResp, err := r.client.APIClient.S3KeysApi.DeleteS3Key(ctx, orgID, accessKeyID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
