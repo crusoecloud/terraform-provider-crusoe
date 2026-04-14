@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
 
 func TestTfListToNodeTaints(t *testing.T) {
@@ -92,7 +93,36 @@ func TestNodeTaintsToTFList_Empty(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %s", diags.Errors())
 	}
-	if !tfList.IsNull() {
-		t.Error("expected null list for empty taints")
+	if tfList.IsNull() {
+		t.Error("expected empty list, got null")
+	}
+	if len(tfList.Elements()) != 0 {
+		t.Errorf("expected 0 elements, got %d", len(tfList.Elements()))
+	}
+}
+
+func TestValidateNodeTaintDuplicates(t *testing.T) {
+	// no duplicates
+	err := validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{
+		{Key: "gpu", Effect: "NoSchedule"},
+		{Key: "gpu", Effect: "NoExecute"},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+
+	// duplicate key+effect
+	err = validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{
+		{Key: "gpu", Effect: "NoSchedule"},
+		{Key: "gpu", Effect: "NoSchedule"},
+	})
+	if err == nil {
+		t.Error("expected error for duplicate taints")
+	}
+
+	// empty
+	err = validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{})
+	if err != nil {
+		t.Errorf("unexpected error for empty taints: %s", err)
 	}
 }

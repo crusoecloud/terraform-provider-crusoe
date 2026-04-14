@@ -195,17 +195,23 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Taint key. Must be at most 63 characters.",
+							MarkdownDescription: "Taint key. Must be non-empty and at most 63 characters.",
+							Validators: []validator.String{
+								stringvalidator.LengthBetween(1, 63),
+							},
 						},
 						"value": schema.StringAttribute{
 							Optional:            true,
 							Computed:            true,
 							Default:             stringdefault.StaticString(""),
 							MarkdownDescription: "Taint value. Must be at most 63 characters.",
+							Validators: []validator.String{
+								stringvalidator.LengthAtMost(63),
+							},
 						},
 						"effect": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Taint effect. Possible values: `Noschedule`, `PreferNoSchedule`, `NoExecute`.",
+							MarkdownDescription: "Taint effect. Possible values: `NoSchedule`, `PreferNoSchedule`, `NoExecute`.",
 							Validators: []validator.String{
 								stringvalidator.OneOf("NoSchedule", "PreferNoSchedule", "NoExecute"),
 							},
@@ -242,6 +248,11 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	nodeTaints, err := tfListToNodeTaints(ctx, plan.NodeTaints)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool", fmt.Sprintf("error when parsing node taints: %s", err))
+
+		return
+	}
+	if vErr := validateNodeTaintDuplicates(nodeTaints); vErr != nil {
+		resp.Diagnostics.AddError("Failed to create node pool", vErr.Error())
 
 		return
 	}
@@ -517,6 +528,16 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		resp.Diagnostics.AddError("Failed to update node pool", fmt.Sprintf("error when parsing node_taints: %s", err))
 
 		return
+	}
+	if vErr := validateNodeTaintDuplicates(nodeTaints); vErr != nil {
+		resp.Diagnostics.AddError("Failed to update node pool", vErr.Error())
+
+		return
+	}
+
+	// If node_taints block is removed from config but state has taints, send empty list to clear all taints.
+	if nodeTaints == nil && !stored.NodeTaints.IsNull() && len(stored.NodeTaints.Elements()) > 0 {
+		nodeTaints = []swagger.KubernetesNodeTaint{}
 	}
 
 	patchRequest := swagger.KubernetesNodePoolPatchRequest{

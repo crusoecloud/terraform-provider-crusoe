@@ -136,7 +136,7 @@ type nodeTaintModel struct {
 	Effect types.String `tfsdk:"effect"`
 }
 
-// tfListToNodeTaints converts a Teffaform List to swagger node taints.
+// tfListToNodeTaints converts a Terraform List to swagger node taints.
 func tfListToNodeTaints(ctx context.Context, tfList types.List) ([]swagger.KubernetesNodeTaint, error) {
 	if tfList.IsNull() || tfList.IsUnknown() {
 		return nil, nil
@@ -161,9 +161,7 @@ func tfListToNodeTaints(ctx context.Context, tfList types.List) ([]swagger.Kuber
 // nodeTaintsToTFList converts swagger node taints to a Terraform List
 func nodeTaintsToTFList(ctx context.Context, taints []swagger.KubernetesNodeTaint) (types.List, diag.Diagnostics) {
 	if len(taints) == 0 {
-		return types.ListNull(types.ObjectType{
-			AttrTypes: nodeTaintAttrTypes(),
-		}), nil
+		return types.ListValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, []nodeTaintModel{})
 	}
 	models := make([]nodeTaintModel, 0, len(taints))
 	for _, t := range taints {
@@ -183,4 +181,17 @@ func nodeTaintAttrTypes() map[string]attr.Type {
 		"value":  types.StringType,
 		"effect": types.StringType,
 	}
+}
+
+func validateNodeTaintDuplicates(taints []swagger.KubernetesNodeTaint) error {
+	seen := make(map[string]struct{})
+	for _, t := range taints {
+		uniqueKey := t.Key + ":" + t.Effect
+		if _, exists := seen[uniqueKey]; exists {
+			return fmt.Errorf("duplicate taint: key %q with effect %q is specified more than once", t.Key, t.Effect)
+		}
+		seen[uniqueKey] = struct{}{}
+	}
+
+	return nil
 }
