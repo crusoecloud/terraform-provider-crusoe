@@ -195,9 +195,9 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Taint key. Must be non-empty and at most 63 characters.",
+							MarkdownDescription: "Taint key. Follows the Kubernetes qualified-name format (optional DNS subdomain prefix, name segment up to 63 chars). Must be non-empty.",
 							Validators: []validator.String{
-								stringvalidator.LengthBetween(1, 63),
+								stringvalidator.LengthAtLeast(1),
 							},
 						},
 						"value": schema.StringAttribute{
