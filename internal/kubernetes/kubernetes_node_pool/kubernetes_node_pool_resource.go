@@ -191,6 +191,9 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 		},
 		Blocks: map[string]schema.Block{
 			"node_taints": schema.ListNestedBlock{
+				PlanModifiers: []planmodifier.List{
+					SortTaintsByEffectKey(),
+				},
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
