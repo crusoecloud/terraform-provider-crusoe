@@ -30,16 +30,16 @@ func TestKubernetesClusterResource_ExtraArgsSchemaAttributes(t *testing.T) {
 	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
 
 	for _, fieldName := range []string{"apiserver_extra_args", "scheduler_extra_args", "controller_manager_extra_args"} {
-		attr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
+		mapAttr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
 		if !ok {
 			t.Fatalf("%s attribute not found or not MapAttribute", fieldName)
 		}
 
-		if !attr.Optional {
+		if !mapAttr.Optional {
 			t.Errorf("%s should be optional", fieldName)
 		}
 
-		if attr.ElementType != types.StringType {
+		if mapAttr.ElementType != types.StringType {
 			t.Errorf("%s element type should be StringType", fieldName)
 		}
 	}
@@ -222,14 +222,14 @@ func TestKubernetesClusterResource_ExtraArgsHaveNoRequiresReplace(t *testing.T) 
 	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
 
 	for _, fieldName := range []string{"apiserver_extra_args", "scheduler_extra_args", "controller_manager_extra_args"} {
-		attr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
+		mapAttr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
 		if !ok {
 			t.Fatalf("%s attribute not found or not MapAttribute", fieldName)
 		}
 
-		if len(attr.PlanModifiers) != 0 {
+		if len(mapAttr.PlanModifiers) != 0 {
 			t.Errorf("%s should have no plan modifiers (got %d); adding RequiresReplace would force cluster recreation on arg changes",
-				fieldName, len(attr.PlanModifiers))
+				fieldName, len(mapAttr.PlanModifiers))
 		}
 	}
 }
@@ -244,12 +244,12 @@ func TestKubernetesClusterResource_ExtraArgsAreNotComputed(t *testing.T) {
 	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
 
 	for _, fieldName := range []string{"apiserver_extra_args", "scheduler_extra_args", "controller_manager_extra_args"} {
-		attr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
+		mapAttr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
 		if !ok {
 			t.Fatalf("%s attribute not found or not MapAttribute", fieldName)
 		}
 
-		if attr.Computed {
+		if mapAttr.Computed {
 			t.Errorf("%s must not be Computed; that would silently overwrite user config with API state", fieldName)
 		}
 	}
