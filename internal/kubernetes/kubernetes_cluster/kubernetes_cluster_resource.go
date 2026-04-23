@@ -394,6 +394,18 @@ func (r *kubernetesClusterResource) Update(
 		return
 	}
 
+	// All non-extra-args fields have RequiresReplace in the schema, so Update should
+	// only ever be called when extra args change. Panic if that invariant is violated
+	// (e.g. if RequiresReplace is accidentally removed from a field).
+	if !plan.Name.Equal(state.Name) ||
+		!plan.Location.Equal(state.Location) ||
+		!plan.Version.Equal(state.Version) ||
+		!plan.SubnetID.Equal(state.SubnetID) ||
+		!plan.ClusterCidr.Equal(state.ClusterCidr) ||
+		!plan.Private.Equal(state.Private) {
+		panic("only extra_args fields can be updated in-place; all other cluster fields require recreation")
+	}
+
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	updateRequest := swagger.KubernetesClusterPatchRequest{
@@ -402,7 +414,11 @@ func (r *kubernetesClusterResource) Update(
 		ControllerManagerExtraArgs: tfMapToStringMap(ctx, plan.ControllerManagerExtraArgs),
 	}
 
-	asyncOperation, _, err := r.client.APIClient.KubernetesClustersApi.UpdateCluster(ctx, updateRequest, projectID, state.ID.ValueString())
+	asyncOperation, httpResp, err := r.client.APIClient.KubernetesClustersApi.UpdateCluster(ctx, updateRequest, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
+
 	if err != nil {
 		response.Diagnostics.AddError("Failed to update cluster",
 			fmt.Sprintf("Error starting an update cluster operation: %s", common.UnpackAPIError(err)))
@@ -418,6 +434,21 @@ func (r *kubernetesClusterResource) Update(
 		return
 	}
 
+	state.ID = types.StringValue(kubernetesCluster.Id)
+	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
+	state.Name = types.StringValue(kubernetesCluster.Name)
+	state.Version = types.StringValue(kubernetesCluster.Version)
+	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
+	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
+	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
+	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
+	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
+	response.Diagnostics.Append(diags...)
+	state.Location = types.StringValue(kubernetesCluster.Location)
+	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
+	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	response.Diagnostics.Append(diags...)
+	state.Private = types.BoolValue(kubernetesCluster.Private)
 	state.ApiserverExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ApiserverExtraArgs)
 	response.Diagnostics.Append(diags...)
 	state.SchedulerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.SchedulerExtraArgs)
@@ -487,6 +518,7 @@ func tfMapToStringMap(ctx context.Context, tfMap types.Map) map[string]string {
 
 	result := make(map[string]string)
 	for key, value := range tfMap.Elements() {
+		// The schema enforces ElementType: types.StringType, so this assertion always succeeds.
 		if strValue, ok := value.(types.String); ok {
 			result[key] = strValue.ValueString()
 		}
