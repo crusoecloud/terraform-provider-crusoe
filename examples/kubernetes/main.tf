@@ -17,7 +17,7 @@ variable "name_prefix" {
 
 variable "control_plane_version" {
   type    = string
-  default = "1.31.7-cmk.7"
+  default = "1.33.4-cmk.73"
 }
 
 variable "location" {
@@ -46,9 +46,24 @@ variable "worker" {
   })
   default = {
     type    = "a100-80gb.1x"
-    version = "1.32.7-cmk.3"
+    version = "1.33.4-cmk.73"
     count   = 2
   }
+}
+
+variable "apiserver_extra_args" {
+  type    = map(string)
+  default = null
+}
+
+variable "scheduler_extra_args" {
+  type    = map(string)
+  default = null
+}
+
+variable "controller_manager_extra_args" {
+  type    = map(string)
+  default = null
 }
 
 variable "kubeconfig_path" {
@@ -108,6 +123,12 @@ resource "crusoe_kubernetes_cluster" "my_cluster" {
 
   # Optional: Enable private cluster creation
   # private = true
+
+  # Optional: Extra arguments for control plane components.
+  # Changes take effect after a cluster rotation.
+  apiserver_extra_args         = var.apiserver_extra_args
+  scheduler_extra_args         = var.scheduler_extra_args
+  controller_manager_extra_args = var.controller_manager_extra_args
 
   depends_on = [crusoe_vpc_firewall_rule.my_egress_rule]
 }
