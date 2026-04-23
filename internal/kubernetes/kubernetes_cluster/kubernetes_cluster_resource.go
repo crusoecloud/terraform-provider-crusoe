@@ -194,17 +194,17 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"apiserver_extra_args": schema.MapAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-apiserver as key-value pairs.",
+				Description: "Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation.",
 			},
 			"scheduler_extra_args": schema.MapAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-scheduler as key-value pairs.",
+				Description: "Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation.",
 			},
 			"controller_manager_extra_args": schema.MapAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-controller-manager as key-value pairs.",
+				Description: "Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation.",
 			},
 		},
 	}
