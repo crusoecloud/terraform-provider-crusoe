@@ -403,6 +403,7 @@ func (r *kubernetesClusterResource) Update(
 		!plan.SubnetID.Equal(state.SubnetID) ||
 		!plan.ClusterCidr.Equal(state.ClusterCidr) ||
 		!plan.Private.Equal(state.Private) {
+
 		panic("only extra_args fields can be updated in-place; all other cluster fields require recreation")
 	}
 
