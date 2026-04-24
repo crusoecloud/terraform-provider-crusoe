@@ -394,19 +394,6 @@ func (r *kubernetesClusterResource) Update(
 		return
 	}
 
-	// All non-extra-args fields have RequiresReplace in the schema, so Update should
-	// only ever be called when extra args change. Panic if that invariant is violated
-	// (e.g. if RequiresReplace is accidentally removed from a field).
-	if !plan.Name.Equal(state.Name) ||
-		!plan.Location.Equal(state.Location) ||
-		!plan.Version.Equal(state.Version) ||
-		!plan.SubnetID.Equal(state.SubnetID) ||
-		!plan.ClusterCidr.Equal(state.ClusterCidr) ||
-		!plan.Private.Equal(state.Private) {
-
-		panic("only extra_args fields can be updated in-place; all other cluster fields require recreation")
-	}
-
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	updateRequest := swagger.KubernetesClusterPatchRequest{

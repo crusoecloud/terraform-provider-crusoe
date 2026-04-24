@@ -234,45 +234,6 @@ func TestKubernetesClusterResource_ExtraArgsHaveNoRequiresReplace(t *testing.T) 
 	}
 }
 
-// Sad path: every field checked by the Update panic guard must have a plan modifier
-// that prevents Terraform from calling Update when it changes. If any of these fields
-// lacks RequiresReplace, the panic becomes reachable in production.
-func TestKubernetesClusterResource_PanicGuardedFieldsHaveRequiresReplace(t *testing.T) {
-	r := NewKubernetesClusterResource()
-
-	schemaResp := &resource.SchemaResponse{}
-	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
-
-	for _, fieldName := range []string{"name", "location", "version", "cluster_cidr", "service_cluster_ip_range"} {
-		strAttr, ok := schemaResp.Schema.Attributes[fieldName].(schema.StringAttribute)
-		if !ok {
-			t.Fatalf("%s attribute not found or not StringAttribute", fieldName)
-		}
-
-		if len(strAttr.PlanModifiers) == 0 {
-			t.Errorf("%s has no plan modifiers; the Update panic guard checks this field and requires RequiresReplace to stay unreachable", fieldName)
-		}
-	}
-
-	subnetAttr, ok := schemaResp.Schema.Attributes["subnet_id"].(schema.StringAttribute)
-	if !ok {
-		t.Fatal("subnet_id attribute not found or not StringAttribute")
-	}
-
-	if len(subnetAttr.PlanModifiers) == 0 {
-		t.Error("subnet_id has no plan modifiers; the Update panic guard checks this field and requires RequiresReplace to stay unreachable")
-	}
-
-	privateAttr, ok := schemaResp.Schema.Attributes["private"].(schema.BoolAttribute)
-	if !ok {
-		t.Fatal("private attribute not found or not BoolAttribute")
-	}
-
-	if len(privateAttr.PlanModifiers) == 0 {
-		t.Error("private has no plan modifiers; the Update panic guard checks this field and requires RequiresReplace to stay unreachable")
-	}
-}
-
 // Sad path: extra args fields must not be Computed.
 // Marking them Computed would cause Terraform to silently overwrite user config
 // with API state when args are unset, masking drift.
