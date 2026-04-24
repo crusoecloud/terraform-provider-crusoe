@@ -141,7 +141,10 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 
 	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
-	kubernetesCluster, _, err := ds.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, config.ID.ValueString())
+	kubernetesCluster, httpResp, err := ds.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, config.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read Kubernetes Cluster",
 			fmt.Sprintf("Error reading the Kubernetes Cluster: %s", common.UnpackAPIError(err)))
