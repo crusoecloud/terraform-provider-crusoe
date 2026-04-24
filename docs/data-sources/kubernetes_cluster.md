@@ -29,7 +29,10 @@ description: |-
 
 ### Read-Only
 
+- `apiserver_extra_args` (Map of String) Extra arguments passed to the kube-apiserver as key-value pairs.
+- `controller_manager_extra_args` (Map of String) Extra arguments passed to the kube-controller-manager as key-value pairs.
 - `dns_name` (String)
 - `id` (String) The ID of this resource.
 - `nodepool_ids` (List of String)
 - `private` (Boolean)
+- `scheduler_extra_args` (Map of String) Extra arguments passed to the kube-scheduler as key-value pairs.
