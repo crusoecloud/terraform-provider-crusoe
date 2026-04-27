@@ -27,19 +27,22 @@ type kubernetesClusterDataSource struct {
 }
 
 type kubernetesClusterDataSourceModel struct {
-	ID                    types.String `tfsdk:"id"`
-	ProjectID             types.String `tfsdk:"project_id"`
-	Name                  types.String `tfsdk:"name"`
-	Version               types.String `tfsdk:"version"`
-	SubnetID              types.String `tfsdk:"subnet_id"`
-	ClusterCidr           types.String `tfsdk:"cluster_cidr"`
-	NodeCidrMaskSize      types.Int64  `tfsdk:"node_cidr_mask_size"`
-	ServiceClusterIpRange types.String `tfsdk:"service_cluster_ip_range"`
-	AddOns                types.List   `tfsdk:"add_ons"`
-	Location              types.String `tfsdk:"location"`
-	DNSName               types.String `tfsdk:"dns_name"`
-	NodePoolIds           types.List   `tfsdk:"nodepool_ids"`
-	Private               types.Bool   `tfsdk:"private"`
+	ID                         types.String `tfsdk:"id"`
+	ProjectID                  types.String `tfsdk:"project_id"`
+	Name                       types.String `tfsdk:"name"`
+	Version                    types.String `tfsdk:"version"`
+	SubnetID                   types.String `tfsdk:"subnet_id"`
+	ClusterCidr                types.String `tfsdk:"cluster_cidr"`
+	NodeCidrMaskSize           types.Int64  `tfsdk:"node_cidr_mask_size"`
+	ServiceClusterIpRange      types.String `tfsdk:"service_cluster_ip_range"`
+	AddOns                     types.List   `tfsdk:"add_ons"`
+	Location                   types.String `tfsdk:"location"`
+	DNSName                    types.String `tfsdk:"dns_name"`
+	NodePoolIds                types.List   `tfsdk:"nodepool_ids"`
+	Private                    types.Bool   `tfsdk:"private"`
+	ApiserverExtraArgs         types.Map    `tfsdk:"apiserver_extra_args"`
+	SchedulerExtraArgs         types.Map    `tfsdk:"scheduler_extra_args"`
+	ControllerManagerExtraArgs types.Map    `tfsdk:"controller_manager_extra_args"`
 }
 
 func (ds *kubernetesClusterDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -107,6 +110,21 @@ func (ds *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sc
 			"private": schema.BoolAttribute{
 				Computed: true,
 			},
+			"apiserver_extra_args": schema.MapAttribute{
+				ElementType: types.StringType,
+				Computed:    true,
+				Description: "Extra arguments passed to the kube-apiserver as key-value pairs.",
+			},
+			"scheduler_extra_args": schema.MapAttribute{
+				ElementType: types.StringType,
+				Computed:    true,
+				Description: "Extra arguments passed to the kube-scheduler as key-value pairs.",
+			},
+			"controller_manager_extra_args": schema.MapAttribute{
+				ElementType: types.StringType,
+				Computed:    true,
+				Description: "Extra arguments passed to the kube-controller-manager as key-value pairs.",
+			},
 		},
 	}
 }
@@ -123,7 +141,10 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 
 	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
-	kubernetesCluster, _, err := ds.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, config.ID.ValueString())
+	kubernetesCluster, httpResp, err := ds.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, config.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read Kubernetes Cluster",
 			fmt.Sprintf("Error reading the Kubernetes Cluster: %s", common.UnpackAPIError(err)))
@@ -152,7 +173,13 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 	state.Location = types.StringValue(kubernetesCluster.Location)
 	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
 	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	resp.Diagnostics.Append(diags...)
 	state.Private = types.BoolValue(kubernetesCluster.Private)
+	state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
 	resp.Diagnostics.Append(diags...)
 
 	diags = resp.State.Set(ctx, &state)

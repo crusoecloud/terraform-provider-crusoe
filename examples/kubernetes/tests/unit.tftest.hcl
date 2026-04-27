@@ -2,7 +2,7 @@
 
 variables {
   name_prefix           = "tf-test-kubernetes-"
-  control_plane_version = "1.32.7-cmk.3"
+  control_plane_version = "1.33.4-cmk.73"
   location              = "us-east1-a"
   add_ons = [
     "cluster_autoscaler",

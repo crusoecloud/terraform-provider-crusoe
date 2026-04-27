@@ -43,25 +43,28 @@ func NewKubernetesClusterResource() resource.Resource {
 }
 
 type kubernetesClusterResourceModel struct {
-	ID                    types.String `tfsdk:"id"`
-	ProjectID             types.String `tfsdk:"project_id"`
-	Name                  types.String `tfsdk:"name"`
-	Version               types.String `tfsdk:"version"`
-	SubnetID              types.String `tfsdk:"subnet_id"`
-	ClusterCidr           types.String `tfsdk:"cluster_cidr"`
-	NodeCidrMaskSize      types.Int64  `tfsdk:"node_cidr_mask_size"`
-	ServiceClusterIpRange types.String `tfsdk:"service_cluster_ip_range"`
-	AddOns                types.List   `tfsdk:"add_ons"`
-	Location              types.String `tfsdk:"location"`
-	DNSName               types.String `tfsdk:"dns_name"`
-	NodePoolIds           types.List   `tfsdk:"nodepool_ids"`
-	OIDCIssuerURL         types.String `tfsdk:"oidc_issuer_url"`
-	OIDCClientID          types.String `tfsdk:"oidc_client_id"`
-	OIDCUsernameClaim     types.String `tfsdk:"oidc_username_claim"`
-	OIDCUsernamePrefix    types.String `tfsdk:"oidc_username_prefix"`
-	OIDCGroupsClaim       types.String `tfsdk:"oidc_groups_claim"`
-	OIDCCACert            types.String `tfsdk:"oidc_ca_cert"`
-	Private               types.Bool   `tfsdk:"private"`
+	ID                         types.String `tfsdk:"id"`
+	ProjectID                  types.String `tfsdk:"project_id"`
+	Name                       types.String `tfsdk:"name"`
+	Version                    types.String `tfsdk:"version"`
+	SubnetID                   types.String `tfsdk:"subnet_id"`
+	ClusterCidr                types.String `tfsdk:"cluster_cidr"`
+	NodeCidrMaskSize           types.Int64  `tfsdk:"node_cidr_mask_size"`
+	ServiceClusterIpRange      types.String `tfsdk:"service_cluster_ip_range"`
+	AddOns                     types.List   `tfsdk:"add_ons"`
+	Location                   types.String `tfsdk:"location"`
+	DNSName                    types.String `tfsdk:"dns_name"`
+	NodePoolIds                types.List   `tfsdk:"nodepool_ids"`
+	OIDCIssuerURL              types.String `tfsdk:"oidc_issuer_url"`
+	OIDCClientID               types.String `tfsdk:"oidc_client_id"`
+	OIDCUsernameClaim          types.String `tfsdk:"oidc_username_claim"`
+	OIDCUsernamePrefix         types.String `tfsdk:"oidc_username_prefix"`
+	OIDCGroupsClaim            types.String `tfsdk:"oidc_groups_claim"`
+	OIDCCACert                 types.String `tfsdk:"oidc_ca_cert"`
+	Private                    types.Bool   `tfsdk:"private"`
+	ApiserverExtraArgs         types.Map    `tfsdk:"apiserver_extra_args"`
+	SchedulerExtraArgs         types.Map    `tfsdk:"scheduler_extra_args"`
+	ControllerManagerExtraArgs types.Map    `tfsdk:"controller_manager_extra_args"`
 }
 
 func (r *kubernetesClusterResource) Configure(_ context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -188,6 +191,21 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				},
 				Default: booldefault.StaticBool(false), // Default to false
 			},
+			"apiserver_extra_args": schema.MapAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: "Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+			},
+			"scheduler_extra_args": schema.MapAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: "Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+			},
+			"controller_manager_extra_args": schema.MapAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: "Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+			},
 		},
 	}
 }
@@ -211,15 +229,18 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	createRequest := swagger.KubernetesClusterPostRequest{
-		AddOns:                addOns,
-		ClusterCidr:           plan.ClusterCidr.ValueString(),
-		Location:              plan.Location.ValueString(),
-		Name:                  plan.Name.ValueString(),
-		NodeCidrMaskSize:      int32(plan.NodeCidrMaskSize.ValueInt64()),
-		ServiceClusterIpRange: plan.ServiceClusterIpRange.ValueString(),
-		SubnetId:              plan.SubnetID.ValueString(),
-		Version:               plan.Version.ValueString(),
-		Private:               plan.Private.ValueBool(),
+		AddOns:                     addOns,
+		ClusterCidr:                plan.ClusterCidr.ValueString(),
+		Location:                   plan.Location.ValueString(),
+		Name:                       plan.Name.ValueString(),
+		NodeCidrMaskSize:           int32(plan.NodeCidrMaskSize.ValueInt64()),
+		ServiceClusterIpRange:      plan.ServiceClusterIpRange.ValueString(),
+		SubnetId:                   plan.SubnetID.ValueString(),
+		Version:                    plan.Version.ValueString(),
+		Private:                    plan.Private.ValueBool(),
+		ApiserverExtraArgs:         tfMapToStringMap(plan.ApiserverExtraArgs),
+		SchedulerExtraArgs:         tfMapToStringMap(plan.SchedulerExtraArgs),
+		ControllerManagerExtraArgs: tfMapToStringMap(plan.ControllerManagerExtraArgs),
 	}
 
 	authConfig, diagErr := buildOIDCAuthConfig(ctx, &plan)
@@ -265,6 +286,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	state.Location = types.StringValue(kubernetesCluster.Location)
 	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
 	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	resp.Diagnostics.Append(diags...)
 	state.OIDCIssuerURL = plan.OIDCIssuerURL
 	state.OIDCClientID = plan.OIDCClientID
 	state.OIDCUsernameClaim = plan.OIDCUsernameClaim
@@ -272,6 +294,11 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	state.OIDCGroupsClaim = plan.OIDCGroupsClaim
 	state.OIDCCACert = plan.OIDCCACert
 	state.Private = types.BoolValue(kubernetesCluster.Private)
+	state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
 	resp.Diagnostics.Append(diags...)
 
 	diags = resp.State.Set(ctx, &state)
@@ -336,6 +363,14 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 	state.OIDCGroupsClaim = stored.OIDCGroupsClaim
 	state.OIDCCACert = stored.OIDCCACert
 	state.Private = types.BoolValue(kubernetesCluster.Private)
+
+	state.ApiserverExtraArgs, diags = resolveExtraArg(stored.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.SchedulerExtraArgs, diags = resolveExtraArg(stored.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.ControllerManagerExtraArgs, diags = resolveExtraArg(stored.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
+	resp.Diagnostics.Append(diags...)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -346,7 +381,119 @@ func (r *kubernetesClusterResource) Update(
 	request resource.UpdateRequest,
 	response *resource.UpdateResponse,
 ) {
-	panic("Upgrading standard clusters to HA clusters is not currently supported")
+	var plan kubernetesClusterResourceModel
+	diags := request.Plan.Get(ctx, &plan)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	var state kubernetesClusterResourceModel
+	diags = request.State.Get(ctx, &state)
+	response.Diagnostics.Append(diags...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
+
+	apiserverArgs := tfMapToStringMap(plan.ApiserverExtraArgs)
+	schedulerArgs := tfMapToStringMap(plan.SchedulerExtraArgs)
+	controllerManagerArgs := tfMapToStringMap(plan.ControllerManagerExtraArgs)
+
+	// The client SDK uses omitempty on extra args map fields, so empty maps ({}) are
+	// serialized identically to nil and the API receives no fields to update.
+	// Clearing extra args via the provider is not supported until the SDK is fixed;
+	// direct users to the CLI instead.
+	if hasEmptyExtraArg(apiserverArgs, schedulerArgs, controllerManagerArgs) {
+		response.Diagnostics.AddError(
+			"Clearing extra args is not supported",
+			"Setting an extra args field to an empty map ({}) cannot be sent to the API due to a client SDK limitation. "+
+				"To clear extra args, use the Crusoe CLI: crusoe kubernetes clusters update --apiserver-extra-args '' <cluster-id>",
+		)
+
+		return
+	}
+
+	// All three are nil when the user leaves extra args unset (null) in config.
+	// The API rejects an empty PATCH, so skip it and accept the plan's null values.
+	if apiserverArgs == nil && schedulerArgs == nil && controllerManagerArgs == nil {
+		state.ApiserverExtraArgs = plan.ApiserverExtraArgs
+		state.SchedulerExtraArgs = plan.SchedulerExtraArgs
+		state.ControllerManagerExtraArgs = plan.ControllerManagerExtraArgs
+		diags = response.State.Set(ctx, &state)
+		response.Diagnostics.Append(diags...)
+
+		return
+	}
+
+	updateRequest := swagger.KubernetesClusterPatchRequest{
+		ApiserverExtraArgs:         apiserverArgs,
+		SchedulerExtraArgs:         schedulerArgs,
+		ControllerManagerExtraArgs: controllerManagerArgs,
+	}
+
+	asyncOperation, httpResp, err := r.client.APIClient.KubernetesClustersApi.UpdateCluster(ctx, updateRequest, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
+
+	if err != nil {
+		response.Diagnostics.AddError("Failed to update cluster",
+			fmt.Sprintf("Error starting an update cluster operation: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	_, _, err = common.AwaitOperationAndResolve[swagger.KubernetesCluster](ctx, asyncOperation.Operation, projectID, r.client.APIClient.KubernetesClusterOperationsApi.GetKubernetesClustersOperation)
+	if err != nil {
+		response.Diagnostics.AddError("Failed to update cluster",
+			fmt.Sprintf("Error updating the cluster: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	// The PATCH operation result does not include the full cluster object, so fetch
+	// the current state directly after the operation completes.
+	kubernetesCluster, httpResp2, err := r.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, state.ID.ValueString())
+	if httpResp2 != nil {
+		defer httpResp2.Body.Close()
+	}
+
+	if err != nil {
+		response.Diagnostics.AddError("Failed to read cluster after update",
+			fmt.Sprintf("Error reading the cluster: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	state.ID = types.StringValue(kubernetesCluster.Id)
+	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
+	state.Name = types.StringValue(kubernetesCluster.Name)
+	state.Version = types.StringValue(kubernetesCluster.Version)
+	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
+	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
+	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
+	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
+	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
+	response.Diagnostics.Append(diags...)
+	state.Location = types.StringValue(kubernetesCluster.Location)
+	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
+	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	response.Diagnostics.Append(diags...)
+	state.Private = types.BoolValue(kubernetesCluster.Private)
+
+	// For null plan fields, preserve null in state so the field stays unmanaged.
+	// For non-null plan fields, use the server response to reflect actual state.
+	state.ApiserverExtraArgs, diags = resolveExtraArg(plan.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
+	response.Diagnostics.Append(diags...)
+	state.SchedulerExtraArgs, diags = resolveExtraArg(plan.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
+	response.Diagnostics.Append(diags...)
+	state.ControllerManagerExtraArgs, diags = resolveExtraArg(plan.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
+	response.Diagnostics.Append(diags...)
+
+	diags = response.State.Set(ctx, &state)
+	response.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -398,6 +545,59 @@ func (r *kubernetesClusterResource) ImportState(ctx context.Context, req resourc
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), clusterID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
+}
+
+func tfMapToStringMap(tfMap types.Map) map[string]string {
+	if tfMap.IsNull() || tfMap.IsUnknown() {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for key, value := range tfMap.Elements() {
+		// The schema enforces ElementType: types.StringType, so this assertion always succeeds.
+		if strValue, ok := value.(types.String); ok {
+			result[key] = strValue.ValueString()
+		}
+	}
+
+	return result
+}
+
+func stringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
+	if m == nil {
+		return types.MapNull(types.StringType), nil
+	}
+
+	elements := make(map[string]attr.Value, len(m))
+	for k, v := range m {
+		elements[k] = types.StringValue(v)
+	}
+
+	return types.MapValue(types.StringType, elements)
+}
+
+// resolveExtraArg returns null when stored is null (field unconfigured), otherwise
+// converts apiValue to a types.Map. This prevents a perpetual plan diff when the
+// API returns {} for a field the user never set.
+func resolveExtraArg(stored types.Map, apiValue map[string]string) (types.Map, diag.Diagnostics) {
+	if stored.IsNull() {
+		return types.MapNull(types.StringType), nil
+	}
+
+	return stringMapToTFMap(apiValue)
+}
+
+// hasEmptyExtraArg reports whether any of the provided maps is non-nil but empty.
+// The client SDK serialises empty maps identically to nil (omitempty), so an empty
+// map cannot be used to clear args via PATCH; callers must detect this case explicitly.
+func hasEmptyExtraArg(maps ...map[string]string) bool {
+	for _, m := range maps {
+		if m != nil && len(m) == 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildOIDCAuthConfig(ctx context.Context, plan *kubernetesClusterResourceModel) (*swagger.KubernetesClusterAuthConfig, diag.Diagnostics) {

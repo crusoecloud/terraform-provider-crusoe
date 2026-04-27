@@ -1,0 +1,334 @@
+package kubernetes_cluster
+
+import (
+	"context"
+	"testing"
+
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+func TestKubernetesClusterResource_Metadata(t *testing.T) {
+	r := NewKubernetesClusterResource()
+
+	req := resource.MetadataRequest{ProviderTypeName: "crusoe"}
+	resp := &resource.MetadataResponse{}
+	r.Metadata(context.Background(), req, resp)
+
+	expected := "crusoe_kubernetes_cluster"
+	if resp.TypeName != expected {
+		t.Errorf("TypeName: expected %q, got %q", expected, resp.TypeName)
+	}
+}
+
+func TestKubernetesClusterResource_ExtraArgsSchemaAttributes(t *testing.T) {
+	r := NewKubernetesClusterResource()
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	for _, fieldName := range []string{"apiserver_extra_args", "scheduler_extra_args", "controller_manager_extra_args"} {
+		mapAttr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
+		if !ok {
+			t.Fatalf("%s attribute not found or not MapAttribute", fieldName)
+		}
+
+		if !mapAttr.Optional {
+			t.Errorf("%s should be optional", fieldName)
+		}
+
+		if mapAttr.ElementType != types.StringType {
+			t.Errorf("%s element type should be StringType", fieldName)
+		}
+	}
+}
+
+func TestTfMapToStringMap_Nil(t *testing.T) {
+	result := tfMapToStringMap(types.MapNull(types.StringType))
+	if result != nil {
+		t.Errorf("expected nil for null map, got %v", result)
+	}
+}
+
+func TestTfMapToStringMap_Unknown(t *testing.T) {
+	result := tfMapToStringMap(types.MapUnknown(types.StringType))
+	if result != nil {
+		t.Errorf("expected nil for unknown map, got %v", result)
+	}
+}
+
+func TestTfMapToStringMap_Values(t *testing.T) {
+	tfMap, diags := types.MapValue(types.StringType, map[string]attr.Value{
+		"key1": types.StringValue("val1"),
+		"key2": types.StringValue("val2"),
+	})
+	if diags.HasError() {
+		t.Fatalf("failed to build types.Map: %v", diags)
+	}
+
+	result := tfMapToStringMap(tfMap)
+
+	if len(result) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(result))
+	}
+	if result["key1"] != "val1" {
+		t.Errorf("key1: expected %q, got %q", "val1", result["key1"])
+	}
+	if result["key2"] != "val2" {
+		t.Errorf("key2: expected %q, got %q", "val2", result["key2"])
+	}
+}
+
+func TestStringMapToTFMap_Nil(t *testing.T) {
+	result, diags := stringMapToTFMap(nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !result.IsNull() {
+		t.Errorf("expected null map for nil input, got %v", result)
+	}
+}
+
+func TestStringMapToTFMap_Values(t *testing.T) {
+	input := map[string]string{
+		"flag1": "value1",
+		"flag2": "value2",
+	}
+
+	result, diags := stringMapToTFMap(input)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	elements := result.Elements()
+	if len(elements) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(elements))
+	}
+
+	for k, v := range input {
+		elem, ok := elements[k]
+		if !ok {
+			t.Errorf("missing key %q in result", k)
+
+			continue
+		}
+
+		strVal, ok := elem.(types.String)
+		if !ok {
+			t.Errorf("element %q is not types.String", k)
+
+			continue
+		}
+
+		if strVal.ValueString() != v {
+			t.Errorf("element %q: expected %q, got %q", k, v, strVal.ValueString())
+		}
+	}
+}
+
+func TestTfMapToStringMap_RoundTrip(t *testing.T) {
+	input := map[string]string{
+		"audit-log-maxage":         "30",
+		"enable-admission-plugins": "NodeRestriction",
+	}
+
+	tfMap, diags := stringMapToTFMap(input)
+	if diags.HasError() {
+		t.Fatalf("stringMapToTFMap diagnostics: %v", diags)
+	}
+
+	result := tfMapToStringMap(tfMap)
+
+	if len(result) != len(input) {
+		t.Fatalf("expected %d entries, got %d", len(input), len(result))
+	}
+
+	for k, v := range input {
+		if result[k] != v {
+			t.Errorf("key %q: expected %q, got %q", k, v, result[k])
+		}
+	}
+}
+
+// Sad path: empty (non-null) map must NOT become nil.
+// The PATCH API distinguishes nil (preserve existing args) from empty (clear args),
+// so losing the distinction here would silently break arg removal.
+func TestTfMapToStringMap_EmptyMapIsNotNil(t *testing.T) {
+	tfMap, diags := types.MapValue(types.StringType, map[string]attr.Value{})
+	if diags.HasError() {
+		t.Fatalf("failed to build empty types.Map: %v", diags)
+	}
+
+	result := tfMapToStringMap(tfMap)
+
+	if result == nil {
+		t.Error("expected empty map (not nil) for empty non-null types.Map; nil would preserve args instead of clearing them")
+	}
+
+	if len(result) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(result))
+	}
+}
+
+// Sad path: empty Go map must produce a non-null types.Map.
+// A null result would be indistinguishable from "not set" in state.
+func TestStringMapToTFMap_EmptyMapIsNotNull(t *testing.T) {
+	result, diags := stringMapToTFMap(map[string]string{})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if result.IsNull() {
+		t.Error("expected non-null types.Map for empty (non-nil) Go map")
+	}
+
+	if len(result.Elements()) != 0 {
+		t.Errorf("expected 0 elements, got %d", len(result.Elements()))
+	}
+}
+
+// Sad path: an empty-string value must be preserved, not dropped.
+// Flags like --some-flag="" are valid and must round-trip correctly.
+func TestTfMapToStringMap_PreservesEmptyStringValue(t *testing.T) {
+	tfMap, diags := types.MapValue(types.StringType, map[string]attr.Value{
+		"flag-with-empty-value": types.StringValue(""),
+	})
+	if diags.HasError() {
+		t.Fatalf("failed to build types.Map: %v", diags)
+	}
+
+	result := tfMapToStringMap(tfMap)
+
+	v, ok := result["flag-with-empty-value"]
+	if !ok {
+		t.Fatal("key \"flag-with-empty-value\" was dropped; empty-string values must be preserved")
+	}
+
+	if v != "" {
+		t.Errorf("expected empty string, got %q", v)
+	}
+}
+
+// Sad path: extra args fields must not have RequiresReplace.
+// These fields are updated in-place via PATCH; RequiresReplace would force
+// unnecessary cluster recreation on every extra-args change.
+func TestKubernetesClusterResource_ExtraArgsHaveNoRequiresReplace(t *testing.T) {
+	r := NewKubernetesClusterResource()
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	for _, fieldName := range []string{"apiserver_extra_args", "scheduler_extra_args", "controller_manager_extra_args"} {
+		mapAttr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
+		if !ok {
+			t.Fatalf("%s attribute not found or not MapAttribute", fieldName)
+		}
+
+		if len(mapAttr.PlanModifiers) != 0 {
+			t.Errorf("%s should have no plan modifiers (got %d); adding RequiresReplace would force cluster recreation on arg changes",
+				fieldName, len(mapAttr.PlanModifiers))
+		}
+	}
+}
+
+// resolveExtraArg must return null when stored is null (unconfigured), and the
+// converted API value otherwise. This is what prevents the perpetual plan diff
+// when the API returns {} for a field the user never set in config.
+func TestResolveExtraArg_NullStoredReturnsNull(t *testing.T) {
+	result, diags := resolveExtraArg(types.MapNull(types.StringType), map[string]string{"k": "v"})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !result.IsNull() {
+		t.Error("expected null map when stored is null, even if API returns values")
+	}
+}
+
+func TestResolveExtraArg_NonNullStoredReturnsAPIValue(t *testing.T) {
+	stored, diags := types.MapValue(types.StringType, map[string]attr.Value{
+		"existing": types.StringValue("val"),
+	})
+	if diags.HasError() {
+		t.Fatalf("failed to build stored map: %v", diags)
+	}
+
+	result, diags := resolveExtraArg(stored, map[string]string{"k": "v"})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if result.IsNull() {
+		t.Error("expected non-null map when stored is non-null")
+	}
+
+	elems := result.Elements()
+	v, ok := elems["k"]
+	if !ok {
+		t.Fatalf("expected key 'k' in result, got %v", elems)
+	}
+
+	strVal, ok := v.(types.String)
+	if !ok || strVal.ValueString() != "v" {
+		t.Errorf("expected key 'k'='v', got %v", v)
+	}
+}
+
+func TestResolveExtraArg_NullStoredWithNilAPI(t *testing.T) {
+	result, diags := resolveExtraArg(types.MapNull(types.StringType), nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !result.IsNull() {
+		t.Error("expected null map when stored is null and API returns nil")
+	}
+}
+
+// hasEmptyExtraArg must return true when any map is non-nil but empty, and false otherwise.
+// This is the condition that gates the SDK-limitation error in Update.
+func TestHasEmptyExtraArg(t *testing.T) {
+	cases := []struct {
+		name string
+		maps []map[string]string
+		want bool
+	}{
+		{"nil only", []map[string]string{nil}, false},
+		{"all nil", []map[string]string{nil, nil, nil}, false},
+		{"one empty", []map[string]string{{}}, true},
+		{"empty among nils", []map[string]string{nil, {}, nil}, true},
+		{"non-empty", []map[string]string{{"k": "v"}}, false},
+		{"mixed non-empty and nil", []map[string]string{{"k": "v"}, nil}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasEmptyExtraArg(tc.maps...); got != tc.want {
+				t.Errorf("hasEmptyExtraArg(%v) = %v, want %v", tc.maps, got, tc.want)
+			}
+		})
+	}
+}
+
+// Sad path: extra args fields must not be Computed.
+// Marking them Computed would cause Terraform to silently overwrite user config
+// with API state when args are unset, masking drift.
+func TestKubernetesClusterResource_ExtraArgsAreNotComputed(t *testing.T) {
+	r := NewKubernetesClusterResource()
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	for _, fieldName := range []string{"apiserver_extra_args", "scheduler_extra_args", "controller_manager_extra_args"} {
+		mapAttr, ok := schemaResp.Schema.Attributes[fieldName].(schema.MapAttribute)
+		if !ok {
+			t.Fatalf("%s attribute not found or not MapAttribute", fieldName)
+		}
+
+		if mapAttr.Computed {
+			t.Errorf("%s must not be Computed; that would silently overwrite user config with API state", fieldName)
+		}
+	}
+}
