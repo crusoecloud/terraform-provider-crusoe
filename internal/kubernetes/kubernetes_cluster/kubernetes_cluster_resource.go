@@ -423,7 +423,6 @@ func (r *kubernetesClusterResource) Update(
 	// Clearing extra args via the provider is not supported until the SDK is fixed;
 	// direct users to the CLI instead.
 	if hasEmptyExtraArg(apiserverArgs, schedulerArgs, controllerManagerArgs) {
-
 		response.Diagnostics.AddError(
 			"Clearing extra args is not supported",
 			"Setting an extra args field to an empty map ({}) cannot be sent to the API due to a client SDK limitation. "+

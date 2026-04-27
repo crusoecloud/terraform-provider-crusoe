@@ -238,9 +238,9 @@ func TestKubernetesClusterResource_ExtraArgsHaveNoRequiresReplace(t *testing.T) 
 // This is the condition that gates the SDK-limitation error in Update.
 func TestHasEmptyExtraArg(t *testing.T) {
 	cases := []struct {
-		name  string
-		maps  []map[string]string
-		want  bool
+		name string
+		maps []map[string]string
+		want bool
 	}{
 		{"nil only", []map[string]string{nil}, false},
 		{"all nil", []map[string]string{nil, nil, nil}, false},
