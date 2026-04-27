@@ -27,6 +27,7 @@ description: |-
 - `disks` (Attributes Set) (see [below for nested schema](#nestedatt--disks))
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `image` (String)
+- `install_crusoe_watch_agent` (Boolean) Whether to install the Crusoe Watch Agent on the VM. Defaults to false.
 - `location` (String)
 - `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
 - `nvlink_domain_id` (String) NVLink domain ID to use for NVLink communication.

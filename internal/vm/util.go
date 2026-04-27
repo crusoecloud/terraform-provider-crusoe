@@ -281,4 +281,10 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 	} else {
 		state.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
 	}
+
+	// install_crusoe_watch_agent is not returned by the API (create-time-only flag);
+	// preserve the existing state value, defaulting to false when empty (e.g., imports).
+	if state.InstallCrusoeWatchAgent.IsNull() || state.InstallCrusoeWatchAgent.IsUnknown() {
+		state.InstallCrusoeWatchAgent = types.BoolValue(false)
+	}
 }

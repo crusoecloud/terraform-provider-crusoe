@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -26,25 +27,26 @@ type vmByTemplateResource struct {
 }
 
 type vmByTemplateResourceModel struct {
-	NamePrefix          types.String `tfsdk:"name_prefix"`
-	InstanceTemplateID  types.String `tfsdk:"instance_template"`
-	ID                  types.String `tfsdk:"id"`
-	ProjectID           types.String `tfsdk:"project_id"`
-	Name                types.String `tfsdk:"name"`
-	Type                types.String `tfsdk:"type"`
-	SSHKey              types.String `tfsdk:"ssh_key"`
-	Location            types.String `tfsdk:"location"`
-	Image               types.String `tfsdk:"image"`
-	StartupScript       types.String `tfsdk:"startup_script"`
-	ShutdownScript      types.String `tfsdk:"shutdown_script"`
-	FQDN                types.String `tfsdk:"fqdn"`
-	InternalDNSName     types.String `tfsdk:"internal_dns_name"`
-	ExternalDNSName     types.String `tfsdk:"external_dns_name"`
-	Disks               types.Set    `tfsdk:"disks"`
-	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
-	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
-	ReservationID       types.String `tfsdk:"reservation_id"`
-	NvlinkDomainID      types.String `tfsdk:"nvlink_domain_id"`
+	NamePrefix              types.String `tfsdk:"name_prefix"`
+	InstanceTemplateID      types.String `tfsdk:"instance_template"`
+	ID                      types.String `tfsdk:"id"`
+	ProjectID               types.String `tfsdk:"project_id"`
+	Name                    types.String `tfsdk:"name"`
+	Type                    types.String `tfsdk:"type"`
+	SSHKey                  types.String `tfsdk:"ssh_key"`
+	Location                types.String `tfsdk:"location"`
+	Image                   types.String `tfsdk:"image"`
+	StartupScript           types.String `tfsdk:"startup_script"`
+	ShutdownScript          types.String `tfsdk:"shutdown_script"`
+	FQDN                    types.String `tfsdk:"fqdn"`
+	InternalDNSName         types.String `tfsdk:"internal_dns_name"`
+	ExternalDNSName         types.String `tfsdk:"external_dns_name"`
+	Disks                   types.Set    `tfsdk:"disks"`
+	NetworkInterfaces       types.List   `tfsdk:"network_interfaces"`
+	HostChannelAdapters     types.List   `tfsdk:"host_channel_adapters"`
+	ReservationID           types.String `tfsdk:"reservation_id"`
+	NvlinkDomainID          types.String `tfsdk:"nvlink_domain_id"`
+	InstallCrusoeWatchAgent types.Bool   `tfsdk:"install_crusoe_watch_agent"`
 }
 
 func NewVMByTemplateResource() resource.Resource {
@@ -233,6 +235,12 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 				Description:   "NVLink domain ID to use for NVLink communication.",
 			},
+			"install_crusoe_watch_agent": schema.BoolAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
+				Description:   "Whether to install the Crusoe Watch Agent on the VM. Defaults to false.",
+			},
 		},
 	}
 }
@@ -269,10 +277,17 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	var installCrusoeWatchAgent *bool
+	if !plan.InstallCrusoeWatchAgent.IsNull() && !plan.InstallCrusoeWatchAgent.IsUnknown() {
+		v := plan.InstallCrusoeWatchAgent.ValueBool()
+		installCrusoeWatchAgent = &v
+	}
+
 	dataResp, httpResp, err := r.client.APIClient.VMsApi.BulkCreateInstance(ctx, swagger.BulkInstancePostRequestV1Alpha5{
-		NamePrefix:         plan.NamePrefix.ValueString(),
-		Count:              1,
-		InstanceTemplateId: instanceTemplateID,
+		NamePrefix:              plan.NamePrefix.ValueString(),
+		Count:                   1,
+		InstanceTemplateId:      instanceTemplateID,
+		InstallCrusoeWatchAgent: installCrusoeWatchAgent,
 	}, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
@@ -306,6 +321,12 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	plan.ProjectID = types.StringValue(projectID)
 	plan.Type = types.StringValue(instance.Type_)
 	plan.Location = types.StringValue(instance.Location)
+
+	// install_crusoe_watch_agent is a create-time-only flag not returned by the API;
+	// preserve the user's chosen value, defaulting to false (the API default) when unset.
+	if plan.InstallCrusoeWatchAgent.IsNull() || plan.InstallCrusoeWatchAgent.IsUnknown() {
+		plan.InstallCrusoeWatchAgent = types.BoolValue(false)
+	}
 
 	if instance.ReservationId != "" {
 		plan.ReservationID = types.StringValue(instance.ReservationId)
@@ -394,6 +415,12 @@ func (r *vmByTemplateResource) Read(ctx context.Context, req resource.ReadReques
 	var vmState vmResourceModel
 	vmToTerraformResourceModel(instance, &vmState)
 	resp.State.Set(ctx, &vmState)
+
+	// install_crusoe_watch_agent is not returned by the API (create-time-only flag);
+	// preserve the existing state value, defaulting to false when empty (e.g., imports).
+	if state.InstallCrusoeWatchAgent.IsNull() || state.InstallCrusoeWatchAgent.IsUnknown() {
+		state.InstallCrusoeWatchAgent = types.BoolValue(false)
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
