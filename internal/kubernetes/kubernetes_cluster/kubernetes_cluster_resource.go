@@ -364,29 +364,12 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 	state.OIDCCACert = stored.OIDCCACert
 	state.Private = types.BoolValue(kubernetesCluster.Private)
 
-	// Preserve null in state for fields the user has not configured.
-	// Without this, an API response of {} would produce a non-null empty map and
-	// cause a perpetual plan diff against a null config value.
-	if stored.ApiserverExtraArgs.IsNull() {
-		state.ApiserverExtraArgs = types.MapNull(types.StringType)
-	} else {
-		state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
-		resp.Diagnostics.Append(diags...)
-	}
-
-	if stored.SchedulerExtraArgs.IsNull() {
-		state.SchedulerExtraArgs = types.MapNull(types.StringType)
-	} else {
-		state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
-		resp.Diagnostics.Append(diags...)
-	}
-
-	if stored.ControllerManagerExtraArgs.IsNull() {
-		state.ControllerManagerExtraArgs = types.MapNull(types.StringType)
-	} else {
-		state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
-		resp.Diagnostics.Append(diags...)
-	}
+	state.ApiserverExtraArgs, diags = resolveExtraArg(stored.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.SchedulerExtraArgs, diags = resolveExtraArg(stored.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
+	resp.Diagnostics.Append(diags...)
+	state.ControllerManagerExtraArgs, diags = resolveExtraArg(stored.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
+	resp.Diagnostics.Append(diags...)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -502,26 +485,12 @@ func (r *kubernetesClusterResource) Update(
 
 	// For null plan fields, preserve null in state so the field stays unmanaged.
 	// For non-null plan fields, use the server response to reflect actual state.
-	if plan.ApiserverExtraArgs.IsNull() {
-		state.ApiserverExtraArgs = types.MapNull(types.StringType)
-	} else {
-		state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
-		response.Diagnostics.Append(diags...)
-	}
-
-	if plan.SchedulerExtraArgs.IsNull() {
-		state.SchedulerExtraArgs = types.MapNull(types.StringType)
-	} else {
-		state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
-		response.Diagnostics.Append(diags...)
-	}
-
-	if plan.ControllerManagerExtraArgs.IsNull() {
-		state.ControllerManagerExtraArgs = types.MapNull(types.StringType)
-	} else {
-		state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
-		response.Diagnostics.Append(diags...)
-	}
+	state.ApiserverExtraArgs, diags = resolveExtraArg(plan.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
+	response.Diagnostics.Append(diags...)
+	state.SchedulerExtraArgs, diags = resolveExtraArg(plan.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
+	response.Diagnostics.Append(diags...)
+	state.ControllerManagerExtraArgs, diags = resolveExtraArg(plan.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
+	response.Diagnostics.Append(diags...)
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
@@ -605,6 +574,17 @@ func stringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
 	}
 
 	return types.MapValue(types.StringType, elements)
+}
+
+// resolveExtraArg returns null when stored is null (field unconfigured), otherwise
+// converts apiValue to a types.Map. This prevents a perpetual plan diff when the
+// API returns {} for a field the user never set.
+func resolveExtraArg(stored types.Map, apiValue map[string]string) (types.Map, diag.Diagnostics) {
+	if stored.IsNull() {
+		return types.MapNull(types.StringType), nil
+	}
+
+	return stringMapToTFMap(apiValue)
 }
 
 // hasEmptyExtraArg reports whether any of the provided maps is non-nil but empty.

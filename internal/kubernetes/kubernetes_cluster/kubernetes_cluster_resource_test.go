@@ -234,6 +234,60 @@ func TestKubernetesClusterResource_ExtraArgsHaveNoRequiresReplace(t *testing.T) 
 	}
 }
 
+// resolveExtraArg must return null when stored is null (unconfigured), and the
+// converted API value otherwise. This is what prevents the perpetual plan diff
+// when the API returns {} for a field the user never set in config.
+func TestResolveExtraArg_NullStoredReturnsNull(t *testing.T) {
+	result, diags := resolveExtraArg(types.MapNull(types.StringType), map[string]string{"k": "v"})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !result.IsNull() {
+		t.Error("expected null map when stored is null, even if API returns values")
+	}
+}
+
+func TestResolveExtraArg_NonNullStoredReturnsAPIValue(t *testing.T) {
+	stored, diags := types.MapValue(types.StringType, map[string]attr.Value{
+		"existing": types.StringValue("val"),
+	})
+	if diags.HasError() {
+		t.Fatalf("failed to build stored map: %v", diags)
+	}
+
+	result, diags := resolveExtraArg(stored, map[string]string{"k": "v"})
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if result.IsNull() {
+		t.Error("expected non-null map when stored is non-null")
+	}
+
+	elems := result.Elements()
+	v, ok := elems["k"]
+	if !ok {
+		t.Fatalf("expected key 'k' in result, got %v", elems)
+	}
+
+	strVal, ok := v.(types.String)
+	if !ok || strVal.ValueString() != "v" {
+		t.Errorf("expected key 'k'='v', got %v", v)
+	}
+}
+
+func TestResolveExtraArg_NullStoredWithNilAPI(t *testing.T) {
+	result, diags := resolveExtraArg(types.MapNull(types.StringType), nil)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !result.IsNull() {
+		t.Error("expected null map when stored is null and API returns nil")
+	}
+}
+
 // hasEmptyExtraArg must return true when any map is non-nil but empty, and false otherwise.
 // This is the condition that gates the SDK-limitation error in Update.
 func TestHasEmptyExtraArg(t *testing.T) {
