@@ -1,3 +1,10 @@
+## 0.8.0
+
+ENHANCEMENTS:
+
+- Added `apiserver_extra_args`, `scheduler_extra_args`, and `controller_manager_extra_args` fields to the `crusoe_kubernetes_cluster` resource, allowing custom flags to be passed to kube-apiserver, kube-scheduler, and kube-controller-manager. Changes take effect after a cluster rotation.
+- Added the same three fields as computed attributes on the `crusoe_kubernetes_cluster` data source.
+
 ## 0.7.0
 
 FEATURES:
