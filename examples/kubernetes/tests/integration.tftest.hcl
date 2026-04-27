@@ -142,4 +142,14 @@ run "clear_extra_args" {
     condition     = crusoe_kubernetes_cluster.my_cluster.apiserver_extra_args == tomap({})
     error_message = "Expected apiserver_extra_args to be empty after clearing."
   }
+
+  assert {
+    condition     = crusoe_kubernetes_cluster.my_cluster.scheduler_extra_args == tomap({})
+    error_message = "Expected scheduler_extra_args to be empty after clearing."
+  }
+
+  assert {
+    condition     = crusoe_kubernetes_cluster.my_cluster.controller_manager_extra_args == tomap({})
+    error_message = "Expected controller_manager_extra_args to be empty after clearing."
+  }
 }
