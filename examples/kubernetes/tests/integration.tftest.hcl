@@ -70,7 +70,7 @@ run "set_extra_args" {
 
   # Cluster must not have been recreated — same ID proves in-place update.
   assert {
-    condition     = crusoe_kubernetes_cluster.my_cluster.id == run.validate_create_kubernetes_cluster.crusoe_kubernetes_cluster.my_cluster.id
+    condition     = crusoe_kubernetes_cluster.my_cluster.id == run.validate_create_kubernetes_cluster.cluster.id
     error_message = "Cluster was recreated instead of updated in-place when setting extra args."
   }
 
@@ -108,7 +108,7 @@ run "update_extra_args" {
   }
 
   assert {
-    condition     = crusoe_kubernetes_cluster.my_cluster.id == run.validate_create_kubernetes_cluster.crusoe_kubernetes_cluster.my_cluster.id
+    condition     = crusoe_kubernetes_cluster.my_cluster.id == run.validate_create_kubernetes_cluster.cluster.id
     error_message = "Cluster was recreated instead of updated in-place when updating extra args."
   }
 
