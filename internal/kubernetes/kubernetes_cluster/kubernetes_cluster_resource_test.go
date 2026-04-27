@@ -46,14 +46,14 @@ func TestKubernetesClusterResource_ExtraArgsSchemaAttributes(t *testing.T) {
 }
 
 func TestTfMapToStringMap_Nil(t *testing.T) {
-	result := tfMapToStringMap(context.Background(), types.MapNull(types.StringType))
+	result := tfMapToStringMap(types.MapNull(types.StringType))
 	if result != nil {
 		t.Errorf("expected nil for null map, got %v", result)
 	}
 }
 
 func TestTfMapToStringMap_Unknown(t *testing.T) {
-	result := tfMapToStringMap(context.Background(), types.MapUnknown(types.StringType))
+	result := tfMapToStringMap(types.MapUnknown(types.StringType))
 	if result != nil {
 		t.Errorf("expected nil for unknown map, got %v", result)
 	}
@@ -68,7 +68,7 @@ func TestTfMapToStringMap_Values(t *testing.T) {
 		t.Fatalf("failed to build types.Map: %v", diags)
 	}
 
-	result := tfMapToStringMap(context.Background(), tfMap)
+	result := tfMapToStringMap(tfMap)
 
 	if len(result) != 2 {
 		t.Fatalf("expected 2 entries, got %d", len(result))
@@ -82,7 +82,7 @@ func TestTfMapToStringMap_Values(t *testing.T) {
 }
 
 func TestStringMapToTFMap_Nil(t *testing.T) {
-	result, diags := stringMapToTFMap(context.Background(), nil)
+	result, diags := stringMapToTFMap(nil)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -98,7 +98,7 @@ func TestStringMapToTFMap_Values(t *testing.T) {
 		"flag2": "value2",
 	}
 
-	result, diags := stringMapToTFMap(context.Background(), input)
+	result, diags := stringMapToTFMap(input)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -135,12 +135,12 @@ func TestTfMapToStringMap_RoundTrip(t *testing.T) {
 		"enable-admission-plugins": "NodeRestriction",
 	}
 
-	tfMap, diags := stringMapToTFMap(context.Background(), input)
+	tfMap, diags := stringMapToTFMap(input)
 	if diags.HasError() {
 		t.Fatalf("stringMapToTFMap diagnostics: %v", diags)
 	}
 
-	result := tfMapToStringMap(context.Background(), tfMap)
+	result := tfMapToStringMap(tfMap)
 
 	if len(result) != len(input) {
 		t.Fatalf("expected %d entries, got %d", len(input), len(result))
@@ -162,7 +162,7 @@ func TestTfMapToStringMap_EmptyMapIsNotNil(t *testing.T) {
 		t.Fatalf("failed to build empty types.Map: %v", diags)
 	}
 
-	result := tfMapToStringMap(context.Background(), tfMap)
+	result := tfMapToStringMap(tfMap)
 
 	if result == nil {
 		t.Error("expected empty map (not nil) for empty non-null types.Map; nil would preserve args instead of clearing them")
@@ -176,7 +176,7 @@ func TestTfMapToStringMap_EmptyMapIsNotNil(t *testing.T) {
 // Sad path: empty Go map must produce a non-null types.Map.
 // A null result would be indistinguishable from "not set" in state.
 func TestStringMapToTFMap_EmptyMapIsNotNull(t *testing.T) {
-	result, diags := stringMapToTFMap(context.Background(), map[string]string{})
+	result, diags := stringMapToTFMap(map[string]string{})
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -200,7 +200,7 @@ func TestTfMapToStringMap_PreservesEmptyStringValue(t *testing.T) {
 		t.Fatalf("failed to build types.Map: %v", diags)
 	}
 
-	result := tfMapToStringMap(context.Background(), tfMap)
+	result := tfMapToStringMap(tfMap)
 
 	v, ok := result["flag-with-empty-value"]
 	if !ok {
@@ -231,6 +231,30 @@ func TestKubernetesClusterResource_ExtraArgsHaveNoRequiresReplace(t *testing.T) 
 			t.Errorf("%s should have no plan modifiers (got %d); adding RequiresReplace would force cluster recreation on arg changes",
 				fieldName, len(mapAttr.PlanModifiers))
 		}
+	}
+}
+
+// hasEmptyExtraArg must return true when any map is non-nil but empty, and false otherwise.
+// This is the condition that gates the SDK-limitation error in Update.
+func TestHasEmptyExtraArg(t *testing.T) {
+	cases := []struct {
+		name  string
+		maps  []map[string]string
+		want  bool
+	}{
+		{"nil only", []map[string]string{nil}, false},
+		{"all nil", []map[string]string{nil, nil, nil}, false},
+		{"one empty", []map[string]string{{}}, true},
+		{"empty among nils", []map[string]string{nil, {}, nil}, true},
+		{"non-empty", []map[string]string{{"k": "v"}}, false},
+		{"mixed non-empty and nil", []map[string]string{{"k": "v"}, nil}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasEmptyExtraArg(tc.maps...); got != tc.want {
+				t.Errorf("hasEmptyExtraArg(%v) = %v, want %v", tc.maps, got, tc.want)
+			}
+		})
 	}
 }
 

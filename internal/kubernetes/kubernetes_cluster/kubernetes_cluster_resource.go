@@ -238,9 +238,9 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		SubnetId:                   plan.SubnetID.ValueString(),
 		Version:                    plan.Version.ValueString(),
 		Private:                    plan.Private.ValueBool(),
-		ApiserverExtraArgs:         tfMapToStringMap(ctx, plan.ApiserverExtraArgs),
-		SchedulerExtraArgs:         tfMapToStringMap(ctx, plan.SchedulerExtraArgs),
-		ControllerManagerExtraArgs: tfMapToStringMap(ctx, plan.ControllerManagerExtraArgs),
+		ApiserverExtraArgs:         tfMapToStringMap(plan.ApiserverExtraArgs),
+		SchedulerExtraArgs:         tfMapToStringMap(plan.SchedulerExtraArgs),
+		ControllerManagerExtraArgs: tfMapToStringMap(plan.ControllerManagerExtraArgs),
 	}
 
 	authConfig, diagErr := buildOIDCAuthConfig(ctx, &plan)
@@ -294,11 +294,11 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	state.OIDCGroupsClaim = plan.OIDCGroupsClaim
 	state.OIDCCACert = plan.OIDCCACert
 	state.Private = types.BoolValue(kubernetesCluster.Private)
-	state.ApiserverExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ApiserverExtraArgs)
+	state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
 	resp.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.SchedulerExtraArgs)
+	state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
 	resp.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ControllerManagerExtraArgs)
+	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
 	resp.Diagnostics.Append(diags...)
 
 	diags = resp.State.Set(ctx, &state)
@@ -363,12 +363,30 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 	state.OIDCGroupsClaim = stored.OIDCGroupsClaim
 	state.OIDCCACert = stored.OIDCCACert
 	state.Private = types.BoolValue(kubernetesCluster.Private)
-	state.ApiserverExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ApiserverExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.SchedulerExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ControllerManagerExtraArgs)
-	resp.Diagnostics.Append(diags...)
+
+	// Preserve null in state for fields the user has not configured.
+	// Without this, an API response of {} would produce a non-null empty map and
+	// cause a perpetual plan diff against a null config value.
+	if stored.ApiserverExtraArgs.IsNull() {
+		state.ApiserverExtraArgs = types.MapNull(types.StringType)
+	} else {
+		state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
+		resp.Diagnostics.Append(diags...)
+	}
+
+	if stored.SchedulerExtraArgs.IsNull() {
+		state.SchedulerExtraArgs = types.MapNull(types.StringType)
+	} else {
+		state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
+		resp.Diagnostics.Append(diags...)
+	}
+
+	if stored.ControllerManagerExtraArgs.IsNull() {
+		state.ControllerManagerExtraArgs = types.MapNull(types.StringType)
+	} else {
+		state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
+		resp.Diagnostics.Append(diags...)
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -396,17 +414,15 @@ func (r *kubernetesClusterResource) Update(
 
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-	apiserverArgs := tfMapToStringMap(ctx, plan.ApiserverExtraArgs)
-	schedulerArgs := tfMapToStringMap(ctx, plan.SchedulerExtraArgs)
-	controllerManagerArgs := tfMapToStringMap(ctx, plan.ControllerManagerExtraArgs)
+	apiserverArgs := tfMapToStringMap(plan.ApiserverExtraArgs)
+	schedulerArgs := tfMapToStringMap(plan.SchedulerExtraArgs)
+	controllerManagerArgs := tfMapToStringMap(plan.ControllerManagerExtraArgs)
 
 	// The client SDK uses omitempty on extra args map fields, so empty maps ({}) are
 	// serialized identically to nil and the API receives no fields to update.
 	// Clearing extra args via the provider is not supported until the SDK is fixed;
 	// direct users to the CLI instead.
-	if len(apiserverArgs) == 0 && apiserverArgs != nil ||
-		len(schedulerArgs) == 0 && schedulerArgs != nil ||
-		len(controllerManagerArgs) == 0 && controllerManagerArgs != nil {
+	if hasEmptyExtraArg(apiserverArgs, schedulerArgs, controllerManagerArgs) {
 
 		response.Diagnostics.AddError(
 			"Clearing extra args is not supported",
@@ -490,21 +506,21 @@ func (r *kubernetesClusterResource) Update(
 	if plan.ApiserverExtraArgs.IsNull() {
 		state.ApiserverExtraArgs = types.MapNull(types.StringType)
 	} else {
-		state.ApiserverExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ApiserverExtraArgs)
+		state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
 		response.Diagnostics.Append(diags...)
 	}
 
 	if plan.SchedulerExtraArgs.IsNull() {
 		state.SchedulerExtraArgs = types.MapNull(types.StringType)
 	} else {
-		state.SchedulerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.SchedulerExtraArgs)
+		state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
 		response.Diagnostics.Append(diags...)
 	}
 
 	if plan.ControllerManagerExtraArgs.IsNull() {
 		state.ControllerManagerExtraArgs = types.MapNull(types.StringType)
 	} else {
-		state.ControllerManagerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ControllerManagerExtraArgs)
+		state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
 		response.Diagnostics.Append(diags...)
 	}
 
@@ -563,7 +579,7 @@ func (r *kubernetesClusterResource) ImportState(ctx context.Context, req resourc
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
-func tfMapToStringMap(ctx context.Context, tfMap types.Map) map[string]string {
+func tfMapToStringMap(tfMap types.Map) map[string]string {
 	if tfMap.IsNull() || tfMap.IsUnknown() {
 		return nil
 	}
@@ -579,7 +595,7 @@ func tfMapToStringMap(ctx context.Context, tfMap types.Map) map[string]string {
 	return result
 }
 
-func stringMapToTFMap(ctx context.Context, m map[string]string) (types.Map, diag.Diagnostics) {
+func stringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
 	if m == nil {
 		return types.MapNull(types.StringType), nil
 	}
@@ -590,6 +606,19 @@ func stringMapToTFMap(ctx context.Context, m map[string]string) (types.Map, diag
 	}
 
 	return types.MapValue(types.StringType, elements)
+}
+
+// hasEmptyExtraArg reports whether any of the provided maps is non-nil but empty.
+// The client SDK serialises empty maps identically to nil (omitempty), so an empty
+// map cannot be used to clear args via PATCH; callers must detect this case explicitly.
+func hasEmptyExtraArg(maps ...map[string]string) bool {
+	for _, m := range maps {
+		if m != nil && len(m) == 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildOIDCAuthConfig(ctx context.Context, plan *kubernetesClusterResourceModel) (*swagger.KubernetesClusterAuthConfig, diag.Diagnostics) {
