@@ -96,8 +96,8 @@ run "update_extra_args" {
 
   variables {
     apiserver_extra_args = {
-      "audit-log-maxage"         = "60"
-      "enable-admission-plugins" = "NodeRestriction"
+      "audit-log-maxage"    = "60"
+      "audit-log-maxbackup" = "5"
     }
     scheduler_extra_args = {
       "v" = "2"
@@ -118,8 +118,8 @@ run "update_extra_args" {
   }
 
   assert {
-    condition     = crusoe_kubernetes_cluster.my_cluster.apiserver_extra_args["enable-admission-plugins"] == "NodeRestriction"
-    error_message = "Expected apiserver_extra_args[enable-admission-plugins] to be 'NodeRestriction'."
+    condition     = crusoe_kubernetes_cluster.my_cluster.apiserver_extra_args["audit-log-maxbackup"] == "5"
+    error_message = "Expected apiserver_extra_args[audit-log-maxbackup] to be '5'."
   }
 }
 
