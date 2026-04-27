@@ -396,10 +396,26 @@ func (r *kubernetesClusterResource) Update(
 
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
+	apiserverArgs := tfMapToStringMap(ctx, plan.ApiserverExtraArgs)
+	schedulerArgs := tfMapToStringMap(ctx, plan.SchedulerExtraArgs)
+	controllerManagerArgs := tfMapToStringMap(ctx, plan.ControllerManagerExtraArgs)
+
+	// All three are nil when the user leaves extra args unset (null) in config.
+	// The API rejects an empty PATCH, so skip it and accept the plan's null values.
+	if apiserverArgs == nil && schedulerArgs == nil && controllerManagerArgs == nil {
+		state.ApiserverExtraArgs = plan.ApiserverExtraArgs
+		state.SchedulerExtraArgs = plan.SchedulerExtraArgs
+		state.ControllerManagerExtraArgs = plan.ControllerManagerExtraArgs
+		diags = response.State.Set(ctx, &state)
+		response.Diagnostics.Append(diags...)
+
+		return
+	}
+
 	updateRequest := swagger.KubernetesClusterPatchRequest{
-		ApiserverExtraArgs:         tfMapToStringMap(ctx, plan.ApiserverExtraArgs),
-		SchedulerExtraArgs:         tfMapToStringMap(ctx, plan.SchedulerExtraArgs),
-		ControllerManagerExtraArgs: tfMapToStringMap(ctx, plan.ControllerManagerExtraArgs),
+		ApiserverExtraArgs:         apiserverArgs,
+		SchedulerExtraArgs:         schedulerArgs,
+		ControllerManagerExtraArgs: controllerManagerArgs,
 	}
 
 	asyncOperation, httpResp, err := r.client.APIClient.KubernetesClustersApi.UpdateCluster(ctx, updateRequest, projectID, state.ID.ValueString())
@@ -437,12 +453,29 @@ func (r *kubernetesClusterResource) Update(
 	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
 	response.Diagnostics.Append(diags...)
 	state.Private = types.BoolValue(kubernetesCluster.Private)
-	state.ApiserverExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ApiserverExtraArgs)
-	response.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.SchedulerExtraArgs)
-	response.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ControllerManagerExtraArgs)
-	response.Diagnostics.Append(diags...)
+
+	// For null plan fields, preserve null in state so the field stays unmanaged.
+	// For non-null plan fields, use the server response to reflect actual state.
+	if plan.ApiserverExtraArgs.IsNull() {
+		state.ApiserverExtraArgs = types.MapNull(types.StringType)
+	} else {
+		state.ApiserverExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ApiserverExtraArgs)
+		response.Diagnostics.Append(diags...)
+	}
+
+	if plan.SchedulerExtraArgs.IsNull() {
+		state.SchedulerExtraArgs = types.MapNull(types.StringType)
+	} else {
+		state.SchedulerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.SchedulerExtraArgs)
+		response.Diagnostics.Append(diags...)
+	}
+
+	if plan.ControllerManagerExtraArgs.IsNull() {
+		state.ControllerManagerExtraArgs = types.MapNull(types.StringType)
+	} else {
+		state.ControllerManagerExtraArgs, diags = stringMapToTFMap(ctx, kubernetesCluster.ControllerManagerExtraArgs)
+		response.Diagnostics.Append(diags...)
+	}
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
