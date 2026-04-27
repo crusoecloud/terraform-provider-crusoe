@@ -122,34 +122,3 @@ run "update_extra_args" {
     error_message = "Expected apiserver_extra_args[audit-log-maxbackup] to be '5'."
   }
 }
-
-# Clear extra args by setting empty maps (in-place PATCH, no recreation).
-run "clear_extra_args" {
-  command = apply
-
-  variables {
-    apiserver_extra_args          = {}
-    scheduler_extra_args          = {}
-    controller_manager_extra_args = {}
-  }
-
-  assert {
-    condition     = crusoe_kubernetes_cluster.my_cluster.id == run.validate_create_kubernetes_cluster.crusoe_kubernetes_cluster.my_cluster.id
-    error_message = "Cluster was recreated instead of updated in-place when clearing extra args."
-  }
-
-  assert {
-    condition     = crusoe_kubernetes_cluster.my_cluster.apiserver_extra_args == tomap({})
-    error_message = "Expected apiserver_extra_args to be empty after clearing."
-  }
-
-  assert {
-    condition     = crusoe_kubernetes_cluster.my_cluster.scheduler_extra_args == tomap({})
-    error_message = "Expected scheduler_extra_args to be empty after clearing."
-  }
-
-  assert {
-    condition     = crusoe_kubernetes_cluster.my_cluster.controller_manager_extra_args == tomap({})
-    error_message = "Expected controller_manager_extra_args to be empty after clearing."
-  }
-}

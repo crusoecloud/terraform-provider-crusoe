@@ -194,17 +194,17 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"apiserver_extra_args": schema.MapAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation.",
+				Description: "Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
 			},
 			"scheduler_extra_args": schema.MapAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation.",
+				Description: "Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
 			},
 			"controller_manager_extra_args": schema.MapAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation.",
+				Description: "Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
 			},
 		},
 	}
@@ -399,6 +399,23 @@ func (r *kubernetesClusterResource) Update(
 	apiserverArgs := tfMapToStringMap(ctx, plan.ApiserverExtraArgs)
 	schedulerArgs := tfMapToStringMap(ctx, plan.SchedulerExtraArgs)
 	controllerManagerArgs := tfMapToStringMap(ctx, plan.ControllerManagerExtraArgs)
+
+	// The client SDK uses omitempty on extra args map fields, so empty maps ({}) are
+	// serialized identically to nil and the API receives no fields to update.
+	// Clearing extra args via the provider is not supported until the SDK is fixed;
+	// direct users to the CLI instead.
+	if len(apiserverArgs) == 0 && apiserverArgs != nil ||
+		len(schedulerArgs) == 0 && schedulerArgs != nil ||
+		len(controllerManagerArgs) == 0 && controllerManagerArgs != nil {
+
+		response.Diagnostics.AddError(
+			"Clearing extra args is not supported",
+			"Setting an extra args field to an empty map ({}) cannot be sent to the API due to a client SDK limitation. "+
+				"To clear extra args, use the Crusoe CLI: crusoe kubernetes clusters update --apiserver-extra-args '' <cluster-id>",
+		)
+
+		return
+	}
 
 	// All three are nil when the user leaves extra args unset (null) in config.
 	// The API rejects an empty PATCH, so skip it and accept the plan's null values.
