@@ -430,10 +430,24 @@ func (r *kubernetesClusterResource) Update(
 		return
 	}
 
-	kubernetesCluster, _, err := common.AwaitOperationAndResolve[swagger.KubernetesCluster](ctx, asyncOperation.Operation, projectID, r.client.APIClient.KubernetesClusterOperationsApi.GetKubernetesClustersOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.KubernetesCluster](ctx, asyncOperation.Operation, projectID, r.client.APIClient.KubernetesClusterOperationsApi.GetKubernetesClustersOperation)
 	if err != nil {
 		response.Diagnostics.AddError("Failed to update cluster",
 			fmt.Sprintf("Error updating the cluster: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	// The PATCH operation result does not include the full cluster object, so fetch
+	// the current state directly after the operation completes.
+	kubernetesCluster, httpResp2, err := r.client.APIClient.KubernetesClustersApi.GetCluster(ctx, projectID, state.ID.ValueString())
+	if httpResp2 != nil {
+		defer httpResp2.Body.Close()
+	}
+
+	if err != nil {
+		response.Diagnostics.AddError("Failed to read cluster after update",
+			fmt.Sprintf("Error reading the cluster: %s", common.UnpackAPIError(err)))
 
 		return
 	}
