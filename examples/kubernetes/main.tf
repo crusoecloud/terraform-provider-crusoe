@@ -46,7 +46,7 @@ variable "worker" {
   })
   default = {
     type    = "a100-80gb.1x"
-    version = "1.33.4-cmk.73"
+    version = "1.32.7-cmk.3"
     count   = 2
   }
 }
