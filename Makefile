@@ -71,5 +71,5 @@ docs: build-deps
 .PHONY: docs-ci
 docs-ci: build-deps
 	@echo "==> $@"
-	@go generate ./... || true # intentionally swallow all failures: tfplugindocs downloads the Terraform binary at runtime and fails when the binary or HashiCorp PGP key is unavailable (outside our control). The diff check below catches any docs that do get generated but aren't checked in.
+	@go generate ./... || true # tfplugindocs requires Terraform binary; tolerate download failures (e.g. expired HashiCorp PGP key)
 	@git diff --exit-code docs/* # fail if doc autogen produces a diff

@@ -52,6 +52,28 @@ run "validate_create_kubernetes_cluster" {
   }
 }
 
+# Verify no perpetual diff: a plan immediately after create (with no extra args configured)
+# must show "No changes". If Read wrote {} instead of null back to state, this plan would
+# show a diff (apiserver_extra_args: {} -> null) and the assertion below would fail.
+run "validate_no_perpetual_diff" {
+  command = plan
+
+  assert {
+    condition     = crusoe_kubernetes_cluster.my_cluster.apiserver_extra_args == null
+    error_message = "Perpetual diff detected: Read wrote a non-null value for apiserver_extra_args when the field is unconfigured."
+  }
+
+  assert {
+    condition     = crusoe_kubernetes_cluster.my_cluster.scheduler_extra_args == null
+    error_message = "Perpetual diff detected: Read wrote a non-null value for scheduler_extra_args when the field is unconfigured."
+  }
+
+  assert {
+    condition     = crusoe_kubernetes_cluster.my_cluster.controller_manager_extra_args == null
+    error_message = "Perpetual diff detected: Read wrote a non-null value for controller_manager_extra_args when the field is unconfigured."
+  }
+}
+
 # Set extra args on the existing cluster (in-place PATCH, no recreation).
 run "set_extra_args" {
   command = apply
