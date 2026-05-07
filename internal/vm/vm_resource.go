@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -349,13 +349,12 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		plan.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
 	}
 
-	var installCrusoeWatchAgent *bool
+	var installCrusoeWatchAgent bool
 	if !plan.InstallCrusoeWatchAgent.IsNull() && !plan.InstallCrusoeWatchAgent.IsUnknown() {
-		v := plan.InstallCrusoeWatchAgent.ValueBool()
-		installCrusoeWatchAgent = &v
+		installCrusoeWatchAgent = plan.InstallCrusoeWatchAgent.ValueBool()
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1{
 		Name:                    plan.Name.ValueString(),
 		Type_:                   plan.Type.ValueString(),
 		Location:                plan.Location.ValueString(),
@@ -380,7 +379,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](
+	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1](
 		ctx, dataResp.Operation, projectID, r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -450,7 +449,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
@@ -521,7 +520,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	if len(addedDisks) > 0 {
-		attachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha5{
+		attachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1{
 			AttachDisks: addedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if httpResp != nil {
@@ -589,7 +588,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
 				Ips: []swagger.IpAddresses{{

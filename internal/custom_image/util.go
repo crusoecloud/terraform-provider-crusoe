@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
 // customImagesToTerraformDataModel takes the API response and applies name/name_prefix filters.
 // Images that match the filters are converted to the terraform data model and returned as a slice.
-func filterCustomImagesListResponse(resp *swagger.ListImagesResponseV1Alpha5, config customImageDataSourceModel) []customImageModel {
+func filterCustomImagesListResponse(resp *swagger.ListImagesResponseV1, config customImageDataSourceModel) []customImageModel {
 	var filtered []customImageModel
 
 	for _, image := range resp.Items {

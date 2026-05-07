@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -396,7 +396,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	patchReq := swagger.LoadBalancersPatchRequestV1Alpha5{}
+	patchReq := swagger.LoadBalancersPatchRequestV1{}
 	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
 		patchReq.Name = plan.Name.ValueString()
 	}

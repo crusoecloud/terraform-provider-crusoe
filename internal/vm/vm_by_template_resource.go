@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -277,13 +277,12 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	var installCrusoeWatchAgent *bool
+	var installCrusoeWatchAgent bool
 	if !plan.InstallCrusoeWatchAgent.IsNull() && !plan.InstallCrusoeWatchAgent.IsUnknown() {
-		v := plan.InstallCrusoeWatchAgent.ValueBool()
-		installCrusoeWatchAgent = &v
+		installCrusoeWatchAgent = plan.InstallCrusoeWatchAgent.ValueBool()
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.VMsApi.BulkCreateInstance(ctx, swagger.BulkInstancePostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.VMsApi.BulkCreateInstance(ctx, swagger.BulkInstancePostRequestV1{
 		NamePrefix:              plan.NamePrefix.ValueString(),
 		Count:                   1,
 		InstanceTemplateId:      instanceTemplateID,
@@ -299,7 +298,7 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	instances, _, err := common.AwaitOperationAndResolve[[]swagger.InstanceV1Alpha5](
+	instances, _, err := common.AwaitOperationAndResolve[[]swagger.InstanceV1](
 		ctx, dataResp.Operation, projectID, r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -400,7 +399,7 @@ func (r *vmByTemplateResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
@@ -480,7 +479,7 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	if len(addedDisks) > 0 {
-		attachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha5{
+		attachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1{
 			AttachDisks: addedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if httpResp != nil {
@@ -548,7 +547,7 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
 				Ips: []swagger.IpAddresses{{
@@ -584,7 +583,7 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 	// add a reservation ID
 	if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() == "" {
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
 			Action:        "RESERVE",
 			ReservationId: plan.ReservationID.String(),
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
@@ -598,7 +597,7 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 
-		instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+		instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1](ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update reservation ID",
 				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
@@ -616,7 +615,7 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.Append(diags...)
 	} else if plan.ReservationID.ValueString() == "" && state.ReservationID.ValueString() != "" {
 		// remove reservation ID
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
 			Action: "UNRESERVE",
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if httpResp != nil {

@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/custom_image"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/disk"
@@ -64,7 +64,7 @@ func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"api_endpoint": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.crusoecloud.com/v1alpha5`. Can also be set via `CRUSOE_API_ENDPOINT` environment variable.",
+				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.crusoecloud.com/v1`. Can also be set via `CRUSOE_API_ENDPOINT` environment variable.",
 			},
 			"profile": schema.StringAttribute{
 				Optional:            true,

@@ -100,3 +100,5 @@ require (
 	google.golang.org/grpc v1.56.1 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 )
+
+replace github.com/crusoecloud/client-go => gitlab.com/crusoeenergy/island/external/client-go v0.1.143-0.20260507172014-1af30f5f2fe3

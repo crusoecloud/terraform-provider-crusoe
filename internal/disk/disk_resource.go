@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -168,7 +168,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		blockSize = defaultBlockSize
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1{
 		Name:      plan.Name.ValueString(),
 		Location:  plan.Location.ValueString(),
 		Type_:     diskType,
@@ -185,7 +185,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, projectID, r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, projectID, r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error creating a disk: %s", common.UnpackAPIError(err)))
@@ -207,7 +207,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
@@ -262,7 +262,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+

@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -224,7 +224,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		}
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1{
 		TemplateName:        plan.Name.ValueString(),
 		Type_:               plan.Type.ValueString(),
 		Location:            plan.Location.ValueString(),

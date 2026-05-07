@@ -289,7 +289,7 @@ secret_key = "secret"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "https://api.crusoecloud.com/v1alpha5"
+	expected := "https://api.crusoecloud.com/v1"
 	if config.ApiEndpoint != expected {
 		t.Errorf("ApiEndpoint: got %q, want %q", config.ApiEndpoint, expected)
 	}

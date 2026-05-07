@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -49,19 +49,19 @@ func getResourceModel(ctx context.Context, source tfDataGetter, dest *diskResour
 	return nil
 }
 
-func findDisk(ctx context.Context, client *swagger.APIClient, diskID string) (*swagger.DiskV1Alpha5, string, error) {
-	args := common.FindResourceArgs[swagger.DiskV1Alpha5]{
+func findDisk(ctx context.Context, client *swagger.APIClient, diskID string) (*swagger.DiskV1, string, error) {
+	args := common.FindResourceArgs[swagger.DiskV1]{
 		ResourceID:  diskID,
 		GetResource: client.DisksApi.GetDisk,
-		IsResource: func(disk swagger.DiskV1Alpha5, id string) bool {
+		IsResource: func(disk swagger.DiskV1, id string) bool {
 			return disk.Id == id
 		},
 	}
 
-	return common.FindResource[swagger.DiskV1Alpha5](ctx, client, args)
+	return common.FindResource[swagger.DiskV1](ctx, client, args)
 }
 
-func diskToTerraformResourceModel(disk *swagger.DiskV1Alpha5, state *diskResourceModel, sizeFormat string) {
+func diskToTerraformResourceModel(disk *swagger.DiskV1, state *diskResourceModel, sizeFormat string) {
 	state.ID = types.StringValue(disk.Id)
 	state.Name = types.StringValue(disk.Name)
 	state.Location = types.StringValue(disk.Location)

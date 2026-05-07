@@ -418,7 +418,7 @@ BUG FIXES:
 NEW FEATURES:
 
 - Adds support for projects through the projects resource and datasource.
-- Changes the version of the Crusoe Cloud API used from `v1alpha4` to `v1alpha5`.
+- Changes the version of the Crusoe Cloud API used from `v1alpha4` to `V1`.
 - Adds support for specifying a disk `attachment_type` and `mode` when attaching a disk to a VM.
 
 UPGRADE NOTES:

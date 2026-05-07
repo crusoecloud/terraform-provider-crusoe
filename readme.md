@@ -25,7 +25,7 @@ profile="profile1"
 access_key_id="7useLCstekgdYQ8Te2vQxi"
 secret_key="coKGIrMJudgAtk3YKMpsB2"
 ssh_public_key_file="~/.ssh/id_rsa.pub"
-api_endpoint="http://test:80/v1alpha5"
+api_endpoint="http://test:80/v1"
 
 [profile2]
 access_key_id="CstekgdYQ8Te2vQxi7useL"
