@@ -24,7 +24,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &kubernetesNodePoolResource{}
+	_ resource.Resource                   = &kubernetesNodePoolResource{}
+	_ resource.ResourceWithValidateConfig = &kubernetesNodePoolResource{}
 )
 
 type kubernetesNodePoolResource struct {
@@ -46,7 +47,7 @@ type kubernetesNodePoolResourceModel struct {
 	IBPartitionID                 types.String `tfsdk:"ib_partition_id"`
 	RequestedNodeLabels           types.Map    `tfsdk:"requested_node_labels"`
 	AllNodeLabels                 types.Map    `tfsdk:"all_node_labels"`
-	NodeTaints                    types.List   `tfsdk:"node_taints"`
+	NodeTaints                    types.Set    `tfsdk:"node_taints"`
 	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
 	SSHKey                        types.String `tfsdk:"ssh_key"`
 	State                         types.String `tfsdk:"state"`
@@ -75,6 +76,30 @@ func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.C
 
 func (r *kubernetesNodePoolResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_kubernetes_node_pool"
+}
+
+// ValidateConfig runs at plan time and surfaces config-only violations
+// (no remote state needed) before any API call. Schema validators handle
+// per-field shape; this catches list-level rules like duplicate taints.
+func (r *kubernetesNodePoolResource) ValidateConfig(
+	ctx context.Context,
+	req resource.ValidateConfigRequest,
+	resp *resource.ValidateConfigResponse,
+) {
+	var data kubernetesNodePoolResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	nodeTaints, err := tfSetToNodeTaints(ctx, data.NodeTaints)
+	if err != nil {
+		// Unresolved/unknown values; let plan/apply re-evaluate.
+		return
+	}
+	if vErr := validateNodeTaintDuplicates(nodeTaints); vErr != nil {
+		resp.Diagnostics.AddError("Invalid node_taints", vErr.Error())
+	}
 }
 
 func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -190,10 +215,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			},
 		},
 		Blocks: map[string]schema.Block{
-			"node_taints": schema.ListNestedBlock{
-				PlanModifiers: []planmodifier.List{
-					SortTaintsByEffectKey(),
-				},
+			"node_taints": schema.SetNestedBlock{
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
@@ -207,7 +229,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 							Optional:            true,
 							Computed:            true,
 							Default:             stringdefault.StaticString(""),
-							MarkdownDescription: "Taint value. Must be at most 63 characters.",
+							MarkdownDescription: "Taint value. Defaults to empty string if omitted. Must be at most 63 characters.",
 							Validators: []validator.String{
 								stringvalidator.LengthAtMost(63),
 							},
@@ -248,14 +270,9 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		}
 	}
 
-	nodeTaints, err := tfListToNodeTaints(ctx, plan.NodeTaints)
+	nodeTaints, err := tfSetToNodeTaints(ctx, plan.NodeTaints)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool", fmt.Sprintf("error when parsing node taints: %s", err))
-
-		return
-	}
-	if vErr := validateNodeTaintDuplicates(nodeTaints); vErr != nil {
-		resp.Diagnostics.AddError("Failed to create node pool", vErr.Error())
 
 		return
 	}
@@ -310,7 +327,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	state.SubnetID = types.StringValue(kubernetesNodePoolResponse.NodePool.SubnetId)
 	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePoolResponse.NodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFList(ctx, kubernetesNodePoolResponse.NodePool.NodeTaints)
+	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePoolResponse.NodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
@@ -389,7 +406,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
 	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFList(ctx, kubernetesNodePool.NodeTaints)
+	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
@@ -526,14 +543,9 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		}
 	}
 
-	nodeTaints, err := tfListToNodeTaints(ctx, plan.NodeTaints)
+	nodeTaints, err := tfSetToNodeTaints(ctx, plan.NodeTaints)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update node pool", fmt.Sprintf("error when parsing node_taints: %s", err))
-
-		return
-	}
-	if vErr := validateNodeTaintDuplicates(nodeTaints); vErr != nil {
-		resp.Diagnostics.AddError("Failed to update node pool", vErr.Error())
 
 		return
 	}
@@ -643,7 +655,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	state.SubnetID = types.StringValue(updatedNodePool.SubnetId)
 	state.AllNodeLabels, diags = common.StringMapToTFMap(updatedNodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFList(ctx, updatedNodePool.NodeTaints)
+	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, updatedNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(updatedNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)

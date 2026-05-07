@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -136,13 +137,13 @@ type nodeTaintModel struct {
 	Effect types.String `tfsdk:"effect"`
 }
 
-// tfListToNodeTaints converts a Terraform List to swagger node taints.
-func tfListToNodeTaints(ctx context.Context, tfList types.List) ([]swagger.KubernetesNodeTaint, error) {
-	if tfList.IsNull() || tfList.IsUnknown() {
+// tfSetToNodeTaints converts a Terraform Set to swagger node taints.
+func tfSetToNodeTaints(ctx context.Context, tfSet types.Set) ([]swagger.KubernetesNodeTaint, error) {
+	if tfSet.IsNull() || tfSet.IsUnknown() {
 		return nil, nil
 	}
 	var models []nodeTaintModel
-	diags := tfList.ElementsAs(ctx, &models, false)
+	diags := tfSet.ElementsAs(ctx, &models, false)
 	if diags.HasError() {
 		return nil, fmt.Errorf("failed to parse node taints")
 	}
@@ -158,10 +159,12 @@ func tfListToNodeTaints(ctx context.Context, tfList types.List) ([]swagger.Kuber
 	return taints, nil
 }
 
-// nodeTaintsToTFList converts swagger node taints to a Terraform List
-func nodeTaintsToTFList(ctx context.Context, taints []swagger.KubernetesNodeTaint) (types.List, diag.Diagnostics) {
+// nodeTaintsToTFSet converts swagger node taints to a Terraform Set.
+// Returns an empty set (not null) when the server has no taints, matching
+// how Terraform represents an absent SetNestedBlock.
+func nodeTaintsToTFSet(ctx context.Context, taints []swagger.KubernetesNodeTaint) (types.Set, diag.Diagnostics) {
 	if len(taints) == 0 {
-		return types.ListValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, []nodeTaintModel{})
+		return types.SetValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, []nodeTaintModel{})
 	}
 	models := make([]nodeTaintModel, 0, len(taints))
 	for _, t := range taints {
@@ -172,7 +175,7 @@ func nodeTaintsToTFList(ctx context.Context, taints []swagger.KubernetesNodeTain
 		})
 	}
 
-	return types.ListValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, models)
+	return types.SetValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, models)
 }
 
 func nodeTaintAttrTypes() map[string]attr.Type {
@@ -185,13 +188,21 @@ func nodeTaintAttrTypes() map[string]attr.Type {
 
 func validateNodeTaintDuplicates(taints []swagger.KubernetesNodeTaint) error {
 	seen := make(map[string]struct{})
+	var dups []string
 	for _, t := range taints {
 		uniqueKey := t.Key + ":" + t.Effect
 		if _, exists := seen[uniqueKey]; exists {
-			return fmt.Errorf("duplicate taint: key %q with effect %q is specified more than once", t.Key, t.Effect)
+			dups = append(dups, fmt.Sprintf("key %q with effect %q", t.Key, t.Effect))
+		} else {
+			seen[uniqueKey] = struct{}{}
 		}
-		seen[uniqueKey] = struct{}{}
 	}
-
-	return nil
+	switch len(dups) {
+	case 0:
+		return nil
+	case 1:
+		return fmt.Errorf("duplicate taint: %s is specified more than once", dups[0])
+	default:
+		return fmt.Errorf("duplicate taints:\n  - %s", strings.Join(dups, "\n  - "))
+	}
 }

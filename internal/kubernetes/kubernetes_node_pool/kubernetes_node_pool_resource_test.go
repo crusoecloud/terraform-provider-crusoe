@@ -36,13 +36,13 @@ func TestKubernetesNodePoolResource_NodeTaintsBlockExists(t *testing.T) {
 		t.Fatal("node_taints block not found in schema")
 	}
 
-	listBlock, ok := block.(schema.ListNestedBlock)
+	setBlock, ok := block.(schema.SetNestedBlock)
 	if !ok {
-		t.Fatal("node_taints is not a ListNestedBlock")
+		t.Fatal("node_taints is not a SetNestedBlock")
 	}
 
 	// verify key has validators
-	keyAttr, ok := listBlock.NestedObject.Attributes["key"].(schema.StringAttribute)
+	keyAttr, ok := setBlock.NestedObject.Attributes["key"].(schema.StringAttribute)
 	if !ok {
 		t.Fatal("key attribute is not a StringAttribute")
 	}
@@ -52,13 +52,13 @@ func TestKubernetesNodePoolResource_NodeTaintsBlockExists(t *testing.T) {
 
 	// verify key, value, effect attributes exist
 	for _, field := range []string{"key", "value", "effect"} {
-		if _, exists := listBlock.NestedObject.Attributes[field]; !exists {
+		if _, exists := setBlock.NestedObject.Attributes[field]; !exists {
 			t.Errorf("node_taints block missing %s attribute", field)
 		}
 	}
 
 	// verify value has validators
-	valueAttr, ok := listBlock.NestedObject.Attributes["value"].(schema.StringAttribute)
+	valueAttr, ok := setBlock.NestedObject.Attributes["value"].(schema.StringAttribute)
 	if !ok {
 		t.Fatal("value attribute is not a StringAttribute")
 	}
@@ -67,7 +67,7 @@ func TestKubernetesNodePoolResource_NodeTaintsBlockExists(t *testing.T) {
 	}
 
 	// verify effect has validators
-	effectAttr, ok := listBlock.NestedObject.Attributes["effect"].(schema.StringAttribute)
+	effectAttr, ok := setBlock.NestedObject.Attributes["effect"].(schema.StringAttribute)
 	if !ok {
 		t.Fatal("effect attribute is not a StringAttribute")
 	}

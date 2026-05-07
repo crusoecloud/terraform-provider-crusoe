@@ -33,7 +33,7 @@ type kubernetesNodePoolDataSourceModel struct {
 	ClusterID                     types.String `tfsdk:"cluster_id"`
 	SubnetID                      types.String `tfsdk:"subnet_id"`
 	NodeLabels                    types.Map    `tfsdk:"node_labels"`
-	NodeTaints                    types.List   `tfsdk:"node_taints"`
+	NodeTaints                    types.Set    `tfsdk:"node_taints"`
 	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
 	State                         types.String `tfsdk:"state"`
 	Name                          types.String `tfsdk:"name"`
@@ -80,7 +80,7 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 				ElementType: types.StringType,
 				Optional:    true,
 			},
-			"node_taints": schema.ListNestedAttribute{
+			"node_taints": schema.SetNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -171,7 +171,7 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
 	state.NodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFList(ctx, kubernetesNodePool.NodeTaints)
+	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)

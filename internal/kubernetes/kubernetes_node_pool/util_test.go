@@ -2,6 +2,7 @@ package kubernetes_node_pool
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -9,7 +10,7 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
 )
 
-func TestTfListToNodeTaints(t *testing.T) {
+func TestTfSetToNodeTaints(t *testing.T) {
 	ctx := context.Background()
 
 	taints := []nodeTaintModel{
@@ -25,14 +26,14 @@ func TestTfListToNodeTaints(t *testing.T) {
 		},
 	}
 
-	tfList, diags := types.ListValueFrom(ctx, types.ObjectType{
+	tfList, diags := types.SetValueFrom(ctx, types.ObjectType{
 		AttrTypes: nodeTaintAttrTypes(),
 	}, taints)
 	if diags.HasError() {
 		t.Fatalf("failed to create test list: %s", diags.Errors())
 	}
 
-	result, err := tfListToNodeTaints(ctx, tfList)
+	result, err := tfSetToNodeTaints(ctx, tfList)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -48,10 +49,10 @@ func TestTfListToNodeTaints(t *testing.T) {
 	}
 }
 
-func TestTfListToNodeTaints_Null(t *testing.T) {
+func TestTfSetToNodeTaints_Null(t *testing.T) {
 	ctx := context.Background()
 
-	result, err := tfListToNodeTaints(ctx, types.ListNull(types.ObjectType{
+	result, err := tfSetToNodeTaints(ctx, types.SetNull(types.ObjectType{
 		AttrTypes: nodeTaintAttrTypes(),
 	}))
 	if err != nil {
@@ -62,14 +63,14 @@ func TestTfListToNodeTaints_Null(t *testing.T) {
 	}
 }
 
-func TestNodeTaintsToTFList(t *testing.T) {
+func TestNodeTaintsToTFSet(t *testing.T) {
 	ctx := context.Background()
 
 	taints := []swagger.KubernetesNodeTaint{
 		{Key: "gpu", Value: "true", Effect: "NoSchedule"},
 	}
 
-	tfList, diags := nodeTaintsToTFList(ctx, taints)
+	tfList, diags := nodeTaintsToTFSet(ctx, taints)
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %s", diags.Errors())
 	}
@@ -77,7 +78,7 @@ func TestNodeTaintsToTFList(t *testing.T) {
 		t.Fatal("expected non-null list")
 	}
 
-	result, err := tfListToNodeTaints(ctx, tfList)
+	result, err := tfSetToNodeTaints(ctx, tfList)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -86,10 +87,10 @@ func TestNodeTaintsToTFList(t *testing.T) {
 	}
 }
 
-func TestNodeTaintsToTFList_Empty(t *testing.T) {
+func TestNodeTaintsToTFSet_Empty(t *testing.T) {
 	ctx := context.Background()
 
-	tfList, diags := nodeTaintsToTFList(ctx, []swagger.KubernetesNodeTaint{})
+	tfList, diags := nodeTaintsToTFSet(ctx, []swagger.KubernetesNodeTaint{})
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %s", diags.Errors())
 	}
@@ -102,7 +103,7 @@ func TestNodeTaintsToTFList_Empty(t *testing.T) {
 }
 
 func TestValidateNodeTaintDuplicates(t *testing.T) {
-	// no duplicates
+	// no duplicates: same key with different effect is OK
 	err := validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{
 		{Key: "gpu", Effect: "NoSchedule"},
 		{Key: "gpu", Effect: "NoExecute"},
@@ -111,16 +112,43 @@ func TestValidateNodeTaintDuplicates(t *testing.T) {
 		t.Errorf("unexpected error: %s", err)
 	}
 
-	// duplicate key+effect
+	// single duplicate: should be flat one-liner, no bullet
 	err = validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{
 		{Key: "gpu", Effect: "NoSchedule"},
 		{Key: "gpu", Effect: "NoSchedule"},
 	})
 	if err == nil {
-		t.Error("expected error for duplicate taints")
+		t.Fatal("expected error for duplicate taints")
+	}
+	if !strings.Contains(err.Error(), `"gpu"`) || !strings.Contains(err.Error(), `"NoSchedule"`) {
+		t.Errorf("error should mention key and effect, got: %s", err)
+	}
+	if strings.Contains(err.Error(), "\n") {
+		t.Errorf("single duplicate should be one-line, got: %q", err.Error())
 	}
 
-	// empty
+	// multiple duplicates: aggregated into a bullet list
+	err = validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{
+		{Key: "gpu", Effect: "NoSchedule"},
+		{Key: "gpu", Effect: "NoSchedule"}, // dup #1
+		{Key: "team", Effect: "NoExecute"},
+		{Key: "team", Effect: "NoExecute"}, // dup #2
+		{Key: "zone", Effect: "PreferNoSchedule"},
+		{Key: "zone", Effect: "PreferNoSchedule"}, // dup #3
+	})
+	if err == nil {
+		t.Fatal("expected error for multiple duplicates")
+	}
+	for _, want := range []string{`"gpu"`, `"team"`, `"zone"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("aggregated error missing %s, got: %s", want, err)
+		}
+	}
+	if !strings.Contains(err.Error(), "\n  - ") {
+		t.Errorf("multiple duplicates should use bullet list format, got: %q", err.Error())
+	}
+
+	// empty input
 	err = validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{})
 	if err != nil {
 		t.Errorf("unexpected error for empty taints: %s", err)
