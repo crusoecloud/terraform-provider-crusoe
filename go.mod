@@ -7,13 +7,12 @@ toolchain go1.23.8
 require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/antihax/optional v1.0.0
-	github.com/crusoecloud/client-go v0.1.140
+	github.com/crusoecloud/client-go v0.1.143
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/terraform-plugin-docs v0.21.0
 	github.com/hashicorp/terraform-plugin-framework v1.3.5
 	github.com/hashicorp/terraform-plugin-framework-validators v0.12.0
-	github.com/stretchr/testify v1.9.0
 	k8s.io/client-go v0.32.3
 )
 
@@ -51,7 +50,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
