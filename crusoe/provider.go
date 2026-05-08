@@ -64,7 +64,7 @@ func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"api_endpoint": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.crusoecloud.com/v1`. Can also be set via `CRUSOE_API_ENDPOINT` environment variable.",
+				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.cloud.crusoe.ai/v1`. Can also be set via `CRUSOE_API_ENDPOINT` environment variable.",
 			},
 			"profile": schema.StringAttribute{
 				Optional:            true,
