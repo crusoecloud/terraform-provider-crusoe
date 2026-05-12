@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -42,6 +43,8 @@ type diskResourceModel struct {
 	Size         types.String `tfsdk:"size"`
 	SerialNumber types.String `tfsdk:"serial_number"`
 	BlockSize    types.Int64  `tfsdk:"block_size"`
+	DNSName      types.String `tfsdk:"dns_name"`
+	Vips         types.List   `tfsdk:"vips"`
 }
 
 func NewDiskResource() resource.Resource {
@@ -128,6 +131,17 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 					int64planmodifier.RequiresReplaceIfConfigured(),
 					int64planmodifier.UseStateForUnknown(),
 				},
+			},
+			"dns_name": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: descDNSName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"vips": schema.ListAttribute{
+				Computed:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: descVips,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}

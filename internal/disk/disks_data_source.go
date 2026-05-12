@@ -21,13 +21,15 @@ type disksDataSourceModel struct {
 }
 
 type diskModel struct {
-	ID           string `tfsdk:"id"`
-	Name         string `tfsdk:"name"`
-	Location     string `tfsdk:"location"`
-	Type         string `tfsdk:"type"`
-	Size         string `tfsdk:"size"`
-	SerialNumber string `tfsdk:"serial_number"`
-	BlockSize    int64  `tfsdk:"block_size"`
+	ID           string   `tfsdk:"id"`
+	Name         string   `tfsdk:"name"`
+	Location     string   `tfsdk:"location"`
+	Type         string   `tfsdk:"type"`
+	Size         string   `tfsdk:"size"`
+	SerialNumber string   `tfsdk:"serial_number"`
+	BlockSize    int64    `tfsdk:"block_size"`
+	DNSName      string   `tfsdk:"dns_name"`
+	Vips         []string `tfsdk:"vips"`
 }
 
 // TODO: let's also implement a singular DiskDataSource for fetching one disk with filtering
@@ -96,6 +98,15 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 							Computed:            true,
 							MarkdownDescription: descBlockSize,
 						},
+						"dns_name": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: descDNSName,
+						},
+						"vips": schema.ListAttribute{
+							Computed:            true,
+							ElementType:         types.StringType,
+							MarkdownDescription: descVips,
+						},
 					},
 				},
 			},
@@ -126,6 +137,10 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 	var state disksDataSourceModel
 	for i := range dataResp.Items {
+		vips := dataResp.Items[i].Vips
+		if vips == nil {
+			vips = []string{}
+		}
 		state.Disks = append(state.Disks, diskModel{
 			ID:           dataResp.Items[i].Id,
 			Name:         dataResp.Items[i].Name,
@@ -134,6 +149,8 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 			Size:         dataResp.Items[i].Size,
 			SerialNumber: dataResp.Items[i].SerialNumber,
 			BlockSize:    dataResp.Items[i].BlockSize,
+			DNSName:      dataResp.Items[i].DnsName,
+			Vips:         vips,
 		})
 	}
 

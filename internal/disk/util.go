@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -27,6 +28,8 @@ const (
 	descLocation           = "Location where the disk is deployed."
 	descSerialNumber       = "Serial number assigned to the disk."
 	descBlockSize          = "Block size of the disk in bytes. Possible values: `512`, `4096`."
+	descDNSName            = "DNS name used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
+	descVips               = "Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
 )
 
 var errGetResourceModel = errors.New("unable to get resource model")
@@ -69,6 +72,27 @@ func diskToTerraformResourceModel(disk *swagger.DiskV1Alpha5, state *diskResourc
 	state.Size = types.StringValue(preserveSizeFormat(sizeFormat, disk.Size))
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
 	state.BlockSize = types.Int64Value(disk.BlockSize)
+	state.DNSName = types.StringValue(disk.DnsName)
+	state.Vips = stringSliceToList(disk.Vips)
+}
+
+// stringSliceToList converts a Go slice of strings into a Terraform list value.
+// A nil or empty slice maps to an empty (non-null) list so the attribute is always known.
+func stringSliceToList(s []string) types.List {
+	if len(s) == 0 {
+		return types.ListValueMust(types.StringType, []attr.Value{})
+	}
+
+	return types.ListValueMust(types.StringType, stringsToAttrValues(s))
+}
+
+func stringsToAttrValues(s []string) []attr.Value {
+	out := make([]attr.Value, len(s))
+	for i, v := range s {
+		out[i] = types.StringValue(v)
+	}
+
+	return out
 }
 
 // preserveSizeFormat converts apiSize to match the user's preferred unit (TiB vs GiB)

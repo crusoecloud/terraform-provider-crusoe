@@ -29,5 +29,7 @@ description: |-
 
 ### Read-Only
 
+- `dns_name` (String) DNS name used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types.
 - `id` (String) Unique identifier of the disk.
 - `serial_number` (String) Serial number assigned to the disk.
+- `vips` (List of String) Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types.

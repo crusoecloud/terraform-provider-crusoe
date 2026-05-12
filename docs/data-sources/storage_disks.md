@@ -29,9 +29,11 @@ description: |-
 Read-Only:
 
 - `block_size` (Number) Block size of the disk in bytes. Possible values: `512`, `4096`.
+- `dns_name` (String) DNS name used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types.
 - `id` (String) Unique identifier of the disk.
 - `location` (String) Location where the disk is deployed.
 - `name` (String) Name of the disk.
 - `serial_number` (String) Serial number assigned to the disk.
 - `size` (String) Storage capacity of the disk (e.g., `100GiB`, `1TiB`).
 - `type` (String) Type of the disk. Possible values: `persistent-ssd`, `shared-volume`.
+- `vips` (List of String) Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types.
