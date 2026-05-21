@@ -156,10 +156,11 @@ Update this file **only for major or minor version bumps** when merging to `rele
 
 We welcome (and have already had several!) open-source contributions to the Crusoe Cloud Terraform Provider.
 Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
-1. Make a branch off `main` and open a pull request from your branch into `main`.
-2. A Crusoe Cloud maintainer will review the pull request and, once approved, merge it into the `main` branch.
-3. To release: open a pull request from `main` into `release`. This PR must include a changelog entry for the new version (see Maintaining Changelog below).
-4. Once the pull request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
+1. Make a branch off `main` and open a merge request from your branch into `main`.
+2. A Crusoe Cloud maintainer will review the merge request and, once approved, merge it into the `main` branch.
+3. Before a release, add a changelog entry for the new version (see Maintaining Changelog below) that documents all of the changes/commits since the last release. Merge this change in before the next step.
+4. To release: open a merge request from `main` into `release`. 
+5. Once the merge request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
 
 ## Maintaining Changelog
 
