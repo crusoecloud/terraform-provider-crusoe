@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -94,7 +94,7 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 	return disksAdded, disksRemoved
 }
 
-func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID string) (*swagger.InstanceV1Alpha5, error) {
+func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID string) (*swagger.InstanceV1, error) {
 	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, projectID, vmID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
@@ -208,7 +208,7 @@ func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAtta
 	return diskAttachmentsSet, diags
 }
 
-func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1Alpha5, error) {
+func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1, error) {
 	opts := &swagger.ProjectsApiListProjectsOpts{
 		OrgId: optional.EmptyString(),
 	}
@@ -237,7 +237,7 @@ func findInstance(ctx context.Context, client *swagger.APIClient, instanceID str
 }
 
 // takes instance and populates state pointer (could be empty or non-empty)
-func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
+func vmToTerraformResourceModel(instance *swagger.InstanceV1, state *vmResourceModel) {
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.Type_)

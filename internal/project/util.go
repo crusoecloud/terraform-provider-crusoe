@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
 // getUserOrg returns the organization id for the authenticated user.

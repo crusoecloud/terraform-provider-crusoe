@@ -276,6 +276,114 @@ api_endpoint = "https://profile-endpoint/v1"
 	})
 }
 
+func TestMigrateEndpoint(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "migrates api.crusoecloud.com v1alpha5 to new domain",
+			input:    "https://api.crusoecloud.com/v1alpha5",
+			expected: "https://api.cloud.crusoe.ai/v1",
+		},
+		{
+			name:     "migrates api.crusoecloud.com v1 to new domain",
+			input:    "https://api.crusoecloud.com/v1",
+			expected: "https://api.cloud.crusoe.ai/v1",
+		},
+		{
+			name:     "returns empty string for current endpoint",
+			input:    "https://api.cloud.crusoe.ai/v1",
+			expected: "",
+		},
+		{
+			name:     "returns empty string for unknown custom endpoint",
+			input:    "https://my-custom-endpoint.example.com/v1",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := migrateEndpoint(tt.input)
+			if result != tt.expected {
+				t.Errorf("migrateEndpoint(%q): got %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEndpointMigrationApplied(t *testing.T) {
+	t.Run("migrates old endpoint from config file", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		configPath := writeTempConfig(t, `
+[default]
+access_key_id = "key"
+secret_key = "secret"
+api_endpoint = "https://api.crusoecloud.com/v1alpha5"
+`)
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if config.ApiEndpoint != "https://api.cloud.crusoe.ai/v1" {
+			t.Errorf("ApiEndpoint should be migrated: got %q, want %q", config.ApiEndpoint, "https://api.cloud.crusoe.ai/v1")
+		}
+	})
+
+	t.Run("migrates old endpoint from env var", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		os.Setenv("CRUSOE_API_ENDPOINT", "https://api.crusoecloud.com/v1alpha5")
+		configPath := writeTempConfig(t, `
+[default]
+access_key_id = "key"
+secret_key = "secret"
+`)
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if config.ApiEndpoint != "https://api.cloud.crusoe.ai/v1" {
+			t.Errorf("ApiEndpoint should be migrated: got %q, want %q", config.ApiEndpoint, "https://api.cloud.crusoe.ai/v1")
+		}
+	})
+
+	t.Run("uses default endpoint when config file does not exist", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		nonexistentPath := filepath.Join(t.TempDir(), "nonexistent", "config")
+
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: nonexistentPath})
+		if err != nil {
+			t.Fatalf("missing config file should not cause error: %v", err)
+		}
+
+		if config.ApiEndpoint != "https://api.cloud.crusoe.ai/v1" {
+			t.Errorf("ApiEndpoint should be the default: got %q, want %q", config.ApiEndpoint, "https://api.cloud.crusoe.ai/v1")
+		}
+	})
+
+	t.Run("leaves custom endpoint unchanged", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		configPath := writeTempConfig(t, `
+[default]
+access_key_id = "key"
+secret_key = "secret"
+api_endpoint = "https://my-custom-endpoint.example.com/v1"
+`)
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if config.ApiEndpoint != "https://my-custom-endpoint.example.com/v1" {
+			t.Errorf("ApiEndpoint should be unchanged: got %q, want %q", config.ApiEndpoint, "https://my-custom-endpoint.example.com/v1")
+		}
+	})
+}
+
 func TestDefaultApiEndpoint(t *testing.T) {
 	clearCrusoeEnvVars(t)
 	configPath := writeTempConfig(t, `
@@ -289,7 +397,7 @@ secret_key = "secret"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "https://api.crusoecloud.com/v1alpha5"
+	expected := "https://api.cloud.crusoe.ai/v1"
 	if config.ApiEndpoint != expected {
 		t.Errorf("ApiEndpoint: got %q, want %q", config.ApiEndpoint, expected)
 	}

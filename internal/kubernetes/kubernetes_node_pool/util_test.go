@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
 func TestTfSetToNodeTaints(t *testing.T) {

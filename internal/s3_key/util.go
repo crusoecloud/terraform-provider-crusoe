@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
 var errGetResourceModel = errors.New("unable to get resource model")

@@ -1,3 +1,9 @@
+## 1.0.0
+
+ENHANCEMENTS:
+
+- Updated provider to use Crusoe API v1 (`https://api.cloud.crusoe.ai/v1`). Existing configurations with the legacy endpoint (`api.crusoecloud.com`) will be automatically migrated.
+
 ## 0.8.0
 
 ENHANCEMENTS:

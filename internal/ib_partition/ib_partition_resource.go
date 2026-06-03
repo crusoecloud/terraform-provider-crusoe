@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -95,7 +95,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	dataResp, httpResp, err := r.client.APIClient.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1{
 		Name:        plan.Name.ValueString(),
 		IbNetworkId: plan.IBNetworkID.ValueString(),
 	}, projectID)
@@ -124,7 +124,7 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 

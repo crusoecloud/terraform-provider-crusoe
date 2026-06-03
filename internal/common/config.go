@@ -10,7 +10,7 @@ import (
 const (
 	configFilePath = "/.crusoe/config" // full path is this appended to the user's home path
 
-	defaultApiEndpoint = "https://api.crusoecloud.com/v1alpha5"
+	defaultApiEndpoint = "https://api.cloud.crusoe.ai/v1"
 )
 
 // Config holds options that can be set via ~/.crusoe/config and env variables.
@@ -36,6 +36,21 @@ type ConfigOptions struct {
 
 	// ConfigPath overrides the default ~/.crusoe/config path. Empty uses default.
 	ConfigPath string
+}
+
+// migrateEndpoint maps legacy API endpoints to the current domain and version.
+// Returns the new endpoint if migration is needed, or empty string if no change is required.
+func migrateEndpoint(endpoint string) string {
+	migrations := map[string]string{
+		"https://api.crusoecloud.com/v1alpha5": defaultApiEndpoint,
+		"https://api.crusoecloud.com/v1":       defaultApiEndpoint,
+	}
+
+	if newEndpoint, ok := migrations[endpoint]; ok {
+		return newEndpoint
+	}
+
+	return ""
 }
 
 // GetConfig populates a config struct based on default values, the user's Crusoe config file, and environment variables.
@@ -157,6 +172,10 @@ func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 	}
 	if apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT"); apiEndpoint != "" {
 		config.ApiEndpoint = apiEndpoint
+	}
+
+	if newEndpoint := migrateEndpoint(config.ApiEndpoint); newEndpoint != "" {
+		config.ApiEndpoint = newEndpoint
 	}
 
 	// Project precedence: provider block > CRUSOE_DEFAULT_PROJECT env > profile default

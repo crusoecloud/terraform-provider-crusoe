@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -140,7 +140,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	sourcePortsStr := strings.ReplaceAll(plan.SourcePorts.ValueString(), "*", "1-65535")
 	destPortsStr := strings.ReplaceAll(plan.DestinationPorts.ValueString(), "*", "1-65535")
 
-	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequestV1{
 		VpcNetworkId:     plan.Network.ValueString(),
 		Name:             plan.Name.ValueString(),
 		Action:           plan.Action.ValueString(),
@@ -187,7 +187,7 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
