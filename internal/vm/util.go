@@ -283,8 +283,8 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1, state *vmResourceM
 	}
 
 	// install_crusoe_watch_agent is not returned by the API (create-time-only flag);
-	// preserve the existing state value, defaulting to false when empty (e.g., imports).
+	// preserve the existing state value, defaulting to true when empty (e.g., imports).
 	if state.InstallCrusoeWatchAgent.IsNull() || state.InstallCrusoeWatchAgent.IsUnknown() {
-		state.InstallCrusoeWatchAgent = types.BoolValue(false)
+		state.InstallCrusoeWatchAgent = types.BoolValue(true)
 	}
 }

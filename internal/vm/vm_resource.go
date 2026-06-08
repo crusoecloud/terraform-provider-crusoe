@@ -275,7 +275,7 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
-				Description:   "Whether to install the Crusoe Watch Agent on the VM. Defaults to false.",
+				Description:   "Whether to install the Crusoe Watch Agent on the VM. Defaults to true.",
 			},
 		},
 	}
@@ -392,9 +392,9 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	plan.ID = types.StringValue(instance.Id)
 
 	// install_crusoe_watch_agent is a create-time-only flag not returned by the API;
-	// preserve the user's chosen value, defaulting to false (the API default) when unset.
+	// preserve the user's chosen value, defaulting to true (the API default) when unset.
 	if plan.InstallCrusoeWatchAgent.IsNull() || plan.InstallCrusoeWatchAgent.IsUnknown() {
-		plan.InstallCrusoeWatchAgent = types.BoolValue(false)
+		plan.InstallCrusoeWatchAgent = types.BoolValue(true)
 	}
 
 	if instance.ReservationId != "" {
