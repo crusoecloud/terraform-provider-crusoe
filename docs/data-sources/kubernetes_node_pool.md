@@ -33,7 +33,7 @@ description: |-
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `node_taints` (Attributes List) (see [below for nested schema](#nestedatt--node_taints))
+- `node_taints` (Attributes Set) (see [below for nested schema](#nestedatt--node_taints))
 - `public_ip_type` (String)
 
 <a id="nestedatt--node_taints"></a>

@@ -29,7 +29,7 @@ description: |-
 - `batch_size` (Number) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. Number of nodes to update at a time during rollout (minimum 1, maximum 10). Mutually exclusive with batch_percentage. If both this and batch_percentage are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
 - `ephemeral_storage_for_containerd` (Boolean)
 - `ib_partition_id` (String)
-- `node_taints` (Block List) (see [below for nested schema](#nestedblock--node_taints))
+- `node_taints` (Block Set) (see [below for nested schema](#nestedblock--node_taints))
 - `nvlink_domain_id` (String)
 - `project_id` (String)
 - `public_ip_type` (String)
@@ -50,8 +50,8 @@ description: |-
 Required:
 
 - `effect` (String) Taint effect. Possible values: `NoSchedule`, `PreferNoSchedule`, `NoExecute`.
-- `key` (String) Taint key. Must be non-empty and at most 63 characters.
+- `key` (String) Taint key. Follows the Kubernetes qualified-name format (optional DNS subdomain prefix, name segment up to 63 chars). Must be non-empty.
 
 Optional:
 
-- `value` (String) Taint value. Must be at most 63 characters.
+- `value` (String) Taint value. Defaults to empty string if omitted. Must be at most 63 characters.

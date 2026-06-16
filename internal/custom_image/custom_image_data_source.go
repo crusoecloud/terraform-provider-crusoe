@@ -2,6 +2,7 @@ package custom_image
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -111,7 +112,10 @@ func (ds *customImageDataSource) Read(ctx context.Context, req datasource.ReadRe
 		defer httpResp.Body.Close()
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch custom images", err.Error())
+		resp.Diagnostics.AddError(
+			"Failed to fetch custom images",
+			fmt.Sprintf("Could not fetch custom images: %s", common.UnpackAPIError(err)),
+		)
 
 		return
 	}

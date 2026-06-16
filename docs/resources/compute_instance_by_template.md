@@ -22,7 +22,7 @@ description: |-
 
 ### Optional
 
-- `install_crusoe_watch_agent` (Boolean) Whether to install the Crusoe Watch Agent on the VM. Defaults to false.
+- `install_crusoe_watch_agent` (Boolean) Whether to install the Crusoe Watch Agent on the VM. Defaults to true.
 - `nvlink_domain_id` (String) NVLink domain ID to use for NVLink communication.
 - `project_id` (String)
 

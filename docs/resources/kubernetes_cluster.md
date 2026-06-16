@@ -24,9 +24,9 @@ description: |-
 ### Optional
 
 - `add_ons` (List of String)
-- `apiserver_extra_args` (Map of String) Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation.
+- `apiserver_extra_args` (Map of String) Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.
 - `cluster_cidr` (String)
-- `controller_manager_extra_args` (Map of String) Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation.
+- `controller_manager_extra_args` (Map of String) Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.
 - `node_cidr_mask_size` (Number)
 - `oidc_ca_cert` (String) CA certificate used to verify the OIDC server (optional).
 - `oidc_client_id` (String)
@@ -36,7 +36,7 @@ description: |-
 - `oidc_username_prefix` (String)
 - `private` (Boolean)
 - `project_id` (String)
-- `scheduler_extra_args` (Map of String) Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation.
+- `scheduler_extra_args` (Map of String) Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.
 - `service_cluster_ip_range` (String)
 - `subnet_id` (String)
 
