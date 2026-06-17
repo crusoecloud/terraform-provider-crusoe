@@ -82,7 +82,15 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 }
 
 func (r *ibPartitionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "ib_partition_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import IB Partition", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

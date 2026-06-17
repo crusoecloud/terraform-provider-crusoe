@@ -192,7 +192,15 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 }
 
 func (r *instanceTemplateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "instance_template_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import Instance Template", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface

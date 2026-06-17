@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	tfResource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
 func TestStringSliceToTFList(t *testing.T) {
@@ -117,6 +118,87 @@ func TestValidateHTTPStatus(t *testing.T) {
 
 			if diagnostics.HasError() != tt.wantError {
 				t.Errorf("ValidateHTTPStatus() HasError = %v, want %v", diagnostics.HasError(), tt.wantError)
+			}
+		})
+	}
+}
+
+func TestParseResourceIdentifiers(t *testing.T) {
+	const (
+		resourceUUID        = "11111111-1111-1111-1111-111111111111"
+		fallbackProjectUUID = "22222222-2222-2222-2222-222222222222"
+		explicitProjectUUID = "33333333-3333-3333-3333-333333333333"
+	)
+
+	client := &CrusoeClient{ProjectID: fallbackProjectUUID}
+
+	tests := []struct {
+		name         string
+		importID     string
+		wantResource string
+		wantProject  string
+		wantErr      bool
+	}{
+		{
+			name:         "resource id only falls back to client project",
+			importID:     resourceUUID,
+			wantResource: resourceUUID,
+			wantProject:  fallbackProjectUUID,
+			wantErr:      false,
+		},
+		{
+			name:         "explicit project id from suffix",
+			importID:     resourceUUID + "," + explicitProjectUUID,
+			wantResource: resourceUUID,
+			wantProject:  explicitProjectUUID,
+			wantErr:      false,
+		},
+		{
+			name:     "invalid resource uuid",
+			importID: "not-a-uuid",
+			wantErr:  true,
+		},
+		{
+			name:     "invalid project uuid in suffix",
+			importID: resourceUUID + ",not-a-uuid",
+			wantErr:  true,
+		},
+		{
+			name:     "too many comma separated parts",
+			importID: resourceUUID + "," + explicitProjectUUID + "," + fallbackProjectUUID,
+			wantErr:  true,
+		},
+		{
+			name:     "empty import id",
+			importID: "",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := tfResource.ImportStateRequest{ID: tt.importID}
+
+			resourceID, projectID, errMsg := ParseResourceIdentifiers(req, client, "resource_id")
+
+			if tt.wantErr {
+				if errMsg == "" {
+					t.Errorf("ParseResourceIdentifiers(%q) expected error, got none", tt.importID)
+				}
+
+				return
+			}
+
+			if errMsg != "" {
+				t.Errorf("ParseResourceIdentifiers(%q) unexpected error: %s", tt.importID, errMsg)
+			}
+
+			if resourceID != tt.wantResource {
+				t.Errorf("ParseResourceIdentifiers(%q) resourceID = %q, want %q", tt.importID, resourceID, tt.wantResource)
+			}
+
+			if projectID != tt.wantProject {
+				t.Errorf("ParseResourceIdentifiers(%q) projectID = %q, want %q", tt.importID, projectID, tt.wantProject)
 			}
 		})
 	}

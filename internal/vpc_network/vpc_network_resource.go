@@ -94,7 +94,15 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 }
 
 func (r *vpcNetworkResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "vpc_network_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import VPC Network", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
