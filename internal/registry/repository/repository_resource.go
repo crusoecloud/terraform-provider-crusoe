@@ -258,7 +258,10 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	panic("Updating repository is not currently supported")
+	response.Diagnostics.AddError(
+		"Updating Repository Not Supported",
+		"Updating an existing repository is not currently supported. To change its configuration, the repository must be destroyed and recreated.",
+	)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
