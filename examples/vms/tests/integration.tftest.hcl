@@ -41,3 +41,29 @@ run "check_vm_and_disk_exists" {
     error_message = "The VM's data disk's ID does not match the data disk's ID."
   }
 }
+
+# Resize the VM in place within the same product family (a100-80gb.1x -> a100-80gb.2x).
+# The VM is stopped to apply the resize and is left stopped afterward.
+run "resize_vm_in_place" {
+  command = apply
+
+  variables {
+    vm = {
+      type     = "a100-80gb.2x"
+      image    = "ubuntu22.04:latest"
+      location = "us-east1-a"
+    }
+  }
+
+  assert {
+    condition     = crusoe_compute_instance.my_vm.type == "a100-80gb.2x"
+    error_message = "Expected the VM type to be updated to 'a100-80gb.2x', got '${crusoe_compute_instance.my_vm.type}'."
+  }
+
+  # The ID must be unchanged from the create step, proving the VM was resized in place
+  # rather than destroyed and recreated.
+  assert {
+    condition     = crusoe_compute_instance.my_vm.id == run.check_vm_and_disk_exists.vm_id
+    error_message = "The VM ID changed after the type update, indicating the VM was replaced instead of resized in place."
+  }
+}

@@ -3,6 +3,7 @@ package vm
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -16,7 +17,20 @@ import (
 const (
 	DiskOS       = "os"
 	StateRunning = "STATE_RUNNING"
+	StateStopped = "STATE_STOPPED"
+	StateShutoff = "STATE_SHUTOFF"
 )
+
+// instanceTypeFamily returns the product-family prefix of an instance type,
+// e.g. "c1a" for "c1a.2x". ok is false if the value isn't in "<family>.<size>" form.
+func instanceTypeFamily(instanceType string) (family string, ok bool) {
+	parts := strings.SplitN(instanceType, ".", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return "", false
+	}
+
+	return parts[0], true
+}
 
 var FQDNDeprecationMessage = common.FormatDeprecationWithReplacement("v0.5.29", "internal_dns_name")
 

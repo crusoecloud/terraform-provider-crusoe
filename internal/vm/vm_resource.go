@@ -103,6 +103,39 @@ func (r *vmResource) Metadata(ctx context.Context, req resource.MetadataRequest,
 	resp.TypeName = req.ProviderTypeName + "_compute_instance"
 }
 
+// resizeRequiresReplace forces a resource replacement only when an instance type change
+// crosses product families (e.g. c1a -> a100). Changes within the same family (e.g.
+// c1a.2x -> c1a.4x) are applied in place via the Update method; the backend validates
+// whether the specific size is supported.
+//
+//nolint:gocritic // hugeParam: req signature required by stringplanmodifier.RequiresReplaceIfFunc
+func resizeRequiresReplace(_ context.Context, req planmodifier.StringRequest,
+	resp *stringplanmodifier.RequiresReplaceIfFuncResponse,
+) {
+	// Only relevant on update with a known, changing value.
+	if req.StateValue.IsNull() || req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	if req.StateValue.ValueString() == req.PlanValue.ValueString() {
+		return
+	}
+
+	oldFamily, oldOK := instanceTypeFamily(req.StateValue.ValueString())
+	newFamily, newOK := instanceTypeFamily(req.PlanValue.ValueString())
+	if !oldOK || !newOK || oldFamily != newFamily {
+		resp.RequiresReplace = true // different family -> destroy & recreate (preserves prior behavior)
+
+		return
+	}
+
+	// Same family -> in-place resize. The API requires the VM to be stopped first.
+	resp.Diagnostics.AddWarning(
+		"VM will be stopped to resize",
+		"Changing the instance type resizes the VM in place. The VM will be stopped to "+
+			"apply the resize, then started again if it was running before the update.",
+	)
+}
+
 func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version: 2,
@@ -121,8 +154,13 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required: true,
+				// Resize in place within the same product family; recreate the VM when the family changes.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIf(
+					resizeRequiresReplace,
+					"Recreates the VM when the instance type's product family changes; resizes in place within the same family.",
+					"Recreates the VM when the instance type's product family changes; resizes in place within the same family.",
+				)},
 			},
 			"ssh_key": schema.StringAttribute{
 				Required:      true,
@@ -551,8 +589,12 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	// handle updating public IP type
-	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
+	// handle updating public IP type, but only when the network interface configuration
+	// actually changed. This avoids a redundant (and running-only) public IP update on
+	// every apply - e.g. a type-only resize, which would otherwise fail here if the VM
+	// is stopped (resizing leaves the VM stopped).
+	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 &&
+		!plan.NetworkInterfaces.Equal(state.NetworkInterfaces) {
 		// instances must be running to update public IP type
 		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 		if httpResp != nil {
@@ -622,6 +664,103 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		state.NetworkInterfaces = plan.NetworkInterfaces
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
+	}
+
+	// resize the instance in place if the type changed within the same product family.
+	// (Cross-family changes trigger a replace via the schema plan modifier and never reach here.)
+	if !plan.Type.IsUnknown() && !plan.Type.IsNull() && plan.Type.ValueString() != state.Type.ValueString() {
+		// fetch the current power state; the backend requires the VM to be stopped before a resize.
+		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error fetching the instance's current state: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		// stop the VM first if it isn't already stopped.
+		wasRunning := instance.State != StateStopped && instance.State != StateShutoff
+		if wasRunning {
+			stopResp, stopHTTPResp, stopErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+				Action: "STOP",
+			}, state.ProjectID.ValueString(), state.ID.ValueString())
+			if stopHTTPResp != nil {
+				defer stopHTTPResp.Body.Close()
+			}
+			if stopErr != nil {
+				resp.Diagnostics.AddError("Failed to resize instance",
+					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
+
+				return
+			}
+
+			_, stopErr = common.AwaitOperation(ctx, stopResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+			if stopErr != nil {
+				resp.Diagnostics.AddError("Failed to resize instance",
+					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
+
+				return
+			}
+		}
+
+		resizeResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+			Action: "UPDATE",
+			Type_:  plan.Type.ValueString(),
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error requesting to resize the instance: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		_, err = common.AwaitOperation(ctx, resizeResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error resizing the instance: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		// Persist the new type before attempting the restart, so a restart failure
+		// does not lose the completed resize from state.
+		state.Type = plan.Type
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// restore the prior power state: resizing leaves the VM stopped, so start it
+		// again if it was running before the resize.
+		if wasRunning {
+			startResp, startHTTPResp, startErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+				Action: "START",
+			}, state.ProjectID.ValueString(), state.ID.ValueString())
+			if startHTTPResp != nil {
+				defer startHTTPResp.Body.Close()
+			}
+			if startErr != nil {
+				resp.Diagnostics.AddError("Failed to start instance after resize",
+					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
+
+				return
+			}
+
+			_, startErr = common.AwaitOperation(ctx, startResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+			if startErr != nil {
+				resp.Diagnostics.AddError("Failed to start instance after resize",
+					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
+
+				return
+			}
+		}
 	}
 
 	//  Reservation ID is deprecated
