@@ -100,6 +100,8 @@ For more usage examples, including storage disks, startup scripts, and firewall 
 
 To develop the Terraform provider, you'll need a recent version of [golang](https://go.dev/doc/install) installed.
 
+This repository includes a `mise.toml` that pins the Go toolchain along with `golangci-lint`, `terraform`, and `tfplugindocs`. If you use [mise](https://mise.jdx.dev), run `mise install` to provision them; otherwise install a recent version of [golang](https://go.dev/doc/install) yourself.
+
 Add the following to your `~/.terraformrc`
 
 ```
@@ -116,7 +118,7 @@ provider_installation {
 }
 ```
 
-Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples.
+Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples. (Under mise this lands in mise's Go bin, which is where the `$GOPATH/bin/` override above resolves, so the snippet works unchanged.)
 
 Other common commands are: `terraform init` to initialize your working directory, and `terraform plan` to preview changes without applying them. 
 
