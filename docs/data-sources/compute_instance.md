@@ -17,7 +17,6 @@ description: |-
 
 ### Optional
 
-- `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
 - `name` (String)
 - `nvlink_domain_id` (String)
 - `project_id` (String)
@@ -25,6 +24,7 @@ description: |-
 
 ### Read-Only
 
+- `disks` (Attributes List) (see [below for nested schema](#nestedatt--disks))
 - `id` (String) The ID of this resource.
 - `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
 - `type` (String)
@@ -32,7 +32,7 @@ description: |-
 <a id="nestedatt--disks"></a>
 ### Nested Schema for `disks`
 
-Required:
+Read-Only:
 
 - `attachment_type` (String)
 - `id` (String)

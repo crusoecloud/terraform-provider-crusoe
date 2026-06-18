@@ -83,17 +83,17 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 				Computed: true,
 			},
 			"disks": schema.ListNestedAttribute{
-				Optional: true,
+				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Required: true,
+							Computed: true,
 						},
 						"attachment_type": schema.StringAttribute{
-							Required: true,
+							Computed: true,
 						},
 						"mode": schema.StringAttribute{
-							Required: true,
+							Computed: true,
 						},
 					},
 				},
