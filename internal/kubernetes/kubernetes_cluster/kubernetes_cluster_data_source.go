@@ -77,28 +77,36 @@ func (ds *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sc
 			},
 			"name": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"version": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"subnet_id": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"cluster_cidr": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"node_cidr_mask_size": schema.Int64Attribute{
 				Optional: true,
+				Computed: true,
 			},
 			"service_cluster_ip_range": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"add_ons": schema.ListAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
+				Computed:    true,
 			},
 			"location": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"dns_name": schema.StringAttribute{
 				Computed: true,
