@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -81,17 +82,17 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 						Computed: true,
 					},
 					"name": schema.StringAttribute{
-						Required: true,
+						Computed: true,
 					},
 					"project_id": schema.StringAttribute{
 						Optional: true,
 						Computed: true,
 					},
 					"type": schema.StringAttribute{
-						Required: true,
+						Computed: true,
 					},
 					"ssh_key": schema.StringAttribute{
-						Required: true,
+						Computed: true,
 					},
 					"location": schema.StringAttribute{
 						Optional: true,
@@ -102,30 +103,29 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 						Computed: true,
 					},
 					"startup_script": schema.StringAttribute{
-						Optional: true,
+						Computed: true,
 					},
 					"shutdown_script": schema.StringAttribute{
-						Optional: true,
+						Computed: true,
 					},
 					"subnet": schema.StringAttribute{
-						Required: true,
+						Computed: true,
 					},
 					"ib_partition": schema.StringAttribute{
-						Optional: true,
+						Computed: true,
 					},
 					"public_ip_address_type": schema.StringAttribute{
 						Optional: true,
 						Computed: true,
 					},
 					"disks": schema.ListNestedAttribute{
-						Optional: true,
+						Computed: true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"size": schema.StringAttribute{
-									Required: true,
+									Computed: true,
 								},
 								"type": schema.StringAttribute{
-									Optional: true,
 									Computed: true,
 								},
 							},
@@ -166,36 +166,43 @@ func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	disks := make([]diskModel, 0)
-	for i := range dataResp.Items {
-		for j := range dataResp.Items[i].Disks {
-			disks = append(disks, diskModel{
-				Size: dataResp.Items[i].Disks[j].Size,
-				Type: dataResp.Items[i].Disks[j].Type_,
-			})
-		}
-	}
-
 	var state instanceTemplatesDataSourceModel
-	for i := range dataResp.Items {
-		state.InstanceTemplates = append(state.InstanceTemplates, instanceTemplatesModel{
-			ID:              dataResp.Items[i].Id,
-			Name:            dataResp.Items[i].Name,
-			Type:            dataResp.Items[i].Type_,
-			SSHKey:          dataResp.Items[i].SshPublicKey,
-			Location:        dataResp.Items[i].Location,
-			ImageName:       dataResp.Items[i].ImageName,
-			StartupScript:   dataResp.Items[i].StartupScript,
-			ShutdownScript:  dataResp.Items[i].ShutdownScript,
-			SubnetId:        dataResp.Items[i].SubnetId,
-			IBPartition:     dataResp.Items[i].IbPartitionId,
-			ProjectID:       dataResp.Items[i].ProjectId,
-			Disks:           disks,
-			PlacementPolicy: dataResp.Items[i].PlacementPolicy,
-			NvlinkDomainID:  dataResp.Items[i].NvlinkDomainId,
-		})
-	}
+	state.InstanceTemplates = instanceTemplatesToModel(dataResp.Items)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
+}
+
+// instanceTemplatesToModel maps API instance templates to the Terraform model.
+// Disks are built per template so each template carries only its own disks.
+func instanceTemplatesToModel(items []swagger.InstanceTemplate) []instanceTemplatesModel {
+	templates := make([]instanceTemplatesModel, 0, len(items))
+	for i := range items {
+		disks := make([]diskModel, 0, len(items[i].Disks))
+		for j := range items[i].Disks {
+			disks = append(disks, diskModel{
+				Size: items[i].Disks[j].Size,
+				Type: items[i].Disks[j].Type_,
+			})
+		}
+
+		templates = append(templates, instanceTemplatesModel{
+			ID:              items[i].Id,
+			Name:            items[i].Name,
+			Type:            items[i].Type_,
+			SSHKey:          items[i].SshPublicKey,
+			Location:        items[i].Location,
+			ImageName:       items[i].ImageName,
+			StartupScript:   items[i].StartupScript,
+			ShutdownScript:  items[i].ShutdownScript,
+			SubnetId:        items[i].SubnetId,
+			IBPartition:     items[i].IbPartitionId,
+			ProjectID:       items[i].ProjectId,
+			Disks:           disks,
+			PlacementPolicy: items[i].PlacementPolicy,
+			NvlinkDomainID:  items[i].NvlinkDomainId,
+		})
+	}
+
+	return templates
 }
