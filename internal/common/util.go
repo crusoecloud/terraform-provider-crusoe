@@ -484,6 +484,15 @@ func FormatDeprecationWithReplacement(deprecatedInVersion, newFieldName string) 
 // ValidateHTTPStatus checks if the HTTP response status code matches any of the accepted codes.
 // Returns true if valid, false if invalid (and adds error to diagnostics).
 func ValidateHTTPStatus(diagnostics *diag.Diagnostics, httpResp *http.Response, operation string, acceptedCodes ...int) bool {
+	if httpResp == nil {
+		diagnostics.AddError(
+			fmt.Sprintf("Failed to %s", operation),
+			"Received a nil HTTP response from the API.",
+		)
+
+		return false
+	}
+
 	for _, code := range acceptedCodes {
 		if httpResp.StatusCode == code {
 			return true

@@ -65,9 +65,17 @@ func TestValidateHTTPStatus(t *testing.T) {
 		name          string
 		statusCode    int
 		acceptedCodes []int
+		nilResp       bool
 		wantValid     bool
 		wantError     bool
 	}{
+		{
+			name:          "nil response rejected",
+			nilResp:       true,
+			acceptedCodes: []int{http.StatusOK},
+			wantValid:     false,
+			wantError:     true,
+		},
 		{
 			name:          "status OK accepted",
 			statusCode:    http.StatusOK,
@@ -108,7 +116,10 @@ func TestValidateHTTPStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var diagnostics diag.Diagnostics
-			httpResp := &http.Response{StatusCode: tt.statusCode}
+			var httpResp *http.Response
+			if !tt.nilResp {
+				httpResp = &http.Response{StatusCode: tt.statusCode}
+			}
 
 			result := ValidateHTTPStatus(&diagnostics, httpResp, "test operation", tt.acceptedCodes...)
 
