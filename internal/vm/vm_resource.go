@@ -205,7 +205,9 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 					},
 				},
-				Default: setdefault.StaticValue(types.Set{}),
+				// Empty set must carry the correct element type; an untyped types.Set{}
+				// fails schema validation in terraform-plugin-framework >= v1.15.
+				Default: setdefault.StaticValue(types.SetValueMust(vmDiskAttachmentSchema, nil)),
 			},
 			"fqdn": schema.StringAttribute{
 				Computed:           true,
