@@ -171,7 +171,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	plan.ID = types.StringValue(firewallRule.Id)
+	firewallRuleToTerraformResourceModel(firewallRule, &plan)
 	plan.ProjectID = types.StringValue(projectID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -251,13 +251,15 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.VpcFirewallRule](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
+	firewallRule, _, err := common.AwaitOperationAndResolve[swagger.VpcFirewallRule](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VPCFirewallRuleOperationsApi.GetNetworkingVPCFirewallRulesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to patch firewall rule",
 			fmt.Sprintf("There was an error updating the firewall rule: %s.", common.UnpackAPIError(err)))
 
 		return
 	}
+
+	firewallRuleToTerraformResourceModel(firewallRule, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
