@@ -285,15 +285,12 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Optional: true,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
-							Optional:      true,
-							Description:   "Infiniband Partition ID",
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Optional:    true,
+							Description: "Infiniband Partition ID",
 						},
 					},
 				},
