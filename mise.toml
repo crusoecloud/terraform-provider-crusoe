@@ -1,0 +1,21 @@
+# mise toolchain for the Crusoe Terraform provider.
+# Install everything with:  mise install
+# Then `make build` / `make dev` / `make docs` will find the right tools on PATH.
+#
+# Requires mise to be active in your shell. Either add this to ~/.zshrc:
+#   eval "$(mise activate zsh)"
+# or run commands ad hoc with:  mise exec -- make build
+
+[tools]
+# Matches the `toolchain go1.23.8` directive in go.mod and CI (go-version "1.23").
+go = "1.23.8"
+
+# Matches GOLANGCI_VERSION in the Makefile and the CI golangci-lint action.
+golangci-lint = "1.62.0"
+
+# Matches the terraform version currently in use locally.
+terraform = "1.15.6"
+
+# Doc generator invoked by `go generate` / `make docs`.
+# Matches TFPLUGINDOCS_VERSION in the Makefile. Built with the mise-managed Go.
+"go:github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs" = "v0.18.0"

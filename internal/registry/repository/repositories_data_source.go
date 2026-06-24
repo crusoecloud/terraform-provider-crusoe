@@ -87,13 +87,15 @@ func (ds *registryRepositoriesDataSource) Read(ctx context.Context, request data
 
 	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-	repos, httpResp, err := ds.client.APIClient.CcrApi.ListCcrRepositories(ctx, projectID)
+	repos, httpResp, err := ds.client.APIClient.CcrApi.ListCcrRepositories(ctx, projectID, nil)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list repositories", fmt.Sprintf("Error listing repositories: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	for _, repo := range repos.Items {
 		state.Repositories = append(state.Repositories, registryRepositoryDataSourceModel{

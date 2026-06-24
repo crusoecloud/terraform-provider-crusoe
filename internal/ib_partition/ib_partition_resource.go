@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -82,7 +82,15 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 }
 
 func (r *ibPartitionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "ib_partition_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import IB Partition", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -95,17 +103,19 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	dataResp, httpResp, err := r.client.APIClient.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1{
 		Name:        plan.Name.ValueString(),
 		IbNetworkId: plan.IBNetworkID.ValueString(),
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create partition",
 			fmt.Sprintf("There was an error creating an Infiniband partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Id)
 	plan.ProjectID = types.StringValue(projectID)
@@ -122,11 +132,14 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	partition, httpResp, err := r.client.APIClient.IBPartitionsApi.GetIBPartition(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		if err.Error() == notFoundMessage {
 			// partition has most likely been deleted out of band, so we update Terraform state to match
@@ -140,7 +153,6 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	state.ProjectID = types.StringValue(projectID)
 	ibPartitionToTerraformResourceModel(&partition, &state)
@@ -166,11 +178,13 @@ func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	httpResp, err := r.client.APIClient.IBPartitionsApi.DeleteIBPartition(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete partition",
 			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -148,7 +148,7 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"disks": schema.SetNestedAttribute{
-				Required: true,
+				Optional: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"size": schema.StringAttribute{
@@ -172,6 +172,7 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Description:   "(Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
 			},
 			"placement_policy": schema.StringAttribute{
 				Optional:      true,
@@ -191,7 +192,15 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 }
 
 func (r *instanceTemplateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "instance_template_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import Instance Template", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -205,22 +214,25 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	tDisks := make([]diskToCreateResourceModel, 0, len(plan.DisksToCreate.Elements()))
-	diags = plan.DisksToCreate.ElementsAs(ctx, &tDisks, true)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+	var disksToCreate []swagger.DiskTemplate
+	if !plan.DisksToCreate.IsNull() && !plan.DisksToCreate.IsUnknown() {
+		tDisks := make([]diskToCreateResourceModel, 0, len(plan.DisksToCreate.Elements()))
+		diags = plan.DisksToCreate.ElementsAs(ctx, &tDisks, true)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		disksToCreate = make([]swagger.DiskTemplate, 0, len(tDisks))
+		for _, disk := range tDisks {
+			disksToCreate = append(disksToCreate, swagger.DiskTemplate{
+				Size:  disk.Size.ValueString(),
+				Type_: disk.Type.ValueString(),
+			})
+		}
 	}
 
-	disksToCreate := make([]swagger.DiskTemplate, 0, len(tDisks))
-	for _, disk := range tDisks {
-		disksToCreate = append(disksToCreate, swagger.DiskTemplate{
-			Size:  disk.Size.ValueString(),
-			Type_: disk.Type.ValueString(),
-		})
-	}
-
-	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1{
 		TemplateName:        plan.Name.ValueString(),
 		Type_:               plan.Type.ValueString(),
 		Location:            plan.Location.ValueString(),
@@ -232,17 +244,18 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		IbPartitionId:       plan.IBPartition.ValueString(),
 		Disks:               disksToCreate,
 		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
-		ReservationId:       plan.ReservationID.ValueString(),
 		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
 		NvlinkDomainId:      plan.NvlinkDomainID.ValueString(),
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance template",
 			fmt.Sprintf("There was an error creating the instance template (project %s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	plan.ID = types.StringValue(dataResp.Id)
 	plan.ProjectID = types.StringValue(dataResp.ProjectId)
@@ -250,7 +263,15 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	plan.Location = types.StringValue(dataResp.Location)
 	plan.Image = types.StringValue(dataResp.ImageName)
 	plan.PlacementPolicy = types.StringValue(dataResp.PlacementPolicy)
-	plan.ReservationID = types.StringValue(dataResp.ReservationId)
+
+	if dataResp.ReservationId != "" {
+		plan.ReservationID = types.StringValue(dataResp.ReservationId)
+	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+			"Reservation assignment during instance template creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
+	} else {
+		plan.ReservationID = types.StringNull()
+	}
 
 	if dataResp.NvlinkDomainId != "" {
 		plan.NvlinkDomainID = types.StringValue(dataResp.NvlinkDomainId)
@@ -267,8 +288,10 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 	}
 	if len(disksToCreateResource) > 0 {
 		plan.DisksToCreate, _ = types.SetValueFrom(ctx, diskToCreateSchema, disksToCreateResource)
-	} else {
+	} else if plan.DisksToCreate.IsNull() {
 		plan.DisksToCreate = types.SetNull(diskToCreateSchema)
+	} else {
+		plan.DisksToCreate, _ = types.SetValueFrom(ctx, diskToCreateSchema, []diskToCreateResourceModel{})
 	}
 
 	diags = resp.State.Set(ctx, &plan)
@@ -285,13 +308,15 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	instanceTemplate, httpResp, err := r.client.APIClient.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get instance template",
 			fmt.Sprintf("Fetching Crusoe instance templates failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode == http.StatusNotFound {
 		// instance template has most likely been deleted out of band, so we update Terraform state to match
@@ -311,8 +336,10 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 	if len(disks) > 0 {
 		tDisks, _ := types.SetValueFrom(context.Background(), diskToCreateSchema, disks)
 		state.DisksToCreate = tDisks
-	} else {
+	} else if state.DisksToCreate.IsNull() {
 		state.DisksToCreate = types.SetNull(diskToCreateSchema)
+	} else {
+		state.DisksToCreate, _ = types.SetValueFrom(context.Background(), diskToCreateSchema, []diskToCreateResourceModel{})
 	}
 
 	state.Name = types.StringValue(instanceTemplate.Name)
@@ -371,11 +398,13 @@ func (r *instanceTemplateResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	httpResp, err := r.client.APIClient.InstanceTemplatesApi.DeleteInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance template",
 			fmt.Sprintf("There was an error starting a delete instance template operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }

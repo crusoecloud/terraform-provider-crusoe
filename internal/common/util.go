@@ -15,12 +15,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/provider"
 	tfResource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
 const (
@@ -29,16 +27,17 @@ const (
 	ErrorMsgProviderInitFailed = "Could not initialize the Crusoe provider." +
 		" Please check your Crusoe configuration and try again, and if the problem persists, contact support@crusoecloud.com."
 
-	latestVersionURL   = "https://api.github.com/repos/crusoecloud/terraform-provider-crusoe/releases/latest"
-	colorGreen         = "\033[32m"
-	colorYellow        = "\033[33m"
-	colorRed           = "\033[31m"
-	colorReset         = "\033[0m"
-	metadataFile       = "/.crusoe/.metadata"
-	DevelopmentMessage = "This feature is currently in development. Reach out to support@crusoecloud.com with any questions."
-	onlyUserReadPerms  = 0o600
-	two                = 2
-	internalErrorCode  = "internal_error"
+	latestVersionURL          = "https://api.github.com/repos/crusoecloud/terraform-provider-crusoe/releases/latest"
+	colorGreen                = "\033[32m"
+	colorYellow               = "\033[33m"
+	colorRed                  = "\033[31m"
+	colorReset                = "\033[0m"
+	metadataFile              = "/.crusoe/.metadata"
+	DevelopmentSupportMessage = "Reach out to support@crusoecloud.com with any questions."
+	DevelopmentMessage        = "This feature is currently in development. " + DevelopmentSupportMessage
+	onlyUserReadPerms         = 0o600
+	two                       = 2
+	internalErrorCode         = "internal_error"
 )
 
 var version string
@@ -153,15 +152,6 @@ func GetProjectIDOrFallback(client *CrusoeClient, projectId string) string {
 	}
 
 	return client.ProjectID
-}
-
-func GetProjectIDFromPointerOrFallback(client *CrusoeClient, projectId *string) string {
-	projectIdStr := ""
-	if projectId != nil {
-		projectIdStr = *projectId
-	}
-
-	return GetProjectIDOrFallback(client, projectIdStr)
 }
 
 func ParseResourceIdentifiers(req tfResource.ImportStateRequest, client *CrusoeClient, resourceIDFieldName string) (resourceID, projectID, err string) {
@@ -379,9 +369,9 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 	}
 
 	projectsResp, projectHttpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
-
-	defer projectHttpResp.Body.Close()
-
+	if projectHttpResp != nil {
+		defer projectHttpResp.Body.Close()
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to query for projects: %w", err)
 	}
@@ -389,18 +379,33 @@ func FindResource[T any](ctx context.Context, client *swagger.APIClient, args Fi
 	for _, project := range projectsResp.Items {
 		resource, getResourceHttpResp, getResourceErr := args.GetResource(ctx, project.Id, args.ResourceID)
 		if getResourceErr != nil {
+			if getResourceHttpResp != nil {
+				getResourceHttpResp.Body.Close()
+			}
+
 			continue
 		}
 		if args.IsResource(resource, args.ResourceID) {
+			if getResourceHttpResp != nil {
+				getResourceHttpResp.Body.Close()
+			}
+
 			return &resource, project.Id, nil
 		}
-		getResourceHttpResp.Body.Close()
+		if getResourceHttpResp != nil {
+			getResourceHttpResp.Body.Close()
+		}
 	}
 
 	return nil, "", errors.New("failed to find resource")
 }
 
 func TFMapToStringMap(tfMap types.Map) (map[string]string, error) {
+	// Handle null or unknown maps
+	if tfMap.IsNull() || tfMap.IsUnknown() {
+		return map[string]string{}, nil
+	}
+
 	// Convert the Terraform map to a string map
 	stringMap := make(map[string]string)
 
@@ -466,12 +471,38 @@ func StringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
 	return types.MapValue(types.StringType, tfMap)
 }
 
-func AddProjectError(resp *provider.ConfigureResponse, defaultProject, titleIfEmpty, msgIfEmpty, titleIfSet, msgIfSet string) {
-	title := titleIfEmpty
-	msg := msgIfEmpty
-	if defaultProject != "" {
-		title = titleIfSet
-		msg = msgIfSet
+func FormatDeprecation(deprecatedInVersion string) string {
+	return fmt.Sprintf("This field is deprecated as of provider version %s "+
+		"and will be removed in the next major version. "+
+		"Please remove this field from your configuration.", deprecatedInVersion)
+}
+
+func FormatDeprecationWithReplacement(deprecatedInVersion, newFieldName string) string {
+	return FormatDeprecation(deprecatedInVersion) + fmt.Sprintf(" Use %s instead.", newFieldName)
+}
+
+// ValidateHTTPStatus checks if the HTTP response status code matches any of the accepted codes.
+// Returns true if valid, false if invalid (and adds error to diagnostics).
+func ValidateHTTPStatus(diagnostics *diag.Diagnostics, httpResp *http.Response, operation string, acceptedCodes ...int) bool {
+	if httpResp == nil {
+		diagnostics.AddError(
+			fmt.Sprintf("Failed to %s", operation),
+			"Received a nil HTTP response from the API.",
+		)
+
+		return false
 	}
-	resp.Diagnostics.AddAttributeError(path.Root("default_project"), title, msg)
+
+	for _, code := range acceptedCodes {
+		if httpResp.StatusCode == code {
+			return true
+		}
+	}
+
+	diagnostics.AddError(
+		fmt.Sprintf("Failed to %s", operation),
+		fmt.Sprintf("API returned unexpected status code %d", httpResp.StatusCode),
+	)
+
+	return false
 }

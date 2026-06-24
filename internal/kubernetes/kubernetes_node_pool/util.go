@@ -6,8 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -83,4 +89,120 @@ func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operati
 	}
 
 	return nil, ErrNodePoolBothNil
+}
+
+// nodePoolNeedsRollout checks if plan and state differences require rollout of changes
+func nodePoolNeedsRollout(plan, state *kubernetesNodePoolResourceModel) bool {
+	return !plan.Version.Equal(state.Version) ||
+		!plan.RequestedNodeLabels.Equal(state.RequestedNodeLabels) ||
+		!plan.NodeTaints.Equal(state.NodeTaints) ||
+		!plan.EphemeralStorageForContainerd.Equal(state.EphemeralStorageForContainerd) ||
+		!plan.BatchPercentage.Equal(state.BatchPercentage) ||
+		!plan.BatchSize.Equal(state.BatchSize)
+}
+
+func UpdateNodePoolNeedsRollout(ctx context.Context, req *resource.UpdateRequest, resp *resource.UpdateResponse) bool {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return false
+	}
+
+	var plan, state kubernetesNodePoolResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return false
+	}
+
+	return nodePoolNeedsRollout(&plan, &state)
+}
+
+func ModifyPlanNodePoolNeedsRollout(ctx context.Context, req *resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) bool {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return false
+	}
+
+	var plan, state kubernetesNodePoolResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return false
+	}
+
+	return nodePoolNeedsRollout(&plan, &state)
+}
+
+type nodeTaintModel struct {
+	Key    types.String `tfsdk:"key"`
+	Value  types.String `tfsdk:"value"`
+	Effect types.String `tfsdk:"effect"`
+}
+
+// tfSetToNodeTaints converts a Terraform Set to swagger node taints.
+func tfSetToNodeTaints(ctx context.Context, tfSet types.Set) ([]swagger.KubernetesNodeTaint, error) {
+	if tfSet.IsNull() || tfSet.IsUnknown() {
+		return nil, nil
+	}
+	var models []nodeTaintModel
+	diags := tfSet.ElementsAs(ctx, &models, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse node taints")
+	}
+	taints := make([]swagger.KubernetesNodeTaint, 0, len(models))
+	for _, m := range models {
+		taints = append(taints, swagger.KubernetesNodeTaint{
+			Key:    m.Key.ValueString(),
+			Value:  m.Value.ValueString(),
+			Effect: m.Effect.ValueString(),
+		})
+	}
+
+	return taints, nil
+}
+
+// nodeTaintsToTFSet converts swagger node taints to a Terraform Set.
+// Returns an empty set (not null) when the server has no taints, matching
+// how Terraform represents an absent SetNestedBlock.
+func nodeTaintsToTFSet(ctx context.Context, taints []swagger.KubernetesNodeTaint) (types.Set, diag.Diagnostics) {
+	if len(taints) == 0 {
+		return types.SetValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, []nodeTaintModel{})
+	}
+	models := make([]nodeTaintModel, 0, len(taints))
+	for _, t := range taints {
+		models = append(models, nodeTaintModel{
+			Key:    types.StringValue(t.Key),
+			Value:  types.StringValue(t.Value),
+			Effect: types.StringValue(t.Effect),
+		})
+	}
+
+	return types.SetValueFrom(ctx, types.ObjectType{AttrTypes: nodeTaintAttrTypes()}, models)
+}
+
+func nodeTaintAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"key":    types.StringType,
+		"value":  types.StringType,
+		"effect": types.StringType,
+	}
+}
+
+func validateNodeTaintDuplicates(taints []swagger.KubernetesNodeTaint) error {
+	seen := make(map[string]struct{})
+	var dups []string
+	for _, t := range taints {
+		uniqueKey := t.Key + ":" + t.Effect
+		if _, exists := seen[uniqueKey]; exists {
+			dups = append(dups, fmt.Sprintf("key %q with effect %q", t.Key, t.Effect))
+		} else {
+			seen[uniqueKey] = struct{}{}
+		}
+	}
+	switch len(dups) {
+	case 0:
+		return nil
+	case 1:
+		return fmt.Errorf("duplicate taint: %s is specified more than once", dups[0])
+	default:
+		return fmt.Errorf("duplicate taints:\n  - %s", strings.Join(dups, "\n  - "))
+	}
 }

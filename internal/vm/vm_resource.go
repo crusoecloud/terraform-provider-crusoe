@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -15,8 +16,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -31,24 +33,25 @@ type vmResource struct {
 }
 
 type vmResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	ProjectID           types.String `tfsdk:"project_id"`
-	Name                types.String `tfsdk:"name"`
-	Type                types.String `tfsdk:"type"`
-	SSHKey              types.String `tfsdk:"ssh_key"`
-	Location            types.String `tfsdk:"location"`
-	Image               types.String `tfsdk:"image"`
-	CustomImage         types.String `tfsdk:"custom_image"`
-	StartupScript       types.String `tfsdk:"startup_script"`
-	ShutdownScript      types.String `tfsdk:"shutdown_script"`
-	FQDN                types.String `tfsdk:"fqdn"`
-	InternalDNSName     types.String `tfsdk:"internal_dns_name"`
-	ExternalDNSName     types.String `tfsdk:"external_dns_name"`
-	Disks               types.Set    `tfsdk:"disks"`
-	NetworkInterfaces   types.List   `tfsdk:"network_interfaces"`
-	HostChannelAdapters types.List   `tfsdk:"host_channel_adapters"`
-	ReservationID       types.String `tfsdk:"reservation_id"`
-	NvlinkDomainID      types.String `tfsdk:"nvlink_domain_id"`
+	ID                      types.String `tfsdk:"id"`
+	ProjectID               types.String `tfsdk:"project_id"`
+	Name                    types.String `tfsdk:"name"`
+	Type                    types.String `tfsdk:"type"`
+	SSHKey                  types.String `tfsdk:"ssh_key"`
+	Location                types.String `tfsdk:"location"`
+	Image                   types.String `tfsdk:"image"`
+	CustomImage             types.String `tfsdk:"custom_image"`
+	StartupScript           types.String `tfsdk:"startup_script"`
+	ShutdownScript          types.String `tfsdk:"shutdown_script"`
+	FQDN                    types.String `tfsdk:"fqdn"`
+	InternalDNSName         types.String `tfsdk:"internal_dns_name"`
+	ExternalDNSName         types.String `tfsdk:"external_dns_name"`
+	Disks                   types.Set    `tfsdk:"disks"`
+	NetworkInterfaces       types.List   `tfsdk:"network_interfaces"`
+	HostChannelAdapters     types.List   `tfsdk:"host_channel_adapters"`
+	ReservationID           types.String `tfsdk:"reservation_id"`
+	NvlinkDomainID          types.String `tfsdk:"nvlink_domain_id"`
+	InstallCrusoeWatchAgent types.Bool   `tfsdk:"install_crusoe_watch_agent"`
 }
 
 type vmNetworkInterfaceResourceModel struct {
@@ -100,6 +103,39 @@ func (r *vmResource) Metadata(ctx context.Context, req resource.MetadataRequest,
 	resp.TypeName = req.ProviderTypeName + "_compute_instance"
 }
 
+// resizeRequiresReplace forces a resource replacement only when an instance type change
+// crosses product families (e.g. c1a -> a100). Changes within the same family (e.g.
+// c1a.2x -> c1a.4x) are applied in place via the Update method; the backend validates
+// whether the specific size is supported.
+//
+//nolint:gocritic // hugeParam: req signature required by stringplanmodifier.RequiresReplaceIfFunc
+func resizeRequiresReplace(_ context.Context, req planmodifier.StringRequest,
+	resp *stringplanmodifier.RequiresReplaceIfFuncResponse,
+) {
+	// Only relevant on update with a known, changing value.
+	if req.StateValue.IsNull() || req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	if req.StateValue.ValueString() == req.PlanValue.ValueString() {
+		return
+	}
+
+	oldFamily, oldOK := instanceTypeFamily(req.StateValue.ValueString())
+	newFamily, newOK := instanceTypeFamily(req.PlanValue.ValueString())
+	if !oldOK || !newOK || oldFamily != newFamily {
+		resp.RequiresReplace = true // different family -> destroy & recreate (preserves prior behavior)
+
+		return
+	}
+
+	// Same family -> in-place resize. The API requires the VM to be stopped first.
+	resp.Diagnostics.AddWarning(
+		"VM will be stopped to resize",
+		"Changing the instance type resizes the VM in place. The VM will be stopped to "+
+			"apply the resize, then started again if it was running before the update.",
+	)
+}
+
 func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version: 2,
@@ -118,8 +154,13 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required: true,
+				// Resize in place within the same product family; recreate the VM when the family changes.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIf(
+					resizeRequiresReplace,
+					"Recreates the VM when the instance type's product family changes; resizes in place within the same family.",
+					"Recreates the VM when the instance type's product family changes; resizes in place within the same family.",
+				)},
 			},
 			"ssh_key": schema.StringAttribute{
 				Required:      true,
@@ -164,7 +205,9 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 						},
 					},
 				},
-				Default: setdefault.StaticValue(types.Set{}),
+				// Empty set must carry the correct element type; an untyped types.Set{}
+				// fails schema validation in terraform-plugin-framework >= v1.15.
+				Default: setdefault.StaticValue(types.SetValueMust(vmDiskAttachmentSchema, nil)),
 			},
 			"fqdn": schema.StringAttribute{
 				Computed:           true,
@@ -242,24 +285,22 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Optional: true,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
-							Optional:      true,
-							Description:   "Infiniband Partition ID",
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Optional:    true,
+							Description: "Infiniband Partition ID",
 						},
 					},
 				},
 			},
 			"reservation_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				Description:   "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+				Optional:           true,
+				Computed:           true,
+				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Description:        "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+				DeprecationMessage: "This field is deprecated and will be removed in a future release. Please remove it from your configuration.",
 			},
 			"nvlink_domain_id": schema.StringAttribute{
 				Optional:      true,
@@ -267,12 +308,26 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 				Description:   "NVLink domain ID to use for NVLink communication.",
 			},
+			"install_crusoe_watch_agent": schema.BoolAttribute{
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
+				Description:   "Whether to install the Crusoe Watch Agent on the VM. Defaults to true.",
+			},
 		},
 	}
 }
 
 func (r *vmResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "vm_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import VM", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -282,19 +337,6 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-	var reservationSpecification *swagger.ReservationSpecification
-	if plan.ReservationID.IsNull() || plan.ReservationID.IsUnknown() {
-		reservationSpecification = &swagger.ReservationSpecification{} // defaults to lowest-cost
-	} else if plan.ReservationID.ValueString() != "" {
-		reservationSpecification = &swagger.ReservationSpecification{
-			Id: plan.ReservationID.ValueString(),
-		}
-	} else {
-		// on-demand
-		reservationSpecification = &swagger.ReservationSpecification{
-			SelectionStrategy: "on_demand",
-		}
 	}
 
 	tDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
@@ -352,30 +394,38 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		plan.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1Alpha5{
-		Name:                     plan.Name.ValueString(),
-		Type_:                    plan.Type.ValueString(),
-		Location:                 plan.Location.ValueString(),
-		Image:                    plan.Image.ValueString(),
-		CustomImage:              plan.CustomImage.ValueString(),
-		SshPublicKey:             plan.SSHKey.ValueString(),
-		StartupScript:            plan.StartupScript.ValueString(),
-		ShutdownScript:           plan.ShutdownScript.ValueString(),
-		NetworkInterfaces:        newNetworkInterfaces,
-		Disks:                    diskIds,
-		HostChannelAdapters:      hostChannelAdapters,
-		ReservationSpecification: reservationSpecification,
-		NvlinkDomainId:           plan.NvlinkDomainID.ValueString(),
+	var installCrusoeWatchAgent *bool
+	if !plan.InstallCrusoeWatchAgent.IsNull() && !plan.InstallCrusoeWatchAgent.IsUnknown() {
+		v := plan.InstallCrusoeWatchAgent.ValueBool()
+		installCrusoeWatchAgent = &v
+	}
+
+	dataResp, httpResp, err := r.client.APIClient.VMsApi.CreateInstance(ctx, swagger.InstancesPostRequestV1{
+		Name:                    plan.Name.ValueString(),
+		Type_:                   plan.Type.ValueString(),
+		Location:                plan.Location.ValueString(),
+		Image:                   plan.Image.ValueString(),
+		CustomImage:             plan.CustomImage.ValueString(),
+		SshPublicKey:            plan.SSHKey.ValueString(),
+		StartupScript:           plan.StartupScript.ValueString(),
+		ShutdownScript:          plan.ShutdownScript.ValueString(),
+		NetworkInterfaces:       newNetworkInterfaces,
+		Disks:                   diskIds,
+		HostChannelAdapters:     hostChannelAdapters,
+		NvlinkDomainId:          plan.NvlinkDomainID.ValueString(),
+		InstallCrusoeWatchAgent: installCrusoeWatchAgent,
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
 			fmt.Sprintf("There was an error starting a create instance operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
-	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1Alpha5](
+	instance, _, err := common.AwaitOperationAndResolve[swagger.InstanceV1](
 		ctx, dataResp.Operation, projectID, r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create instance",
@@ -385,7 +435,22 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 	}
 
 	plan.ID = types.StringValue(instance.Id)
-	plan.ReservationID = types.StringValue(instance.ReservationId)
+
+	// install_crusoe_watch_agent is a create-time-only flag not returned by the API;
+	// preserve the user's chosen value, defaulting to true (the API default) when unset.
+	if plan.InstallCrusoeWatchAgent.IsNull() || plan.InstallCrusoeWatchAgent.IsUnknown() {
+		plan.InstallCrusoeWatchAgent = types.BoolValue(true)
+	}
+
+	if instance.ReservationId != "" {
+		plan.ReservationID = types.StringValue(instance.ReservationId)
+	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+			"Reservation assignment during VM creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
+	} else {
+		plan.ReservationID = types.StringNull()
+	}
+
 	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
 	plan.InternalDNSName = internalDNSName
 	plan.FQDN = internalDNSName // fqdn is deprecated but kept for backward compatibility
@@ -430,7 +495,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
@@ -483,11 +548,13 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		detachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceDetachDisks(ctx, swagger.InstancesDetachDiskPostRequest{
 			DetachDisks: removedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to detach disk",
 				fmt.Sprintf("There was an error starting a detach disk operation: %s", common.UnpackAPIError(err)))
 		}
-		defer httpResp.Body.Close()
 
 		_, err = common.AwaitOperation(ctx, detachResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -499,16 +566,18 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	}
 
 	if len(addedDisks) > 0 {
-		attachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1Alpha5{
+		attachResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstanceAttachDisks(ctx, swagger.InstancesAttachDiskPostRequestV1{
 			AttachDisks: addedDisks,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to attach disk",
 				fmt.Sprintf("There was an error starting an attach disk operation: %s", common.UnpackAPIError(err)))
 
 			return
 		}
-		defer httpResp.Body.Close()
 
 		_, err = common.AwaitOperation(ctx, attachResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -527,17 +596,23 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	// handle updating public IP type
-	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
+	// handle updating public IP type, but only when the network interface configuration
+	// actually changed. This avoids a redundant (and running-only) public IP update on
+	// every apply - e.g. a type-only resize, which would otherwise fail here if the VM
+	// is stopped (resizing leaves the VM stopped).
+	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 &&
+		!plan.NetworkInterfaces.Equal(state.NetworkInterfaces) {
 		// instances must be running to update public IP type
 		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error fetching the instance's current state: %v", err))
 
 			return
 		}
-		defer httpResp.Body.Close()
 		if instance.State != StateRunning {
 			resp.Diagnostics.AddError("Cannot update instance network interface",
 				"The instance needs to be running before updating its public IP address.")
@@ -563,7 +638,7 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
+		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
 			Action: "UPDATE",
 			NetworkInterfaces: []swagger.NetworkInterface{{
 				Ips: []swagger.IpAddresses{{
@@ -575,13 +650,15 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			}},
 			HostChannelAdapters: hostChannelAdapters,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update instance network interface",
 				fmt.Sprintf("There was an error requesting to update the instance's network interface: %v", err))
 
 			return
 		}
-		defer httpResp.Body.Close()
 
 		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
@@ -596,101 +673,113 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		resp.Diagnostics.Append(diags...)
 	}
 
-	// add a reservation ID
-	if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() == "" {
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action:        "RESERVE",
-			ReservationId: plan.ReservationID.ValueString(),
+	// resize the instance in place if the type changed within the same product family.
+	// (Cross-family changes trigger a replace via the schema plan modifier and never reach here.)
+	if !plan.Type.IsUnknown() && !plan.Type.IsNull() && plan.Type.ValueString() != state.Type.ValueString() {
+		// fetch the current power state; the backend requires the VM to be stopped before a resize.
+		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error fetching the instance's current state: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		// stop the VM first if it isn't already stopped.
+		wasRunning := instance.State != StateStopped && instance.State != StateShutoff
+		if wasRunning {
+			stopResp, stopHTTPResp, stopErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+				Action: "STOP",
+			}, state.ProjectID.ValueString(), state.ID.ValueString())
+			if stopHTTPResp != nil {
+				defer stopHTTPResp.Body.Close()
+			}
+			if stopErr != nil {
+				resp.Diagnostics.AddError("Failed to resize instance",
+					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
+
+				return
+			}
+
+			_, stopErr = common.AwaitOperation(ctx, stopResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+			if stopErr != nil {
+				resp.Diagnostics.AddError("Failed to resize instance",
+					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
+
+				return
+			}
+		}
+
+		resizeResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+			Action: "UPDATE",
+			Type_:  plan.Type.ValueString(),
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to add vm to reservation",
-				fmt.Sprintf("There was an error requesting add vm to reservation: %v", err))
-
-			return
+		if httpResp != nil {
+			defer httpResp.Body.Close()
 		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error requesting to resize the instance: %s", common.UnpackAPIError(err)))
 
 			return
 		}
 
-		state.ReservationID = plan.ReservationID
+		_, err = common.AwaitOperation(ctx, resizeResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error resizing the instance: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		// Persist the new type before attempting the restart, so a restart failure
+		// does not lose the completed resize from state.
+		state.Type = plan.Type
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
-	} else if plan.ReservationID.ValueString() == "" && state.ReservationID.ValueString() != "" {
-		// remove reservation ID
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action: "UNRESERVE",
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to remove vm from reservation",
-				fmt.Sprintf("There was an error requesting remove vm from reservation: %v", err))
-
-			return
-		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error unreserving the vm: %s", common.UnpackAPIError(err)))
-
+		if resp.Diagnostics.HasError() {
 			return
 		}
 
-		state.ReservationID = plan.ReservationID
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-	} else if plan.ReservationID.ValueString() != "" && state.ReservationID.ValueString() != "" && plan.ReservationID.String() != state.ReservationID.String() {
-		patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action: "UNRESERVE",
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to remove vm from reservation",
-				fmt.Sprintf("There was an error requesting remove vm from its current reservation: %v", err))
+		// restore the prior power state: resizing leaves the VM stopped, so start it
+		// again if it was running before the resize.
+		if wasRunning {
+			startResp, startHTTPResp, startErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+				Action: "START",
+			}, state.ProjectID.ValueString(), state.ID.ValueString())
+			if startHTTPResp != nil {
+				defer startHTTPResp.Body.Close()
+			}
+			if startErr != nil {
+				resp.Diagnostics.AddError("Failed to start instance after resize",
+					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
+
+				return
+			}
+
+			_, startErr = common.AwaitOperation(ctx, startResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+			if startErr != nil {
+				resp.Diagnostics.AddError("Failed to start instance after resize",
+					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
+
+				return
+			}
 		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error unreserving the vm: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-		// update state to reflect the unreserved state
-		state.ReservationID = types.StringValue("")
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-
-		patchResp, httpResp, err = r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1Alpha5{
-			Action:        "RESERVE",
-			ReservationId: plan.ReservationID.String(),
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to add vm to reservation",
-				fmt.Sprintf("There was an error requesting add vm to new reservation: %v", err))
-		}
-		defer httpResp.Body.Close()
-
-		_, err = common.AwaitOperation(ctx, patchResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update reservation ID",
-				fmt.Sprintf("There was an error reserving the vm: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-		// update state to reflect the new reservation
-		state.ReservationID = plan.ReservationID
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
-
-		return
 	}
+
+	//  Reservation ID is deprecated
+	if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
+			"Reservation assignment during VM creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
+	}
+
+	debugMsg := "Setting state Reservation ID equal to plan Reservation ID, since the field is deprecated"
+	tflog.Debug(ctx, debugMsg, map[string]interface{}{})
+	state.ReservationID = plan.ReservationID
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -710,13 +799,15 @@ func (r *vmResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	}
 
 	delDataResp, delHttpResp, err := r.client.APIClient.VMsApi.DeleteInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if delHttpResp != nil {
+		defer delHttpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete instance",
 			fmt.Sprintf("There was an error starting a delete instance operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer delHttpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[interface{}](ctx, delDataResp.Operation, state.ProjectID.ValueString(),
 		r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)

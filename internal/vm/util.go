@@ -3,22 +3,36 @@ package vm
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 const (
-	DiskOS                 = "os"
-	StateRunning           = "STATE_RUNNING"
-	FQDNDeprecationMessage = "This field is deprecated as of provider version v0.5.29 and " +
-		"will be removed in the next major version, use internal_dns_name instead"
+	DiskOS       = "os"
+	StateRunning = "STATE_RUNNING"
+	StateStopped = "STATE_STOPPED"
+	StateShutoff = "STATE_SHUTOFF"
 )
+
+// instanceTypeFamily returns the product-family prefix of an instance type,
+// e.g. "c1a" for "c1a.2x". ok is false if the value isn't in "<family>.<size>" form.
+func instanceTypeFamily(instanceType string) (family string, ok bool) {
+	parts := strings.SplitN(instanceType, ".", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return "", false
+	}
+
+	return parts[0], true
+}
+
+var FQDNDeprecationMessage = common.FormatDeprecationWithReplacement("v0.5.29", "internal_dns_name")
 
 var vmNetworkInterfaceSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
@@ -94,12 +108,14 @@ func getDisksDiff(origDisks, newDisks []vmDiskResourceModel) (disksAdded []swagg
 	return disksAdded, disksRemoved
 }
 
-func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID string) (*swagger.InstanceV1Alpha5, error) {
+func getVM(ctx context.Context, apiClient *swagger.APIClient, projectID, vmID string) (*swagger.InstanceV1, error) {
 	dataResp, httpResp, err := apiClient.VMsApi.GetInstance(ctx, projectID, vmID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find VM: %w", common.UnpackAPIError(err))
 	}
-	defer httpResp.Body.Close()
 
 	return &dataResp, nil
 }
@@ -206,15 +222,15 @@ func vmDiskAttachmentToTerraformResourceModel(diskAttachments []swagger.DiskAtta
 	return diskAttachmentsSet, diags
 }
 
-func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1Alpha5, error) {
+func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1, error) {
 	opts := &swagger.ProjectsApiListProjectsOpts{
 		OrgId: optional.EmptyString(),
 	}
 
 	projectsResp, projectHttpResp, err := client.ProjectsApi.ListProjects(ctx, opts)
-
-	defer projectHttpResp.Body.Close()
-
+	if projectHttpResp != nil {
+		defer projectHttpResp.Body.Close()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query for projects: %w", err)
 	}
@@ -235,7 +251,7 @@ func findInstance(ctx context.Context, client *swagger.APIClient, instanceID str
 }
 
 // takes instance and populates state pointer (could be empty or non-empty)
-func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmResourceModel) {
+func vmToTerraformResourceModel(instance *swagger.InstanceV1, state *vmResourceModel) {
 	state.ID = types.StringValue(instance.Id)
 	state.Name = types.StringValue(instance.Name)
 	state.Type = types.StringValue(instance.Type_)
@@ -278,5 +294,11 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1Alpha5, state *vmRes
 		state.HostChannelAdapters = vmHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
 	} else {
 		state.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
+	}
+
+	// install_crusoe_watch_agent is not returned by the API (create-time-only flag);
+	// preserve the existing state value, defaulting to true when empty (e.g., imports).
+	if state.InstallCrusoeWatchAgent.IsNull() || state.InstallCrusoeWatchAgent.IsUnknown() {
+		state.InstallCrusoeWatchAgent = types.BoolValue(true)
 	}
 }

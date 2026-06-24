@@ -54,7 +54,7 @@ func (r *diskResource) UpgradeState(context.Context) map[int64]resource.StateUpg
 
 				var state diskResourceModel
 				state.ProjectID = types.StringValue(projectID)
-				diskToTerraformResourceModel(disk, &state)
+				diskToTerraformResourceModel(disk, &state, "") // no prior size format to preserve
 
 				resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 				if resp.Diagnostics.HasError() {

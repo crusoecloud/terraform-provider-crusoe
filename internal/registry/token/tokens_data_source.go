@@ -18,8 +18,8 @@ type tokensDataSource struct {
 }
 
 type tokensDataSourceModel struct {
-	Tokens    []tokenDataSourceModel `tfsdk:"tokens"`
 	ProjectID types.String           `tfsdk:"project_id"`
+	Tokens    []tokenDataSourceModel `tfsdk:"tokens"`
 }
 
 type tokenDataSourceModel struct {
@@ -61,7 +61,8 @@ func (ds *tokensDataSource) Schema(ctx context.Context, request datasource.Schem
 		Description: "Fetches a list of container registry tokens.",
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Optional: true,
+				Optional:           true,
+				DeprecationMessage: common.FormatDeprecation("v0.6.0") + " This field has no effect; registry tokens are org-scoped, not project-scoped.",
 			},
 			"tokens": schema.ListNestedAttribute{
 				Computed:    true,
@@ -100,15 +101,15 @@ func (ds *tokensDataSource) Read(ctx context.Context, request datasource.ReadReq
 		return
 	}
 
-	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
-
 	tokens, httpResp, err := ds.client.APIClient.LimitedUsageAPIKeyApi.GetLimitedUsageAPIKeys(ctx)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list tokens", fmt.Sprintf("Error listing tokens: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	for _, token := range tokens.Items {
 		if token.Usage != keyUsageRegistry {
@@ -144,7 +145,6 @@ func (ds *tokensDataSource) Read(ctx context.Context, request datasource.ReadReq
 		})
 	}
 
-	state.ProjectID = types.StringValue(projectID)
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
 }

@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     crusoe = {
-      source = "crusoecloud/crusoe"
+      source = "registry.terraform.io/crusoecloud/crusoe"
     }
   }
 }
@@ -17,7 +17,7 @@ variable "name_prefix" {
 
 variable "control_plane_version" {
   type    = string
-  default = "1.32.7-cmk.3"
+  default = "1.33.4-cmk.73"
 }
 
 variable "location" {
@@ -51,6 +51,21 @@ variable "worker" {
   }
 }
 
+variable "apiserver_extra_args" {
+  type    = map(string)
+  default = null
+}
+
+variable "scheduler_extra_args" {
+  type    = map(string)
+  default = null
+}
+
+variable "controller_manager_extra_args" {
+  type    = map(string)
+  default = null
+}
+
 variable "kubeconfig_path" {
   type    = string
   default = "./kubeconfig.yaml"
@@ -69,7 +84,7 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   nat_gateway_enabled = false
 }
 
-resource "crusoe_vpc_firewall_rule" "egress_rule" {
+resource "crusoe_vpc_firewall_rule" "my_egress_rule" {
   name              = "${var.name_prefix}egress-rule"
   action            = "allow"
   direction         = "egress"
@@ -105,18 +120,28 @@ resource "crusoe_kubernetes_cluster" "my_cluster" {
   # oidc_username_claim  = "sub"      # typically "sub" or "email"
   # oidc_groups_claim    = "groups"   # claim used to identify user groups
   # oidc_username_prefix = ""         # prefix prepended to username claim
-  depends_on = [crusoe_vpc_firewall_rule.egress_rule]
+
+  # Optional: Enable private cluster creation
+  # private = true
+
+  # Optional: Extra arguments for control plane components.
+  # Changes take effect after a cluster rotation.
+  apiserver_extra_args         = var.apiserver_extra_args
+  scheduler_extra_args         = var.scheduler_extra_args
+  controller_manager_extra_args = var.controller_manager_extra_args
+
+  depends_on = [crusoe_vpc_firewall_rule.my_egress_rule]
 }
 
-resource "crusoe_kubernetes_node_pool" "c1a_node_pool" {
-  name           = "${var.name_prefix}c1a-node-pool"
+resource "crusoe_kubernetes_node_pool" "my_node_pool" {
+  name           = "${var.name_prefix}node-pool"
   cluster_id     = crusoe_kubernetes_cluster.my_cluster.id
   instance_count = var.worker.count
   # Optional: Set the desired CMK worker node version
   # If not specified, the default is the latest stable version compatible with the cluster
   # List available node pool versions with "crusoe kubernetes versions list"
-  # version = var.worker.version
-  type = var.worker.type
+  version = var.worker.version
+  type    = var.worker.type
   # Optional: Add your SSH public key to the created nodes to allow SSH access
   ssh_key = local.my_ssh_public_key
 
@@ -125,8 +150,29 @@ resource "crusoe_kubernetes_node_pool" "c1a_node_pool" {
   #   "labelkey" = "labelvalue"
   # }
 
+  # Optional: Apply taints to nodes in the pool                                                                                                                                                                     
+  # node_taints {                                                                                                                                                                                                   
+  #   key    = "dedicated"                                                                                                                                                                                          
+  #   value  = "gpu"                                                                                                                                                                                                
+  #   effect = "NoSchedule"                                                                                                                                                                                         
+  # }                                                                                                                                                                                                               
+  #                                                                                                                                                                                                                 
+  # node_taints {                       
+  #   key    = "team"
+  #   value  = "ml"                                                                                                                                                                                                 
+  #   effect = "PreferNoSchedule"
+  # } 
+
   # Optional: Use local ephemeral NVMe disks for containerd storage
   # ephemeral_storage_for_containerd = true
+
+  # Optional: Control the number of nodes to delete and recreate in batches when updating the node pool.
+  # If omitted, any existing nodes will not be updated, but future ones will use the new config.
+  # batch_size       = 10  # The number of nodes to replace at a time
+  # batch_percentage = 100 # The percentage of nodes to replace at a time
+
+  # Optional: Select the public IP type for the node_pool
+  # public_ip_type = "dynamic"
 
   lifecycle {
     ignore_changes = [
@@ -177,7 +223,7 @@ output "cluster" {
 }
 
 output "node_pool" {
-  value = crusoe_kubernetes_node_pool.c1a_node_pool
+  value = crusoe_kubernetes_node_pool.my_node_pool
 }
 
 # Optional: Output the kubeconfig YAML to a local file on disk

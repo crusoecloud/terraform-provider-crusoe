@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	k8sApi "k8s.io/client-go/tools/clientcmd/api"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -265,7 +265,10 @@ func (r *kubeConfigResource) Read(ctx context.Context, req resource.ReadRequest,
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *kubeConfigResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	panic("Updating kubeconfig is not currently supported")
+	resp.Diagnostics.AddError(
+		"Updating Kubeconfig Not Supported",
+		"Updating an existing kubeconfig is not currently supported. To change its configuration, the kubeconfig must be destroyed and recreated.",
+	)
 }
 
 //nolint:gocritic // Implements Terraform defined interface

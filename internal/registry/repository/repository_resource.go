@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -174,13 +174,15 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 		Body: optional.NewInterface(createRequest),
 	}
 	repository, httpResp, err := r.client.APIClient.CcrApi.CreateCcrRepository(ctx, projectID, opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to create repository",
 			fmt.Sprintf("Error creating the repository: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	var state repositoryResourceModel
 	state.Location = types.StringValue(repository.Location)
@@ -203,7 +205,13 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 
 	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
-	repository, httpResp, err := r.client.APIClient.CcrApi.GetCcrRepository(ctx, projectID, stored.Name.ValueString(), stored.Location.ValueString())
+	opts := &swagger.CcrApiGetCcrRepositoryOpts{
+		Location: optional.NewString(stored.Location.ValueString()),
+	}
+	repository, httpResp, err := r.client.APIClient.CcrApi.GetCcrRepository(ctx, projectID, stored.Name.ValueString(), opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 404 {
 			response.State.RemoveResource(ctx)
@@ -250,7 +258,10 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	panic("Updating repository is not currently supported")
+	response.Diagnostics.AddError(
+		"Updating Repository Not Supported",
+		"Updating an existing repository is not currently supported. To change its configuration, the repository must be destroyed and recreated.",
+	)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -264,14 +275,19 @@ func (r *repositoryResource) Delete(ctx context.Context, request resource.Delete
 
 	projectID := common.GetProjectIDOrFallback(r.client, stored.ProjectID.ValueString())
 
-	httpResp, err := r.client.APIClient.CcrApi.DeleteCcrRepository(ctx, projectID, stored.Name.ValueString(), stored.Location.ValueString())
+	opts := &swagger.CcrApiDeleteCcrRepositoryOpts{
+		Location: optional.NewString(stored.Location.ValueString()),
+	}
+	httpResp, err := r.client.APIClient.CcrApi.DeleteCcrRepository(ctx, projectID, stored.Name.ValueString(), opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to delete repository",
 			fmt.Sprintf("Error deleting repository: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 }
 
 func (r *repositoryResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

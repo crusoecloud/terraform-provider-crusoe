@@ -1,3 +1,111 @@
+## 1.0.0
+
+ENHANCEMENTS:
+
+- Updated provider to use Crusoe API v1 (`https://api.cloud.crusoe.ai/v1`). Existing configurations with the legacy endpoint (`api.crusoecloud.com`) will be automatically migrated.
+
+## 0.8.0
+
+ENHANCEMENTS:
+
+- Added `apiserver_extra_args`, `scheduler_extra_args`, and `controller_manager_extra_args` fields to the `crusoe_kubernetes_cluster` resource, allowing custom flags to be passed to kube-apiserver, kube-scheduler, and kube-controller-manager. Changes take effect after a cluster rotation.
+- Added the same three fields as computed attributes on the `crusoe_kubernetes_cluster` data source.
+
+## 0.7.0
+
+FEATURES:
+
+- Added `crusoe_storage_s3_bucket` resource for managing S3-compatible storage buckets
+- Added `crusoe_storage_s3_buckets` data source for listing S3 buckets
+- Added `crusoe_storage_s3_key` resource for managing S3 access keys
+- Added `crusoe_storage_s3_keys` data source for listing S3 keys
+
+## 0.6.0
+
+FEATURES:
+
+- Added `profile` and `project` attributes to the provider block for configuring Crusoe CLI profiles and default project
+
+BUG FIXES:
+
+- Made instance template disks optional and fixed empty set handling
+
+## 0.5.46
+
+Re-release of v0.5.45 to fix Terraform registry caching issues.
+
+## 0.5.45
+
+ENHANCEMENTS:
+
+- Consolidated project ID fallback helpers across data sources for improved code consistency
+
+BUG FIXES:
+
+- Fixed disk resource to preserve user's size format (TiB vs GiB) instead of normalizing to GiB
+- Fixed potential HTTP response body memory leaks with nil-safe close pattern across all resources
+
+## 0.5.44
+
+ENHANCEMENTS:
+
+- Added support for public and private IP types in Kubernetes clusters and node pools
+
+BUG FIXES:
+
+- N/A
+
+## 0.5.43
+
+ENHANCEMENTS:
+
+- N/A
+
+BUG FIXES:
+
+- **Deprecated:** The `reservation_id` field for VM and instance template resources is now deprecated
+
+## 0.5.42
+
+ENHANCEMENTS:
+
+- Refactored `crusoe_compute_instance_group` resource with new API fields and state upgrade
+  - Renamed `instance_template` to `instance_template_id`
+  - Added `desired_count` (required), `state`, `created_at`, `updated_at` fields
+  - Split `instances` into `active_instance_ids` and `inactive_instance_ids`
+  - Removed deprecated `instance_name_prefix` field
+  - Added schema v0 → v1 state upgrade for existing users
+- Support specifying project ID in config
+- Improve handling of storage disk type
+- Support NVlink domain for kubernetes nodepools
+
+BUG FIXES:
+
+- N/A
+
+## 0.5.41
+
+ENHANCEMENTS:
+
+- Updated node pool rollout to initiate when batch params are updated
+- Removed awaiting on rollout completion
+- Copy changes
+
+BUG FIXES:
+
+- Fixed node pool state error when updating
+
+## 0.5.40
+
+ENHANCEMENTS:
+
+- Add support for upgrading node pool version and rolling out changes to existing nodes
+- Updated kubernetes example
+
+BUG FIXES:
+
+- N/A
+
 ## 0.5.39
 
 ENHANCEMENTS:
@@ -11,6 +119,44 @@ BUG FIXES:
 - Fix config file parsing issue when decoding top-level `profile=` separately from the rest of the config struct
 - Add `ImmutableStringModifier` plan modifier for Kubernetes cluster `version` attribute to block in-place version changes with a clear error message instead of silently destroying and recreating clusters
 - Make container registry `project_id` attribute computed
+
+## 0.5.38
+
+- Release pipeline fix
+
+## 0.5.37
+
+- Documentation updates
+
+## 0.5.36
+
+ENHANCEMENTS:
+
+- Add NVLink domain support for VMs, instance templates, and VMs created by template
+
+BUG FIXES:
+
+- N/A
+
+## 0.5.35
+
+ENHANCEMENTS:
+
+- Add support for containerd ephemeral storage with configurable NVMe disk usage for Kubernetes node pools
+
+BUG FIXES:
+
+- N/A
+
+## 0.5.34
+
+ENHANCEMENTS:
+
+- Add project ID fallback support for VPC subnet read/delete and VPC network delete operations
+
+BUG FIXES:
+
+- N/A
 
 ## 0.5.33
 

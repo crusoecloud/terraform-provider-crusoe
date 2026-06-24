@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -108,19 +108,23 @@ func (ds *manifestsDataSource) Read(ctx context.Context, request datasource.Read
 
 	projectID := common.GetProjectIDOrFallback(ds.client, state.ProjectID.ValueString())
 
-	opts := &swagger.CcrApiListCcrManifestsOpts{}
+	opts := &swagger.CcrApiListCcrManifestsOpts{
+		Location: optional.NewString(state.Location.ValueString()),
+	}
 	if !state.TagContains.IsNull() {
 		tagSearchQuery := state.TagContains.ValueString()
 		opts.TagContains = optional.NewString(tagSearchQuery)
 	}
 
-	manifests, httpResp, err := ds.client.APIClient.CcrApi.ListCcrManifests(ctx, projectID, state.RepoName.ValueString(), state.ImageName.ValueString(), state.Location.ValueString(), opts)
+	manifests, httpResp, err := ds.client.APIClient.CcrApi.ListCcrManifests(ctx, projectID, state.RepoName.ValueString(), state.ImageName.ValueString(), opts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		response.Diagnostics.AddError("Failed to list manifests", fmt.Sprintf("Error listing manifests: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	for _, manifest := range manifests.Items {
 		// Convert tags slice to types.String slice

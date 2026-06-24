@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
 func TestCustomImageDataSource_Schema(t *testing.T) {
@@ -209,7 +209,7 @@ func TestCustomImageDataSource_NamePrefixWithMultipleMatches(t *testing.T) {
 	}
 }
 
-func createMockListImagesResponse(imageNames ...string) *swagger.ListImagesResponseV1Alpha5 {
+func createMockListImagesResponse(imageNames ...string) *swagger.ListImagesResponseV1 {
 	var images []swagger.Image
 	for i, imageName := range imageNames {
 		images = append(images, swagger.Image{
@@ -222,7 +222,7 @@ func createMockListImagesResponse(imageNames ...string) *swagger.ListImagesRespo
 		})
 	}
 
-	return &swagger.ListImagesResponseV1Alpha5{
+	return &swagger.ListImagesResponseV1{
 		Items: images,
 	}
 }

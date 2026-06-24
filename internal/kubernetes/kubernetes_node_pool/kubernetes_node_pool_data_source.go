@@ -27,16 +27,19 @@ func NewKubernetesNodePoolDataSource() datasource.DataSource {
 type kubernetesNodePoolDataSourceModel struct {
 	ID                            types.String `tfsdk:"id"`
 	ProjectID                     types.String `tfsdk:"project_id"`
-	Version                       types.String `tfsdk:"version"`
+	ImageID                       types.String `tfsdk:"image_id"`
 	Type                          types.String `tfsdk:"type"`
 	InstanceCount                 types.Int64  `tfsdk:"instance_count"`
 	ClusterID                     types.String `tfsdk:"cluster_id"`
 	SubnetID                      types.String `tfsdk:"subnet_id"`
 	NodeLabels                    types.Map    `tfsdk:"node_labels"`
+	NodeTaints                    types.Set    `tfsdk:"node_taints"`
 	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
 	State                         types.String `tfsdk:"state"`
 	Name                          types.String `tfsdk:"name"`
 	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
+	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
+	PublicIPType                  types.String `tfsdk:"public_ip_type"`
 }
 
 func (e *kubernetesNodePoolDataSource) Metadata(_ context.Context,
@@ -60,35 +63,68 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 			},
 			"image_id": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"type": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"instance_count": schema.Int64Attribute{
 				Optional: true,
+				Computed: true,
 			},
 			"cluster_id": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"subnet_id": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"node_labels": schema.MapAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
+				Computed:    true,
+			},
+			"node_taints": schema.SetNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"key": schema.StringAttribute{
+							Computed: true,
+						},
+						"value": schema.StringAttribute{
+							Computed: true,
+						},
+						"effect": schema.StringAttribute{
+							Computed: true,
+						},
+					},
+				},
 			},
 			"instance_ids": schema.ListAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
+				Computed:    true,
 			},
 			"state": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"name": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
 			"ephemeral_storage_for_containerd": schema.BoolAttribute{
 				Optional: true,
+				Computed: true,
+			},
+			"nvlink_domain_id": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"public_ip_type": schema.StringAttribute{
+				Computed: true,
 			},
 		},
 	}
@@ -139,18 +175,22 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(projectID)
-	state.Version = types.StringValue(kubernetesNodePool.ImageId)
+	state.ImageID = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
 	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
 	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
 	state.NodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
 	resp.Diagnostics.Append(diags...)
+	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
+	resp.Diagnostics.Append(diags...)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
+	state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
+	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

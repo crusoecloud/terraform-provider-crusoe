@@ -25,3 +25,130 @@ tag_semver:
 pages:
   rules:
     - when: never
+
+# Slack notifications for release branch pipeline
+notify_release_branch_success:
+  stage: .post
+  image: curlimages/curl:latest
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" && $CI_PIPELINE_SOURCE == "push"'
+  script:
+    - COMMIT_SHORT=$(echo $CI_COMMIT_SHA | cut -c1-8)
+    - |
+      curl -X POST "https://hooks.slack.com/services/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" \
+        -H 'Content-Type: application/json' \
+        -d '{
+          "text": "*Terraform Provider Release Pipeline Succeeded*",
+          "blocks": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "Release Branch Pipeline Passed"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Branch:*\n'"$CI_COMMIT_BRANCH"'"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Commit:*\n'"$COMMIT_SHORT"'"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Triggered by:*\n'"$GITLAB_USER_NAME"'"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Duration:*\n'"$CI_PIPELINE_DURATION"'s"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Next steps:*\n• Review the changes in this commit\n• GitHub Action will automatically tag and release\n• Monitor GitHub release pipeline"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "<'"$CI_PIPELINE_URL"'|View Pipeline>"
+              }
+            }
+          ]
+        }'
+  allow_failure: true
+
+notify_release_branch_failure:
+  stage: .post
+  image: curlimages/curl:latest
+  when: on_failure
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release" && $CI_PIPELINE_SOURCE == "push"'
+  script:
+    - COMMIT_SHORT=$(echo $CI_COMMIT_SHA | cut -c1-8)
+    - |
+      curl -X POST "https://hooks.slack.com/services/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" \
+        -H 'Content-Type: application/json' \
+        -d '{
+          "text": "*Terraform Provider Release Pipeline Failed*",
+          "blocks": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "Release Branch Pipeline Failed"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Branch:*\n'"$CI_COMMIT_BRANCH"'"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Commit:*\n'"$COMMIT_SHORT"'"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Triggered by:*\n'"$GITLAB_USER_NAME"'"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Duration:*\n'"$CI_PIPELINE_DURATION"'s"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Possible causes:*\n• Test failures\n• Linting errors\n• Build issues\n• Pipeline timeout\n• Infrastructure problems\n\n*Action required:* This blocks the GitHub Action from tagging and releasing. Fix the failing jobs before proceeding."
+              }
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "View Failed Pipeline"
+                  },
+                  "url": "'"$CI_PIPELINE_URL"'",
+                  "style": "danger"
+                }
+              ]
+            }
+          ]
+        }'
+  allow_failure: true

@@ -41,3 +41,6 @@ terraform
 # IDE configs
 .idea
 .vscode
+
+# Claude Code local config
+.claude

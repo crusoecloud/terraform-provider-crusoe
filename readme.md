@@ -25,7 +25,7 @@ profile="profile1"
 access_key_id="7useLCstekgdYQ8Te2vQxi"
 secret_key="coKGIrMJudgAtk3YKMpsB2"
 ssh_public_key_file="~/.ssh/id_rsa.pub"
-api_endpoint="http://test:80/v1alpha5"
+api_endpoint="http://test:80/v1"
 
 [profile2]
 access_key_id="CstekgdYQ8Te2vQxi7useL"
@@ -35,6 +35,35 @@ secret_key="IrMJudgAtk3YKMpsB2coKG"
 In the above, we have specified two profiles, where profile1 will be used as the default as we specify on the first line. If a value is not specified in the profile, the default value will be used. For example, profile2 did not specify an api_endpoint, so the default API endpoint to production will be used.
 
 You may set which profile you use with the environment variable `CRUSOE_PROFILE` like `export CRUSOE_PROFILE=profile2`
+
+## Provider Configuration
+
+The provider block supports optional `profile` and `project` attributes:
+
+```hcl
+provider "crusoe" {
+  profile = "production"  # Optional: profile from ~/.crusoe/config
+  project = "my-project"  # Optional: project name or UUID
+}
+```
+
+### Project Precedence
+
+The project used for resources is determined by the following precedence (highest to lowest):
+
+1. `project_id` attribute on individual resource/data source (UUID)
+2. `project` argument in provider block (name or UUID)
+3. `CRUSOE_DEFAULT_PROJECT` environment variable (name or UUID)
+4. `default_project` from selected profile in `~/.crusoe/config`
+
+### Profile Precedence
+
+The profile used for credentials is determined by:
+
+1. `profile` argument in provider block
+2. `CRUSOE_PROFILE` environment variable
+3. `profile` key in config file (top-level)
+4. `"default"`
 
 Then, add the following to the start of your terraform file, for example `main.tf`:
 
@@ -71,6 +100,8 @@ For more usage examples, including storage disks, startup scripts, and firewall 
 
 To develop the Terraform provider, you'll need a recent version of [golang](https://go.dev/doc/install) installed.
 
+This repository includes a `mise.toml` that pins the Go toolchain along with `golangci-lint`, `terraform`, and `tfplugindocs`. If you use [mise](https://mise.jdx.dev), run `mise install` to provision them; otherwise install a recent version of [golang](https://go.dev/doc/install) yourself.
+
 Add the following to your `~/.terraformrc`
 
 ```
@@ -87,28 +118,84 @@ provider_installation {
 }
 ```
 
-Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples.
+Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples. (Under mise this lands in mise's Go bin, which is where the `$GOPATH/bin/` override above resolves, so the snippet works unchanged.)
 
 Other common commands are: `terraform init` to initialize your working directory, and `terraform plan` to preview changes without applying them. 
 
 ## Versioning
 
-A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub. 
+A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub.
 This generates a new tag and triggers our `goreleaser` pipeline which will handle distributing the new Terraform version.
 
-Our `main` branch is primarily used for development. Once features are ready to be deployed, a Crusoe Cloud maintainer will merge the changes from `main` into `release` to deploy a new version. 
+Our `main` branch is primarily used for development. Once features are ready to be deployed, a Crusoe Cloud maintainer will merge the changes from `main` into `release` to deploy a new version.
+
+### Semantic Versioning
+
+This provider follows semantic versioning (MAJOR.MINOR.PATCH):
+
+- **MAJOR** (1.0.0 → 2.0.0): Breaking changes that require user action
+- **MINOR** (0.5.0 → 0.6.0): New features, new resources/data sources, new attributes
+- **PATCH** (0.5.42 → 0.5.43): Bug fixes, documentation updates, internal refactoring
+
+Examples:
+- New provider attribute → minor bump (0.5.42 → 0.6.0)
+- New resource or data source → minor bump
+- Bug fix → patch bump
+- Breaking schema change → major bump (with UPGRADE NOTES in changelog)
+
+### `versions.env`
+
+The `versions.env` file at the repository root defines the current major and minor version numbers:
+
+```bash
+export MAJOR_VERSION=0
+export MINOR_VERSION=6
+```
+
+Update this file **only for major or minor version bumps** when merging to `release`. Patch versions are auto-incremented by the release pipeline.
 
 ## Contributing
 
 We welcome (and have already had several!) open-source contributions to the Crusoe Cloud Terraform Provider.
 Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
-1. Make a branch off `main` and open a pull request from your branch into `main`.
-2. A Crusoe Cloud maintainer will review the pull request and, once approved, merge it into the `main` branch.
-3. Once your pull request has been approved, make a separate pull request to add your changes to the changelog into the `main` branch. There will be an (Unreleased) version that you can add your changes to.
-4. To release your changes, you can make a separate pull request from the `main` branch into the `release` branch. Merges into the release branch trigger our `goreleaser` job which handles distributing a new version.
-5. Once the pull request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits. It will cause the `main` branch and `release` branch to diverge.
-6. A separate pull request will be made by a Crusoe Cloud maintainer to update the changelog with the date the newest version has been released.
+1. Make a branch off `main` and open a merge request from your branch into `main`.
+2. A Crusoe Cloud maintainer will review the merge request and, once approved, merge it into the `main` branch.
+3. Before a release, add a changelog entry for the new version (see Maintaining Changelog below) that documents all of the changes/commits since the last release. Merge this change in before the next step.
+4. To release: open a merge request from `main` into `release`. 
+5. Once the merge request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
 
 ## Maintaining Changelog
 
 The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
+
+**Every merge to the `release` branch must include a changelog entry.** To add an entry:
+
+1. Open `CHANGELOG.md` and add a new version section at the top
+2. Increment the version number from the previous release (e.g., `0.5.45` → `0.5.46`)
+3. Follow the category and format guidelines below
+
+### Changelog Categories
+
+Only include categories that have entries. Use dash-prefixed bullets. Keep descriptions concise but informative.
+
+- `ENHANCEMENTS:` - Smaller features added to an existing resource or data source, such as a new attribute.
+- `BUG FIXES:` - Any bugs that were fixed.
+- `NEW FEATURES:` - Major new improvements such as a new resource or data source.
+- `UPGRADE NOTES:` - Breaking or incompatible changes and how to handle them.
+
+### Example
+
+```markdown
+## 0.6.0
+
+ENHANCEMENTS:
+
+- Added `profile` attribute to provider block for config file profile selection
+```
+
+### When a Changelog Entry is Needed
+
+- New provider/resource/data source attributes
+- Behavioral changes
+- Bug fixes
+- Breaking changes (always include UPGRADE NOTES)

@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
@@ -116,10 +116,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required: true,
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"network": schema.StringAttribute{
 							Computed:      true,
@@ -135,10 +133,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"destinations": schema.ListNestedAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"cidr": schema.StringAttribute{
 							Computed:      true,
@@ -159,9 +155,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"protocols": schema.ListAttribute{
-				ElementType:   types.StringType,
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				ElementType: types.StringType,
+				Required:    true,
 			},
 			"algorithm": schema.StringAttribute{
 				Required:      true,
@@ -240,7 +235,15 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 }
 
 func (r *loadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "load_balancer_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import Load Balancer", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -312,13 +315,15 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
 	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.CreateLoadBalancer(ctx, postReq, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create load balancer",
 			fmt.Sprintf("There was an error starting a create load balancer operation (%s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](
 		ctx, dataResp.Operation, projectID, r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation)
@@ -354,13 +359,15 @@ func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
 	loadBalancer, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.GetLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get load balancer",
 			fmt.Sprintf("Fetching load balancer failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode == http.StatusNotFound {
 		// Load balancer has most likely been deleted out of band, so we update Terraform state to match
@@ -392,7 +399,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	patchReq := swagger.LoadBalancersPatchRequestV1Alpha5{}
+	patchReq := swagger.LoadBalancersPatchRequestV1{}
 	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
 		patchReq.Name = plan.Name.ValueString()
 	}
@@ -437,13 +444,15 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update load balancer",
 			fmt.Sprintf("There was an error starting an update load balancer operation: %s.\n\n", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, _, err = common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
@@ -469,13 +478,15 @@ func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.DeleteLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete load balancer",
 			fmt.Sprintf("There was an error starting a delete load balancer operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)

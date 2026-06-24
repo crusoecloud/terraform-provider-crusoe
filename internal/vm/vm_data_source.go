@@ -20,7 +20,7 @@ type vmDataSource struct {
 
 type vmDataSourceFilter struct {
 	ID                *string                       `tfsdk:"id"`
-	ProjectID         *string                       `tfsdk:"project_id"`
+	ProjectID         types.String                  `tfsdk:"project_id"`
 	ReservationID     *string                       `tfsdk:"reservation_id"`
 	Name              *string                       `tfsdk:"name"`
 	Type              *string                       `tfsdk:"type"`
@@ -83,17 +83,17 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 				Computed: true,
 			},
 			"disks": schema.ListNestedAttribute{
-				Optional: true,
+				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Required: true,
+							Computed: true,
 						},
 						"attachment_type": schema.StringAttribute{
-							Required: true,
+							Computed: true,
 						},
 						"mode": schema.StringAttribute{
-							Required: true,
+							Computed: true,
 						},
 					},
 				},
@@ -159,7 +159,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		return
 	}
 
-	projectID := common.GetProjectIDFromPointerOrFallback(ds.client, config.ProjectID)
+	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
 	if config.ID != nil {
 		vm, err := getVM(ctx, ds.client.APIClient, projectID, *config.ID)
@@ -171,7 +171,7 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		}
 
 		state.ID = &vm.Id
-		state.ProjectID = &vm.ProjectId
+		state.ProjectID = types.StringValue(vm.ProjectId)
 		state.Name = &vm.Name
 		state.Type = &vm.Type_
 		state.NvlinkDomainID = &vm.NvlinkDomainId

@@ -3,8 +3,6 @@ package disk
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -12,20 +10,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	swagger "github.com/crusoecloud/client-go/swagger/v1alpha5"
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
 const (
+	defaultDiskType    = "<tf-default-disk-type>" // this is not a real value, used for validation logic to determine correct value
 	persistentSSD      = "persistent-ssd"
 	sharedVolume       = "shared-volume"
-	gibInTib           = 1024
 	alternateBlockSize = 512
 	defaultBlockSize   = 4096
 )
@@ -43,6 +43,8 @@ type diskResourceModel struct {
 	Size         types.String `tfsdk:"size"`
 	SerialNumber types.String `tfsdk:"serial_number"`
 	BlockSize    types.Int64  `tfsdk:"block_size"`
+	DNSName      types.String `tfsdk:"dns_name"`
+	Vips         types.List   `tfsdk:"vips"`
 }
 
 func NewDiskResource() resource.Resource {
@@ -76,50 +78,70 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 		Version: 1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: descID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: descProjectID + " " + descProjectIDInference,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: descLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: descName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"type": schema.StringAttribute{
-				Optional:   true,
-				Computed:   true,
-				Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: descType + " " + descTypeRequired,
+				Default:             stringdefault.StaticString(defaultDiskType),
+				Validators:          []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),    // cannot be updated in place
-					stringplanmodifier.UseStateForUnknown(), // maintain across updates if not explicitly changed
+					diskTypeModifier{},
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"size": schema.StringAttribute{
-				Required:   true,
-				Validators: []validator.String{validators.StorageSizeValidator{}},
+				Required:            true,
+				MarkdownDescription: descSize,
+				Validators:          []validator.String{validators.StorageSizeValidator{}},
 			},
 			"serial_number": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: descSerialNumber,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"block_size": schema.Int64Attribute{
-				Optional:   true,
-				Computed:   true,
-				Validators: []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)}, // we support either 512 or 4096 bits
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: descBlockSize,
+				Validators:          []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)},
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplaceIfConfigured(), // cannot be updated in place
+					int64planmodifier.RequiresReplaceIfConfigured(),
 					int64planmodifier.UseStateForUnknown(),
 				},
+			},
+			"dns_name": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: descDNSName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"vips": schema.ListAttribute{
+				Computed:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: descVips,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -141,15 +163,16 @@ func (r *diskResource) ImportState(ctx context.Context, req resource.ImportState
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan diskResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	diskType := plan.Type.ValueString()
-	if diskType == "" {
-		diskType = persistentSSD
+	if diskType == "" || diskType == defaultDiskType {
+		resp.Diagnostics.AddError("Disk type should be specified",
+			"Disk type was not specified and Crusoe terraform module failed to set default. This is an internal Crusoe terraform error and you should not see this.")
+
+		return
 	}
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
@@ -159,22 +182,24 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		blockSize = defaultBlockSize
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1Alpha5{
+	dataResp, httpResp, err := r.client.APIClient.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1{
 		Name:      plan.Name.ValueString(),
 		Location:  plan.Location.ValueString(),
 		Type_:     diskType,
 		Size:      plan.Size.ValueString(),
 		BlockSize: blockSize,
 	}, projectID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error starting a create disk operation (%s): %s", projectID, common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
-	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, projectID, r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, projectID, r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create disk",
 			fmt.Sprintf("There was an error creating a disk: %s", common.UnpackAPIError(err)))
@@ -182,71 +207,55 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	plan.ID = types.StringValue(disk.Id)
-	plan.Type = types.StringValue(disk.Type_)
-	plan.Location = types.StringValue(disk.Location)
-	plan.SerialNumber = types.StringValue(disk.SerialNumber)
-	plan.Size = types.StringValue(formatSize(plan.Size.ValueString(), disk.Size))
-	plan.ProjectID = types.StringValue(projectID)
-	plan.BlockSize = types.Int64Value(disk.BlockSize)
+	var state diskResourceModel
+	state.ProjectID = types.StringValue(projectID)
+	diskToTerraformResourceModel(disk, &state, plan.Size.ValueString())
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state diskResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to v1alpha5 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-	dataResp, httpResp, err := r.client.APIClient.DisksApi.ListDisks(ctx, projectID, &swagger.DisksApiListDisksOpts{})
+	disk, httpResp, err := r.client.APIClient.DisksApi.GetDisk(ctx, projectID, state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get disks",
 			fmt.Sprintf("Fetching Crusoe disks failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
-	var disk *swagger.DiskV1Alpha5
-	for i := range dataResp.Items {
-		if dataResp.Items[i].Id == state.ID.ValueString() {
-			disk = &dataResp.Items[i]
-		}
-	}
-
-	if disk == nil {
+	if httpResp.StatusCode == 404 {
 		// disk has most likely been deleted out of band, so we update Terraform state to match
 		resp.State.RemoveResource(ctx)
 
 		return
 	}
 
-	diskToTerraformResourceModel(disk, &state)
+	diskToTerraformResourceModel(&disk, &state, state.Size.ValueString())
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state diskResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan diskResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -255,6 +264,9 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		plan.ProjectID.ValueString(),
 		plan.ID.ValueString(),
 	)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error starting a resize operation: %s.\n\n"+
@@ -263,9 +275,8 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 		return
 	}
-	defer httpResp.Body.Close()
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1Alpha5](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
+	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
@@ -275,27 +286,26 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state diskResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.DisksApi.DeleteDisk(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete disk",
 			fmt.Sprintf("There was an error starting a delete disk operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
-	defer httpResp.Body.Close()
 
 	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
@@ -304,29 +314,4 @@ func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 		return
 	}
-}
-
-// formatSize takes a format size to use as a pattern and converts the sizeStr to match it.
-func formatSize(format, sizeStr string) string {
-	lowerFormatSize := strings.ToLower(format)
-	lowerSize := strings.ToLower(sizeStr)
-	if strings.HasSuffix(lowerFormatSize, "tib") && strings.HasSuffix(lowerSize, "gib") {
-		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil &&
-			size >= gibInTib && size%gibInTib == 0 {
-
-			return strconv.Itoa(size/gibInTib) + "TiB"
-		}
-
-		return sizeStr
-	}
-
-	if strings.HasSuffix(lowerFormatSize, "gib") && strings.HasSuffix(lowerSize, "tib") {
-		if size, err := strconv.Atoi(sizeStr[:len(sizeStr)-3]); err == nil {
-			return strconv.Itoa(size*gibInTib) + "GiB"
-		}
-
-		return sizeStr
-	}
-
-	return sizeStr
 }
