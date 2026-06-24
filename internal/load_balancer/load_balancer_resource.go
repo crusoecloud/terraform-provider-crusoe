@@ -116,10 +116,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required: true,
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"network": schema.StringAttribute{
 							Computed:      true,
@@ -135,10 +133,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"destinations": schema.ListNestedAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"cidr": schema.StringAttribute{
 							Computed:      true,
@@ -159,9 +155,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"protocols": schema.ListAttribute{
-				ElementType:   types.StringType,
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				ElementType: types.StringType,
+				Required:    true,
 			},
 			"algorithm": schema.StringAttribute{
 				Required:      true,
