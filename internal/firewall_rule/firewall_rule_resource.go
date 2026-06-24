@@ -68,8 +68,7 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 			},
 			"project_id": schema.StringAttribute{
 				Optional: true,
@@ -94,28 +93,23 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(ingress|egress)"}},
 			},
 			"protocols": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				// TODO: add validator
 			},
 			"source": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				// TODO: add validator
 			},
 			"source_ports": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				// TODO: add validator
 			},
 			"destination": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				// TODO: add validator
 			},
 			"destination_ports": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required: true,
 				// TODO: add validator
 			},
 		},
