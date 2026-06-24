@@ -163,6 +163,14 @@ func (ds *instanceGroupsDataSource) Read(ctx context.Context, req datasource.Rea
 		state.InstanceGroups = append(state.InstanceGroups, instanceGroupToDataSourceModel(&dataResp.Items[i]))
 	}
 
+	// Sort instance groups deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.InstanceGroups,
+		func(g instanceGroupDataSourceModel) string { return g.Name },
+		func(g instanceGroupDataSourceModel) string { return g.UpdatedAt },
+		func(g instanceGroupDataSourceModel) string { return g.CreatedAt },
+		func(g instanceGroupDataSourceModel) string { return g.ID },
+	)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

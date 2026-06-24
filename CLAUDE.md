@@ -13,6 +13,7 @@ This file provides guidance to Claude Code when working with this Terraform prov
 - **State extraction**: Use the shared generic `common.GetResourceModel()` helper
 - **Schema validators**: Add `stringvalidator`/`int64validator` directly in schema
 - **Testing validators**: Go unit tests (not Terraform `expect_failures`) for schema validators
+- **Deterministic lists**: Sort API-ordered collections before setting state (`common.SortByKeys`; key priority `name → updated_at → created_at → id`)
 - **Reference implementation**: `internal/instance_group/` follows all current patterns
 
 ## Table of Contents
@@ -35,6 +36,7 @@ This file provides guidance to Claude Code when working with this Terraform prov
     - [HTTP Response Handling](#http-response-handling)
     - [State Upgrades](#state-upgrades)
     - [Schema Validators](#schema-validators)
+    - [Deterministic List Ordering](#deterministic-list-ordering)
   - [Testing](#testing)
     - [Go Unit Tests](#go-unit-tests)
     - [Terraform Unit Tests](#terraform-unit-tests)
@@ -327,6 +329,27 @@ import (
     },
 },
 ```
+
+### Deterministic List Ordering
+
+Crusoe list API endpoints don't guarantee a stable element order, so order-sensitive Terraform `List` attributes built from `dataResp.Items` re-order between reads and produce spurious diffs on otherwise-unchanged infrastructure (CCX-4394). Sort any collection built from an API response before writing state.
+
+- **List data sources**: sort the result slice with `common.SortByKeys` before `resp.State.Set`. Pass key functions as a tiebreaker chain in priority order `name → updated_at → created_at → id`, supplying only the keys the model exposes (`id` is the always-unique final tiebreaker; use the model's unique field — e.g. `Digest` — when there is no id):
+
+  ```go
+  common.SortByKeys(state.Disks,
+      func(d diskModel) string { return d.Name },
+      func(d diskModel) string { return d.ID },
+  )
+  ```
+
+- **Flat/nested string lists** of opaque IDs with no name/timestamp dimension (e.g. `vips`, `subnets`, `active_instance_ids`): sort lexicographically with `slices.Sort` before assigning.
+
+- **Resource-level `Computed` lists** populated in API order (e.g. `active_instance_ids`, `vips`, `subnets`, node-pool `instance_ids`): sort the slice before `common.StringSliceToTFList`.
+
+- **Do NOT sort** `Optional`+`Computed` lists a user may set in config (e.g. `kubernetes_cluster` `add_ons` / `nodepool_ids`) — sorting the read value can fight the configured order. Likewise leave nested object lists that mirror configured order (e.g. load balancer `network_interfaces`, instance_template `disks`) unless they have a clear stable key.
+
+Sorting is non-breaking (sort-only; no schema/attribute-type/state-shape change, no state migration). Add a unit test asserting a shuffled input yields a stable, key-sorted result.
 
 ## Testing
 

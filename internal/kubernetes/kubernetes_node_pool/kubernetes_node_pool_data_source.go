@@ -3,6 +3,7 @@ package kubernetes_node_pool
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -184,6 +185,7 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 	resp.Diagnostics.Append(diags...)
 	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
+	slices.Sort(kubernetesNodePool.InstanceIds)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePool.State)

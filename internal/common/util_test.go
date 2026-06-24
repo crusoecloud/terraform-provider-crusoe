@@ -2,6 +2,7 @@ package common
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -210,6 +211,80 @@ func TestParseResourceIdentifiers(t *testing.T) {
 
 			if projectID != tt.wantProject {
 				t.Errorf("ParseResourceIdentifiers(%q) projectID = %q, want %q", tt.importID, projectID, tt.wantProject)
+			}
+		})
+	}
+}
+
+func TestSortByKeys(t *testing.T) {
+	type item struct {
+		name      string
+		updatedAt string
+		id        string
+	}
+
+	keyFns := []func(item) string{
+		func(i item) string { return i.name },
+		func(i item) string { return i.updatedAt },
+		func(i item) string { return i.id },
+	}
+
+	tests := []struct {
+		name  string
+		input []item
+		want  []string // expected order of ids
+	}{
+		{
+			name:  "empty",
+			input: []item{},
+			want:  []string{},
+		},
+		{
+			name:  "single",
+			input: []item{{name: "a", id: "1"}},
+			want:  []string{"1"},
+		},
+		{
+			name: "sorts by primary key",
+			input: []item{
+				{name: "charlie", id: "3"},
+				{name: "alpha", id: "1"},
+				{name: "bravo", id: "2"},
+			},
+			want: []string{"1", "2", "3"},
+		},
+		{
+			name: "name ties broken by updated_at then id",
+			input: []item{
+				{name: "dup", updatedAt: "2026-01-02", id: "z"},
+				{name: "dup", updatedAt: "2026-01-01", id: "b"},
+				{name: "dup", updatedAt: "2026-01-01", id: "a"},
+			},
+			// updatedAt 2026-01-01 sorts before 2026-01-02; within the same
+			// updatedAt, id a before b.
+			want: []string{"a", "b", "z"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SortByKeys(tt.input, keyFns...)
+
+			got := make([]string, len(tt.input))
+			for i := range tt.input {
+				got[i] = tt.input[i].id
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("SortByKeys() id order = %v, want %v", got, tt.want)
+			}
+
+			// Sorting an already-sorted slice must be idempotent.
+			SortByKeys(tt.input, keyFns...)
+			for i := range tt.input {
+				got[i] = tt.input[i].id
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("SortByKeys() not idempotent: id order = %v, want %v", got, tt.want)
 			}
 		})
 	}

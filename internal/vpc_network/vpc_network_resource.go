@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -134,6 +135,8 @@ func (r *vpcNetworkResource) Create(ctx context.Context, req resource.CreateRequ
 	plan.ProjectID = types.StringValue(projectID)
 	plan.Gateway = types.StringValue(dataResp.Network.Gateway)
 
+	// Sort subnet IDs for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(dataResp.Network.Subnets)
 	subnets, _ := types.ListValueFrom(context.Background(), types.StringType, dataResp.Network.Subnets)
 	plan.Subnets = subnets
 
@@ -171,6 +174,8 @@ func (r *vpcNetworkResource) Read(ctx context.Context, req resource.ReadRequest,
 	state.CIDR = types.StringValue(vpcNetwork.Cidr)
 	state.Gateway = types.StringValue(vpcNetwork.Gateway)
 
+	// Sort subnet IDs for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(vpcNetwork.Subnets)
 	subnets, _ := types.ListValueFrom(context.Background(), types.StringType, vpcNetwork.Subnets)
 	state.Subnets = subnets
 

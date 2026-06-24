@@ -1,6 +1,7 @@
 package common
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -451,6 +453,22 @@ func StringSliceToTFList(s []string) (types.List, diag.Diagnostics) {
 	}
 
 	return types.ListValue(types.StringType, tfList)
+}
+
+// SortByKeys sorts items in place using keyFns as an ordered tiebreaker chain:
+// items are compared by the first key, ties broken by the next, and so on. This
+// gives list data sources a deterministic element order independent of API
+// response order, preventing spurious diffs when the API re-orders its results.
+func SortByKeys[T any](items []T, keyFns ...func(T) string) {
+	slices.SortFunc(items, func(a, b T) int {
+		for _, keyFn := range keyFns {
+			if c := cmp.Compare(keyFn(a), keyFn(b)); c != 0 {
+				return c
+			}
+		}
+
+		return 0
+	})
 }
 
 func StringerMapToTFMap[T fmt.Stringer](m map[string]T) (types.Map, diag.Diagnostics) {

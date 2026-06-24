@@ -140,6 +140,12 @@ func (ds *manifestsDataSource) Read(ctx context.Context, request datasource.Read
 		})
 	}
 
+	// Sort manifests deterministically (digest is the only stable unique key) so
+	// repeated reads produce a stable ordering.
+	common.SortByKeys(state.Manifests,
+		func(m manifestDataSourceModel) string { return m.Digest.ValueString() },
+	)
+
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
 }

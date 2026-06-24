@@ -107,6 +107,11 @@ func (ds *registryRepositoriesDataSource) Read(ctx context.Context, request data
 		})
 	}
 
+	// Sort repositories deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Repositories,
+		func(r registryRepositoryDataSourceModel) string { return r.Name.ValueString() },
+	)
+
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
 }

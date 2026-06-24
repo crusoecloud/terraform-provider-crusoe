@@ -110,3 +110,25 @@ func TestInstanceTemplatesToModel_DisksScopedPerTemplate(t *testing.T) {
 		t.Errorf("unexpected first disk: %+v", got[0].Disks[0])
 	}
 }
+
+// TestInstanceTemplatesToModel_DeterministicOrder verifies that templates are
+// returned in a stable order (by name, then id) regardless of API response order,
+// preventing spurious diffs when the API re-orders its results (CCX-4394).
+func TestInstanceTemplatesToModel_DeterministicOrder(t *testing.T) {
+	items := []swagger.InstanceTemplate{
+		{Id: "3", Name: "charlie"},
+		{Id: "1", Name: "alpha"},
+		{Id: "2", Name: "bravo"},
+		// Duplicate name, broken by id.
+		{Id: "0", Name: "alpha"},
+	}
+
+	got := instanceTemplatesToModel(items)
+
+	wantIDs := []string{"0", "1", "2", "3"} // alpha/id=0, alpha/id=1, bravo, charlie
+	for i, want := range wantIDs {
+		if got[i].ID != want {
+			t.Errorf("position %d: got id %q, want %q (order: %+v)", i, got[i].ID, want, got)
+		}
+	}
+}

@@ -1,6 +1,8 @@
 package instance_group
 
 import (
+	"slices"
+
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -35,6 +37,10 @@ func instanceGroupToResourceModel(instanceGroup *swagger.InstanceGroup, state *i
 	state.CreatedAt = types.StringValue(instanceGroup.CreatedAt)
 	state.UpdatedAt = types.StringValue(instanceGroup.UpdatedAt)
 
+	// Sort instance ID lists for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(instanceGroup.ActiveInstances)
+	slices.Sort(instanceGroup.InactiveInstances)
+
 	var tfListDiags diag.Diagnostics
 	state.ActiveInstanceIDs, tfListDiags = common.StringSliceToTFList(instanceGroup.ActiveInstances)
 	diags.Append(tfListDiags...)
@@ -43,6 +49,10 @@ func instanceGroupToResourceModel(instanceGroup *swagger.InstanceGroup, state *i
 }
 
 func instanceGroupToDataSourceModel(item *swagger.InstanceGroup) instanceGroupDataSourceModel {
+	// Sort instance ID lists for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(item.ActiveInstances)
+	slices.Sort(item.InactiveInstances)
+
 	return instanceGroupDataSourceModel{
 		ID:                   item.Id,
 		ProjectID:            item.ProjectId,

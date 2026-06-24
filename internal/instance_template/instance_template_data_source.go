@@ -204,5 +204,11 @@ func instanceTemplatesToModel(items []swagger.InstanceTemplate) []instanceTempla
 		})
 	}
 
+	// Sort templates deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(templates,
+		func(t instanceTemplatesModel) string { return t.Name },
+		func(t instanceTemplatesModel) string { return t.ID },
+	)
+
 	return templates
 }

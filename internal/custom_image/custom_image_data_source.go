@@ -122,6 +122,14 @@ func (ds *customImageDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	filteredImages := filterCustomImagesListResponse(&apiResp, config)
 
+	// Sort images deterministically so repeated reads produce a stable ordering.
+	// newest_image is computed independently below via its own copy-sort.
+	common.SortByKeys(filteredImages,
+		func(img customImageModel) string { return img.Name },
+		func(img customImageModel) string { return img.CreatedAt },
+		func(img customImageModel) string { return img.ID },
+	)
+
 	var state customImageDataSourceModel
 	state.Name = config.Name
 	state.NamePrefix = config.NamePrefix

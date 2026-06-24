@@ -2,6 +2,7 @@ package vpc_network
 
 import (
 	"context"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -26,6 +27,8 @@ func vpcNetworkToTerraformResourceModel(vpcNetwork *swagger.VpcNetwork, state *v
 	state.Name = types.StringValue(vpcNetwork.Name)
 	state.CIDR = types.StringValue(vpcNetwork.Cidr)
 	state.Gateway = types.StringValue(vpcNetwork.Gateway)
+	// Sort subnet IDs for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(vpcNetwork.Subnets)
 	subnets, _ := types.ListValueFrom(context.Background(), types.StringType, vpcNetwork.Subnets)
 	state.Subnets = subnets
 }

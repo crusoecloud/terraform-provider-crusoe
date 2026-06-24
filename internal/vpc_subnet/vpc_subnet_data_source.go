@@ -115,6 +115,12 @@ func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadReq
 		})
 	}
 
+	// Sort VPC subnets deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.VPCSubnets,
+		func(s vpcSubnetsModel) string { return s.Name },
+		func(s vpcSubnetsModel) string { return s.ID },
+	)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

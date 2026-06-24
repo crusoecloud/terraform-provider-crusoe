@@ -2,6 +2,7 @@ package disk
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -51,6 +52,8 @@ func diskToTerraformResourceModel(disk *swagger.DiskV1, state *diskResourceModel
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
 	state.BlockSize = types.Int64Value(disk.BlockSize)
 	state.DNSName = types.StringValue(disk.DnsName)
+	// Sort VIPs for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(disk.Vips)
 	state.Vips = stringSliceToList(disk.Vips)
 }
 

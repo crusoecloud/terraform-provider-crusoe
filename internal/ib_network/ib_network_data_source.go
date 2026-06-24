@@ -132,6 +132,12 @@ func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadReq
 		})
 	}
 
+	// Sort IB networks deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.IBNetworks,
+		func(n ibNetworkModel) string { return n.Name },
+		func(n ibNetworkModel) string { return n.ID },
+	)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

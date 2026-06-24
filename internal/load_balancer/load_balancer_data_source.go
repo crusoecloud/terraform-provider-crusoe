@@ -235,6 +235,12 @@ func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadR
 		})
 	}
 
+	// Sort load balancers deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.LoadBalancers,
+		func(lb loadBalancerModel) string { return lb.Name },
+		func(lb loadBalancerModel) string { return lb.ID },
+	)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

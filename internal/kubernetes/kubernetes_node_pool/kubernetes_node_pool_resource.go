@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -329,6 +330,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	resp.Diagnostics.Append(diags...)
 	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePoolResponse.NodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
+	slices.Sort(kubernetesNodePoolResponse.NodePool.InstanceIds)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
@@ -408,6 +410,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	resp.Diagnostics.Append(diags...)
 	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
+	slices.Sort(kubernetesNodePool.InstanceIds)
 	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePool.State)
@@ -657,6 +660,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	resp.Diagnostics.Append(diags...)
 	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, updatedNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
+	slices.Sort(updatedNodePool.InstanceIds)
 	state.InstanceIDs, diags = common.StringSliceToTFList(updatedNodePool.InstanceIds)
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(updatedNodePool.State)

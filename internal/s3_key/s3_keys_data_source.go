@@ -147,6 +147,12 @@ func (ds *s3KeysDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		state.Keys = append(state.Keys, s3KeyAPIToDataSourceModel(&dataResp.Items[i]))
 	}
 
+	// Sort keys deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Keys,
+		func(k s3KeyModel) string { return k.CreatedAt },
+		func(k s3KeyModel) string { return k.KeyID },
+	)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

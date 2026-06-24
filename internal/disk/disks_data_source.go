@@ -2,6 +2,7 @@ package disk
 
 import (
 	"context"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -141,6 +142,8 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		if vips == nil {
 			vips = []string{}
 		}
+		// Sort VIPs for deterministic ordering; the API does not guarantee a stable order.
+		slices.Sort(vips)
 		state.Disks = append(state.Disks, diskModel{
 			ID:           dataResp.Items[i].Id,
 			Name:         dataResp.Items[i].Name,
@@ -153,6 +156,12 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 			Vips:         vips,
 		})
 	}
+
+	// Sort disks deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Disks,
+		func(d diskModel) string { return d.Name },
+		func(d diskModel) string { return d.ID },
+	)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

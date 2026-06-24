@@ -145,6 +145,12 @@ func (ds *tokensDataSource) Read(ctx context.Context, request datasource.ReadReq
 		})
 	}
 
+	// Sort tokens deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Tokens,
+		func(t tokenDataSourceModel) string { return t.CreatedAt.ValueString() },
+		func(t tokenDataSourceModel) string { return t.ID.ValueString() },
+	)
+
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
 }

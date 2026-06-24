@@ -156,6 +156,13 @@ func (ds *s3BucketsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		state.Buckets = append(state.Buckets, s3BucketAPIToDataSourceModel(&dataResp.Items[i]))
 	}
 
+	// Sort buckets deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Buckets,
+		func(b s3BucketModel) string { return b.Name },
+		func(b s3BucketModel) string { return b.UpdatedAt },
+		func(b s3BucketModel) string { return b.CreatedAt },
+	)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }

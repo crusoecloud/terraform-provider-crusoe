@@ -94,6 +94,12 @@ func (ds *projectsDataSource) Read(ctx context.Context, req datasource.ReadReque
 		})
 	}
 
+	// Sort projects deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Projects,
+		func(p projectModel) string { return p.Name },
+		func(p projectModel) string { return p.ID },
+	)
+
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
