@@ -2,12 +2,10 @@ package disk
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -31,26 +29,6 @@ const (
 	descDNSName            = "DNS name used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
 	descVips               = "Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
 )
-
-var errGetResourceModel = errors.New("unable to get resource model")
-
-// tfDataGetter is implemented by tfsdk.State and tfsdk.Plan
-type tfDataGetter interface {
-	Get(ctx context.Context, target interface{}) diag.Diagnostics
-}
-
-// getResourceModel extracts the resource model from state or plan.
-// Returns errGetResourceModel if there were errors (diagnostics already appended to respDiags).
-func getResourceModel(ctx context.Context, source tfDataGetter, dest *diskResourceModel, respDiags *diag.Diagnostics) error {
-	diags := source.Get(ctx, dest)
-	respDiags.Append(diags...)
-
-	if respDiags.HasError() {
-		return errGetResourceModel
-	}
-
-	return nil
-}
 
 func findDisk(ctx context.Context, client *swagger.APIClient, diskID string) (*swagger.DiskV1, string, error) {
 	args := common.FindResourceArgs[swagger.DiskV1]{

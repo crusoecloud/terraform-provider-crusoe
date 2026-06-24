@@ -4,29 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
-
-var errGetResourceModel = errors.New("unable to get resource model")
-
-// tfDataGetter is implemented by req.Plan and req.State in CRUD methods.
-type tfDataGetter interface {
-	Get(ctx context.Context, target interface{}) diag.Diagnostics
-}
-
-// getResourceModel extracts the resource model from plan/state with error handling.
-func getResourceModel(ctx context.Context, source tfDataGetter, dest *s3KeyResourceModel, respDiags *diag.Diagnostics) error {
-	diags := source.Get(ctx, dest)
-	respDiags.Append(diags...)
-
-	if respDiags.HasError() {
-		return errGetResourceModel
-	}
-
-	return nil
-}
 
 // Description constants for S3 key schema attributes.
 const (

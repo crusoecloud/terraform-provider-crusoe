@@ -171,7 +171,7 @@ func (r *s3BucketResource) Create(ctx context.Context, req resource.CreateReques
 	defer bucketMutex.Unlock()
 
 	var plan s3BucketResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -243,7 +243,7 @@ func (r *s3BucketResource) Create(ctx context.Context, req resource.CreateReques
 //nolint:gocritic // Implements Terraform defined interface
 func (r *s3BucketResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state s3BucketResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -279,12 +279,12 @@ func (r *s3BucketResource) Update(ctx context.Context, req resource.UpdateReques
 	defer bucketMutex.Unlock()
 
 	var state s3BucketResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan s3BucketResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -394,7 +394,7 @@ func (r *s3BucketResource) Delete(ctx context.Context, req resource.DeleteReques
 	defer bucketMutex.Unlock()
 
 	var state s3BucketResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

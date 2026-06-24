@@ -149,9 +149,7 @@ func (r *vpcSubnetResource) ImportState(ctx context.Context, req resource.Import
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan vpcSubnetResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -190,16 +188,13 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 	plan.NATGateways = natGatewaysList
 	plan.NATGatewayEnabled = types.BoolValue(len(natGatewaysList.Elements()) > 0)
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state vpcSubnetResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -225,23 +220,18 @@ func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	vpcSubnetToTerraformResourceModel(ctx, &vpcSubnet, &state, &resp.Diagnostics)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state vpcSubnetResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan vpcSubnetResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -279,16 +269,13 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state vpcSubnetResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

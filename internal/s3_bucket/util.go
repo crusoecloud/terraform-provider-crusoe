@@ -1,37 +1,14 @@
 package s3_bucket
 
 import (
-	"context"
-	"errors"
 	"regexp"
 	"strings"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
-
-var errGetResourceModel = errors.New("unable to get resource model")
-
-// tfDataGetter is implemented by tfsdk.State and tfsdk.Plan
-type tfDataGetter interface {
-	Get(ctx context.Context, target interface{}) diag.Diagnostics
-}
-
-// getResourceModel extracts the resource model from state or plan.
-// Returns errGetResourceModel if there were errors (diagnostics already appended to respDiags).
-func getResourceModel(ctx context.Context, source tfDataGetter, dest *s3BucketResourceModel, respDiags *diag.Diagnostics) error {
-	diags := source.Get(ctx, dest)
-	respDiags.Append(diags...)
-
-	if respDiags.HasError() {
-		return errGetResourceModel
-	}
-
-	return nil
-}
 
 const (
 	descName                = "Name of the bucket. Must be DNS-compliant: 3-63 characters, lowercase letters, numbers, and hyphens."

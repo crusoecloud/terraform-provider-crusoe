@@ -131,9 +131,7 @@ func (r *firewallRuleResource) ImportState(ctx context.Context, req resource.Imp
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan firewallRuleResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -176,16 +174,13 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	plan.ID = types.StringValue(firewallRule.Id)
 	plan.ProjectID = types.StringValue(projectID)
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state firewallRuleResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -207,23 +202,18 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 	state.ProjectID = types.StringValue(projectID)
 	firewallRuleToTerraformResourceModel(&rule, &state)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state firewallRuleResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan firewallRuleResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 	patchReq := swagger.VpcFirewallRulesPatchRequest{}
@@ -269,16 +259,13 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state firewallRuleResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

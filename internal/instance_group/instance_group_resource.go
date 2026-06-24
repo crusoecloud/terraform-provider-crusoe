@@ -161,7 +161,7 @@ func (r *instanceGroupResource) ImportState(ctx context.Context, req resource.Im
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -197,7 +197,7 @@ func (r *instanceGroupResource) Create(ctx context.Context, req resource.CreateR
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -229,12 +229,12 @@ func (r *instanceGroupResource) Read(ctx context.Context, req resource.ReadReque
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -275,7 +275,7 @@ func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateR
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

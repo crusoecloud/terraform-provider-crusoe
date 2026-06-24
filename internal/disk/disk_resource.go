@@ -163,7 +163,7 @@ func (r *diskResource) ImportState(ctx context.Context, req resource.ImportState
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan diskResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -217,7 +217,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state diskResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -250,12 +250,12 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state diskResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan diskResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -292,7 +292,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state diskResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

@@ -249,9 +249,7 @@ func (r *loadBalancerResource) ImportState(ctx context.Context, req resource.Imp
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan loadBalancerResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -263,7 +261,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 
 	// network interfaces
 	tNetworkInterfaces := make([]loadBalancerNetworkInterfaceModel, 0, len(plan.NetworkInterfaces.Elements()))
-	diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
+	diags := plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -343,16 +341,13 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	plan.HealthCheck, _ = types.ObjectValueFrom(ctx, loadBalancerHealthCheckSchema.AttrTypes, loadBalancerHealthCheckToTerraformResourceModel(loadBalancer.HealthCheck))
 	plan.Destinations, _ = loadBalancerDestinationsToTerraformResourceModel(loadBalancer.Destinations)
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state loadBalancerResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -379,23 +374,18 @@ func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 	state.ProjectID = types.StringValue(projectID)
 	loadBalancerUpdateTerraformState(ctx, &loadBalancer, &state)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state loadBalancerResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan loadBalancerResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -406,7 +396,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 
 	if !plan.Destinations.IsNull() && !plan.Destinations.IsUnknown() {
 		tDestinations := make([]loadBalancerNetworkTargetModel, 0, len(plan.Destinations.Elements()))
-		diags = plan.Destinations.ElementsAs(ctx, &tDestinations, true)
+		diags := plan.Destinations.ElementsAs(ctx, &tDestinations, true)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -464,16 +454,13 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state loadBalancerResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

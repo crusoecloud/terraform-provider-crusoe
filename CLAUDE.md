@@ -10,7 +10,7 @@ This file provides guidance to Claude Code when working with this Terraform prov
 - **Examples & tests** in `examples/<resource>/` with `main.tf` and `tests/*.tftest.hcl`
 - **ID fields**: Always suffix with `ID` (e.g., `ProjectID`, `InstanceTemplateID`)
 - **API errors**: Use `common.UnpackAPIError(err)`, not `err.Error()`
-- **State extraction**: Use `getResourceModel()` helper pattern
+- **State extraction**: Use the shared generic `common.GetResourceModel()` helper
 - **Schema validators**: Add `stringvalidator`/`int64validator` directly in schema
 - **Testing validators**: Go unit tests (not Terraform `expect_failures`) for schema validators
 - **Reference implementation**: `internal/instance_group/` follows all current patterns
@@ -145,25 +145,34 @@ Template           types.String `tfsdk:"template_id"`
 
 ### State Extraction Helper
 
-Use `getResourceModel()` to extract state/plan with error handling:
+Use the shared generic `common.GetResourceModel()` helper to extract state, plan, or
+config with error handling. It lives in `internal/common/resource_model.go` — do **not**
+add a per-package copy. The model type is inferred from `dest`, so callers never specify
+the type parameter:
 
 ```go
-var errGetResourceModel = errors.New("unable to get resource model")
+// internal/common/resource_model.go (shared, generic — already defined)
+var ErrGetResourceModel = errors.New("unable to get resource model")
 
-func getResourceModel(ctx context.Context, source tfDataGetter, dest *myResourceModel, respDiags *diag.Diagnostics) error {
+// TFDataGetter is implemented by tfsdk.State, tfsdk.Plan, and tfsdk.Config.
+type TFDataGetter interface {
+    Get(ctx context.Context, target interface{}) diag.Diagnostics
+}
+
+func GetResourceModel[T any](ctx context.Context, source TFDataGetter, dest *T, respDiags *diag.Diagnostics) error {
     diags := source.Get(ctx, dest)
     respDiags.Append(diags...)
 
     if respDiags.HasError() {
-        return errGetResourceModel
+        return ErrGetResourceModel
     }
 
     return nil
 }
 
-// Usage:
+// Usage in a resource's CRUD methods:
 var state myResourceModel
-if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
     return
 }
 ```
