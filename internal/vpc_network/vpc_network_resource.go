@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -129,16 +128,8 @@ func (r *vpcNetworkResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	plan.ID = types.StringValue(dataResp.Network.Id)
-	plan.Name = types.StringValue(dataResp.Network.Name)
-	plan.CIDR = types.StringValue(dataResp.Network.Cidr)
+	vpcNetworkToTerraformResourceModel(dataResp.Network, &plan)
 	plan.ProjectID = types.StringValue(projectID)
-	plan.Gateway = types.StringValue(dataResp.Network.Gateway)
-
-	// Sort subnet IDs for deterministic ordering; the API does not guarantee a stable order.
-	slices.Sort(dataResp.Network.Subnets)
-	subnets, _ := types.ListValueFrom(context.Background(), types.StringType, dataResp.Network.Subnets)
-	plan.Subnets = subnets
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -170,14 +161,7 @@ func (r *vpcNetworkResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	state.Name = types.StringValue(vpcNetwork.Name)
-	state.CIDR = types.StringValue(vpcNetwork.Cidr)
-	state.Gateway = types.StringValue(vpcNetwork.Gateway)
-
-	// Sort subnet IDs for deterministic ordering; the API does not guarantee a stable order.
-	slices.Sort(vpcNetwork.Subnets)
-	subnets, _ := types.ListValueFrom(context.Background(), types.StringType, vpcNetwork.Subnets)
-	state.Subnets = subnets
+	vpcNetworkToTerraformResourceModel(&vpcNetwork, &state)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -209,7 +193,7 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+	vpcNetwork, _, err := common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
 	})
 	if err != nil {
@@ -218,6 +202,8 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 
 		return
 	}
+
+	vpcNetworkToTerraformResourceModel(vpcNetwork, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
