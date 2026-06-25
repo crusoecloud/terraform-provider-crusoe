@@ -53,5 +53,9 @@ func natGatewaysToTerraformResourceModel(ctx context.Context, natGateways []swag
 		})
 	}
 
+	// Sort by ID for deterministic ordering; the API does not guarantee a stable
+	// order for the (Computed) NAT gateway list.
+	common.SortByKeys(gateways, func(g vpcSubnetNatGatewayResourceModel) string { return g.ID.ValueString() })
+
 	return types.ListValueFrom(ctx, vpcSubnetNatGatewaySchema, gateways)
 }

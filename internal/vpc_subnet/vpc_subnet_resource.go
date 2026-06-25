@@ -172,21 +172,11 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	plan.ID = types.StringValue(dataResp.Subnet.Id)
-	plan.Name = types.StringValue(dataResp.Subnet.Name)
-	plan.CIDR = types.StringValue(dataResp.Subnet.Cidr)
-	plan.Location = types.StringValue(dataResp.Subnet.Location)
-	plan.Network = types.StringValue(dataResp.Subnet.VpcNetworkId)
+	vpcSubnetToTerraformResourceModel(ctx, dataResp.Subnet, &plan, &resp.Diagnostics)
 	plan.ProjectID = types.StringValue(projectID)
-
-	natGatewaysList, natDiags := natGatewaysToTerraformResourceModel(ctx, dataResp.Subnet.NatGateways)
-	if natDiags.HasError() {
-		resp.Diagnostics.Append(natDiags...)
-
+	if resp.Diagnostics.HasError() {
 		return
 	}
-	plan.NATGateways = natGatewaysList
-	plan.NATGatewayEnabled = types.BoolValue(len(natGatewaysList.Elements()) > 0)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -259,13 +249,18 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.VpcSubnet](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+	vpcSubnet, _, err := common.AwaitOperationAndResolve[swagger.VpcSubnet](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID)
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update VPC Subnet",
 			fmt.Sprintf("There was an error updating the VPC Subnet: %s.\n\n", common.UnpackAPIError(err)))
 
+		return
+	}
+
+	vpcSubnetToTerraformResourceModel(ctx, vpcSubnet, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
