@@ -200,22 +200,9 @@ func (r *s3KeyResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	// Find the created key by access_key_id
-	for i := range keys.Items {
-		if keys.Items[i].AccessKeyId == dataResp.AccessKeyId {
-			plan.KeyID = types.StringValue(keys.Items[i].KeyUuid)
-			plan.Status = types.StringValue(keys.Items[i].Status)
-			plan.CreatedAt = types.StringValue(keys.Items[i].CreatedAt)
-			plan.UserID = types.StringValue(keys.Items[i].UserId)
-			if keys.Items[i].Alias != "" {
-				plan.Alias = types.StringValue(keys.Items[i].Alias)
-			}
-			if isValidExpireAt(keys.Items[i].ExpireAt) {
-				plan.ExpireAt = types.StringValue(keys.Items[i].ExpireAt)
-			}
-
-			break
-		}
+	// Populate computed fields from the freshly created key.
+	if key := findKeyByAccessKeyID(keys.Items, dataResp.AccessKeyId); key != nil {
+		s3KeyToResourceModel(key, &plan)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -251,35 +238,18 @@ func (r *s3KeyResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	// Find the key by access_key_id
-	accessKeyID := state.AccessKeyID.ValueString()
-	var found bool
-	for i := range keys.Items {
-		if keys.Items[i].AccessKeyId == accessKeyID {
-			found = true
-			state.KeyID = types.StringValue(keys.Items[i].KeyUuid)
-			state.Status = types.StringValue(keys.Items[i].Status)
-			state.CreatedAt = types.StringValue(keys.Items[i].CreatedAt)
-			state.UserID = types.StringValue(keys.Items[i].UserId)
-			state.OrganizationID = types.StringValue(orgID)
-			if keys.Items[i].Alias != "" {
-				state.Alias = types.StringValue(keys.Items[i].Alias)
-			}
-			if isValidExpireAt(keys.Items[i].ExpireAt) {
-				state.ExpireAt = types.StringValue(keys.Items[i].ExpireAt)
-			}
-			// Note: SecretAccessKey is preserved from state - it cannot be retrieved from the API
-
-			break
-		}
-	}
-
-	if !found {
+	// Find the key by access_key_id.
+	key := findKeyByAccessKeyID(keys.Items, state.AccessKeyID.ValueString())
+	if key == nil {
 		// Key was deleted out of band
 		resp.State.RemoveResource(ctx)
 
 		return
 	}
+
+	// Note: SecretAccessKey is preserved from state - it cannot be retrieved from the API.
+	s3KeyToResourceModel(key, &state)
+	state.OrganizationID = types.StringValue(orgID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
