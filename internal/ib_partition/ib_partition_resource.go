@@ -115,7 +115,7 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	plan.ID = types.StringValue(dataResp.Id)
+	ibPartitionToTerraformResourceModel(&dataResp, &plan)
 	plan.ProjectID = types.StringValue(projectID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
