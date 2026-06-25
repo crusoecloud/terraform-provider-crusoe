@@ -1,6 +1,58 @@
 package disk
 
-import "testing"
+import (
+	"context"
+	"reflect"
+	"testing"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
+)
+
+// Test_diskToTerraformResourceModel covers the shared transform that all CRUD
+// paths use: VIPs are sorted deterministically (the CCX-4394 ordering guarantee
+// the Update path previously bypassed), size is rendered in the user's unit, and
+// serial_number/dns_name/block_size are sourced from the API response.
+func Test_diskToTerraformResourceModel(t *testing.T) {
+	state := &diskResourceModel{}
+	disk := &swagger.DiskV1{
+		Id:           "disk-1",
+		Name:         "my-disk",
+		Location:     "us-east1-a",
+		Type_:        "shared-volume",
+		Size:         "1024GiB",
+		SerialNumber: "SN123",
+		BlockSize:    4096,
+		DnsName:      "my-disk.dns",
+		Vips:         []string{"10.0.0.3", "10.0.0.1", "10.0.0.2"},
+	}
+
+	diskToTerraformResourceModel(disk, state, "1TiB")
+
+	if got := state.ID.ValueString(); got != "disk-1" {
+		t.Errorf("id = %q, want %q", got, "disk-1")
+	}
+	if got := state.SerialNumber.ValueString(); got != "SN123" {
+		t.Errorf("serial_number = %q, want %q (from API)", got, "SN123")
+	}
+	if got := state.DNSName.ValueString(); got != "my-disk.dns" {
+		t.Errorf("dns_name = %q, want %q (from API)", got, "my-disk.dns")
+	}
+	if got := state.BlockSize.ValueInt64(); got != 4096 {
+		t.Errorf("block_size = %d, want %d (from API)", got, 4096)
+	}
+	if got := state.Size.ValueString(); got != "1TiB" {
+		t.Errorf("size = %q, want %q (preserved in user's unit)", got, "1TiB")
+	}
+
+	var gotVips []string
+	if diags := state.Vips.ElementsAs(context.Background(), &gotVips, false); diags.HasError() {
+		t.Fatalf("reading vips: %v", diags)
+	}
+	wantVips := []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}
+	if !reflect.DeepEqual(gotVips, wantVips) {
+		t.Errorf("vips = %v, want %v (sorted)", gotVips, wantVips)
+	}
+}
 
 func TestPreserveSizeFormat(t *testing.T) {
 	tests := []struct {

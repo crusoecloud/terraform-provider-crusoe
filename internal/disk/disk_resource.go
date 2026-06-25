@@ -276,7 +276,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
@@ -285,6 +285,8 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 		return
 	}
+
+	diskToTerraformResourceModel(disk, &plan, plan.Size.ValueString())
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
