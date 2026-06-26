@@ -96,10 +96,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	project := dataResp.Project
-
-	plan.ID = types.StringValue(project.Id)
-	plan.Name = types.StringValue(project.Name)
+	projectToResourceModel(dataResp.Project, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -122,8 +119,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	state.Name = types.StringValue(project.Name)
-	state.ID = types.StringValue(project.Id)
+	projectToResourceModel(&project, &state)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -140,7 +136,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	_, httpResp, err := r.client.APIClient.ProjectsApi.UpdateProject(ctx,
+	dataResp, httpResp, err := r.client.APIClient.ProjectsApi.UpdateProject(ctx,
 		swagger.ProjectsPutRequest{Name: plan.Name.ValueString()},
 		plan.ID.ValueString(),
 	)
@@ -153,6 +149,8 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 		return
 	}
+
+	projectToResourceModel(dataResp.Project, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

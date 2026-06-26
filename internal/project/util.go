@@ -4,8 +4,17 @@ import (
 	"context"
 	"errors"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
+
+// projectToResourceModel maps an API project onto the resource model. All CRUD
+// paths use it so id/name are always sourced from the API response.
+func projectToResourceModel(project *swagger.Project, projectModel *projectResourceModel) {
+	projectModel.ID = types.StringValue(project.Id)
+	projectModel.Name = types.StringValue(project.Name)
+}
 
 // getUserOrg returns the organization id for the authenticated user.
 func getUserOrg(ctx context.Context, apiClient *swagger.APIClient) (string, error) {
