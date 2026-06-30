@@ -31,6 +31,13 @@ const (
 	descVips               = "Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
 )
 
+// blockSizeDeprecationMessage marks the deprecated block_size attribute on both
+// the resource and the data source. All persistent disks now use a 512-byte block
+// size; any value set on create is ignored. Shared by both schemas so the wording
+// stays consistent.
+var blockSizeDeprecationMessage = common.FormatDeprecation("v0.6.0") +
+	" All persistent disks now use a 512-byte block size; any value set here is ignored."
+
 func findDisk(ctx context.Context, client *swagger.APIClient, diskID string) (*swagger.DiskV1, string, error) {
 	args := common.FindResourceArgs[swagger.DiskV1]{
 		ResourceID:  diskID,
@@ -50,11 +57,28 @@ func diskToTerraformResourceModel(disk *swagger.DiskV1, state *diskResourceModel
 	state.Type = types.StringValue(disk.Type_)
 	state.Size = types.StringValue(preserveSizeFormat(sizeFormat, disk.Size))
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
-	state.BlockSize = types.Int64Value(disk.BlockSize)
+	// block_size is deprecated and intentionally not sourced from the API here; callers
+	// preserve the planned/prior value via preserveDeprecatedBlockSize so the deprecated
+	// attribute never triggers a spurious replacement when the backend standardizes it.
 	state.DNSName = types.StringValue(disk.DnsName)
 	// Sort VIPs for deterministic ordering; the API does not guarantee a stable order.
 	slices.Sort(disk.Vips)
 	state.Vips = stringSliceToList(disk.Vips)
+}
+
+// preserveDeprecatedBlockSize keeps a user-configured block_size value in state.
+// block_size is deprecated and no longer sent on create, so retaining the planned
+// (Create) or prior-state (Read) value keeps Terraform's Computed-consistency check
+// satisfied and prevents the RequiresReplaceIfConfigured plan modifier from spuriously
+// replacing the disk if the backend reports a different block size. When the value is
+// unset (e.g. omitted on create, or a freshly imported disk), it reflects what the API
+// assigned.
+func preserveDeprecatedBlockSize(planned types.Int64, apiBlockSize int64) types.Int64 {
+	if planned.IsNull() || planned.IsUnknown() {
+		return types.Int64Value(apiBlockSize)
+	}
+
+	return planned
 }
 
 // stringSliceToList converts a Go slice of strings into a Terraform list value.

@@ -31,7 +31,7 @@ resource "crusoe_storage_disk" "example" {
 
 ### Optional
 
-- `block_size` (Number) Block size of the disk in bytes. Possible values: `512`, `4096`.
+- `block_size` (Number, Deprecated) Block size of the disk in bytes. Possible values: `512`, `4096`.
 - `project_id` (String) ID of the project the disk belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 - `type` (String) Type of the disk. Possible values: `persistent-ssd`, `shared-volume`. This field will be required in a future release.
 

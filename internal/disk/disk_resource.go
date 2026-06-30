@@ -126,6 +126,7 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Optional:            true,
 				Computed:            true,
 				MarkdownDescription: descBlockSize,
+				DeprecationMessage:  blockSizeDeprecationMessage,
 				Validators:          []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplaceIfConfigured(),
@@ -177,17 +178,13 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	blockSize := plan.BlockSize.ValueInt64()
-	if blockSize == 0 && diskType == persistentSSD {
-		blockSize = defaultBlockSize
-	}
-
+	// block_size is deprecated and intentionally omitted from the create request so the
+	// storage backend applies its standard 512-byte block size (CCX-3067).
 	dataResp, httpResp, err := r.client.APIClient.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1{
-		Name:      plan.Name.ValueString(),
-		Location:  plan.Location.ValueString(),
-		Type_:     diskType,
-		Size:      plan.Size.ValueString(),
-		BlockSize: blockSize,
+		Name:     plan.Name.ValueString(),
+		Location: plan.Location.ValueString(),
+		Type_:    diskType,
+		Size:     plan.Size.ValueString(),
 	}, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
@@ -210,6 +207,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	var state diskResourceModel
 	state.ProjectID = types.StringValue(projectID)
 	diskToTerraformResourceModel(disk, &state, plan.Size.ValueString())
+	state.BlockSize = preserveDeprecatedBlockSize(plan.BlockSize, disk.BlockSize)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -244,6 +242,7 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	diskToTerraformResourceModel(&disk, &state, state.Size.ValueString())
+	state.BlockSize = preserveDeprecatedBlockSize(state.BlockSize, disk.BlockSize)
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 

@@ -98,6 +98,7 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 						"block_size": schema.Int64Attribute{
 							Computed:            true,
 							MarkdownDescription: descBlockSize,
+							DeprecationMessage:  blockSizeDeprecationMessage,
 						},
 						"dns_name": schema.StringAttribute{
 							Computed:            true,
