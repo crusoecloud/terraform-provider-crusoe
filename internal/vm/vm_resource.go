@@ -333,14 +333,12 @@ func (r *vmResource) ImportState(ctx context.Context, req resource.ImportStateRe
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan vmResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	tDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
-	diags = plan.Disks.ElementsAs(ctx, &tDisks, true)
+	diags := plan.Disks.ElementsAs(ctx, &tDisks, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -434,52 +432,22 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	plan.ID = types.StringValue(instance.Id)
+	// Capture the requested reservation_id before the transform overwrites it: it is
+	// deprecated and plan-owned, so a requested-but-ignored value must be preserved
+	// below to avoid an inconsistent-result error.
+	requestedReservationID := plan.ReservationID
 
-	// install_crusoe_watch_agent is a create-time-only flag not returned by the API;
-	// preserve the user's chosen value, defaulting to true (the API default) when unset.
-	if plan.InstallCrusoeWatchAgent.IsNull() || plan.InstallCrusoeWatchAgent.IsUnknown() {
-		plan.InstallCrusoeWatchAgent = types.BoolValue(true)
-	}
+	vmToTerraformResourceModel(instance, &plan)
 
-	if instance.ReservationId != "" {
-		plan.ReservationID = types.StringValue(instance.ReservationId)
-	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+	// reservation_id is deprecated: when the backend ignores a requested reservation
+	// (the transform then stored the empty API value), warn and keep the requested
+	// value so it still matches the practitioner's config.
+	if instance.ReservationId == "" &&
+		!requestedReservationID.IsNull() && !requestedReservationID.IsUnknown() && requestedReservationID.ValueString() != "" {
+
 		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
 			"Reservation assignment during VM creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
-	} else {
-		plan.ReservationID = types.StringNull()
-	}
-
-	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
-	plan.InternalDNSName = internalDNSName
-	plan.FQDN = internalDNSName // fqdn is deprecated but kept for backward compatibility
-
-	if instance.NvlinkDomainId != "" {
-		plan.NvlinkDomainID = types.StringValue(instance.NvlinkDomainId)
-	} else {
-		plan.NvlinkDomainID = types.StringNull()
-	}
-
-	if len(instance.NetworkInterfaces) > 0 {
-		plan.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)
-	} else {
-		plan.ExternalDNSName = types.StringNull()
-	}
-
-	plan.ProjectID = types.StringValue(projectID)
-
-	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
-	resp.Diagnostics.Append(networkDiags...)
-	plan.NetworkInterfaces = networkInterfaces
-	if len(diskIds) > 0 {
-		disks, diag := vmDiskAttachmentToTerraformResourceModel(diskIds)
-		resp.Diagnostics.Append(diag...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		plan.Disks = disks
+		plan.ReservationID = requestedReservationID
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -489,9 +457,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state vmResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -509,8 +475,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 
 	vmToTerraformResourceModel(instance, &state)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Update attempts to update a VM. Currently only supports attaching/detaching disks, and requires that the

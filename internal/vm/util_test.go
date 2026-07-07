@@ -80,6 +80,62 @@ func Test_getDisksDiff(t *testing.T) {
 	}
 }
 
+// Test_vmToTerraformResourceModel covers the shared transform that Create and Read
+// now both use: the OS disk is filtered out of `disks`, name/type/location/project_id
+// come from the API, nvlink_domain_id/reservation_id are represented as the API value
+// (so Create matches Read — Create previously wrote null for the empty case), and
+// install_crusoe_watch_agent defaults to true when unset (create-only, not returned).
+func Test_vmToTerraformResourceModel(t *testing.T) {
+	instance := &swagger.InstanceV1{
+		Id:        "vm-1",
+		Name:      "my-vm",
+		Type_:     "c1a.2x",
+		ProjectId: "proj-1",
+		Location:  "us-east1-a",
+		Disks: []swagger.AttachedDiskV1{
+			{Id: "os-disk", AttachmentType: DiskOS, Mode: "read-write"},
+			{Id: "data-disk", AttachmentType: "data", Mode: "read-write"},
+		},
+		ReservationId:  "",
+		NvlinkDomainId: "",
+	}
+
+	state := &vmResourceModel{}
+	vmToTerraformResourceModel(instance, state)
+
+	if got := state.ID.ValueString(); got != "vm-1" {
+		t.Errorf("id = %q, want %q", got, "vm-1")
+	}
+	if got := state.ProjectID.ValueString(); got != "proj-1" {
+		t.Errorf("project_id = %q, want %q (from API)", got, "proj-1")
+	}
+	if got := state.Type.ValueString(); got != "c1a.2x" {
+		t.Errorf("type = %q, want %q (from API)", got, "c1a.2x")
+	}
+	// nvlink_domain_id / reservation_id: empty API value maps to an empty string (not
+	// null), so Create and Read agree.
+	if state.NvlinkDomainID.IsNull() {
+		t.Error("nvlink_domain_id = null, want empty string (matches Read)")
+	}
+	if state.ReservationID.IsNull() {
+		t.Error("reservation_id = null, want empty string (matches Read)")
+	}
+	if !state.InstallCrusoeWatchAgent.ValueBool() {
+		t.Error("install_crusoe_watch_agent = false, want true default when unset")
+	}
+
+	var disks []vmDiskResourceModel
+	if d := state.Disks.ElementsAs(context.Background(), &disks, false); d.HasError() {
+		t.Fatalf("reading disks: %v", d)
+	}
+	if len(disks) != 1 {
+		t.Fatalf("got %d disks, want 1 (OS disk filtered out)", len(disks))
+	}
+	if disks[0].ID != "data-disk" {
+		t.Errorf("disk = %q, want the data disk (OS disk must be filtered)", disks[0].ID)
+	}
+}
+
 func Test_instanceTypeFamily(t *testing.T) {
 	tests := []struct {
 		name       string
