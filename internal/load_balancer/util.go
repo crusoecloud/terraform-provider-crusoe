@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
@@ -153,6 +154,28 @@ func loadBalancerHealthCheckToTerraformResourceModel(healthCheck *swagger.Health
 	}
 
 	return lbHealthCheck
+}
+
+// healthCheckToSwagger decodes the health_check object attribute into a swagger
+// HealthCheckOptions request payload, returning nil when it is null or unknown.
+// The attribute must be decoded into the tfsdk-tagged resource model first — the
+// swagger type only has json tags, so decoding directly into it silently yields an
+// empty struct.
+func healthCheckToSwagger(ctx context.Context, obj types.Object, diags *diag.Diagnostics) *swagger.HealthCheckOptions {
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil
+	}
+
+	var model healthCheckOptionsResourceModel
+	diags.Append(obj.As(ctx, &model, basetypes.ObjectAsOptions{})...)
+
+	return &swagger.HealthCheckOptions{
+		Timeout:      model.Timeout.ValueString(),
+		Port:         model.Port.ValueString(),
+		Interval:     model.Interval.ValueString(),
+		SuccessCount: model.SuccessCount.ValueString(),
+		FailureCount: model.FailureCount.ValueString(),
+	}
 }
 
 func loadBalancerUpdateTerraformState(ctx context.Context, lb *swagger.LoadBalancer, state *loadBalancerResourceModel) {

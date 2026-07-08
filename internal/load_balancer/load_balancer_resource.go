@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -294,10 +293,9 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	postReq.Destinations = destinations
 
 	// health check
-	var healthCheck swagger.HealthCheckOptions
-	if !plan.HealthCheck.IsNull() && !plan.HealthCheck.IsUnknown() {
-		plan.HealthCheck.As(ctx, healthCheck, basetypes.ObjectAsOptions{})
-		postReq.HealthCheck = &healthCheck
+	postReq.HealthCheck = healthCheckToSwagger(ctx, plan.HealthCheck, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	// protocols
@@ -332,14 +330,8 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	plan.ID = types.StringValue(loadBalancer.Id)
-	ips, _ := loadBalancerIPsToTerraformResourceModel(loadBalancer.Ips)
-	plan.IPs = ips
+	loadBalancerUpdateTerraformState(ctx, loadBalancer, &plan)
 	plan.ProjectID = types.StringValue(projectID)
-	plan.Type = types.StringValue(loadBalancer.Type_)
-	plan.NetworkInterfaces, _ = loadBalancerNetworkInterfacesToTerraformResourceModel(loadBalancer.NetworkInterfaces)
-	plan.HealthCheck, _ = types.ObjectValueFrom(ctx, loadBalancerHealthCheckSchema.AttrTypes, loadBalancerHealthCheckToTerraformResourceModel(loadBalancer.HealthCheck))
-	plan.Destinations, _ = loadBalancerDestinationsToTerraformResourceModel(loadBalancer.Destinations)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -411,22 +403,9 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		patchReq.Destinations = destinations
 	}
 
-	healthCheckAttributesMap := plan.HealthCheck.Attributes()
-
-	if !healthCheckAttributesMap["timeout"].IsNull() && !healthCheckAttributesMap["timeout"].IsUnknown() {
-		patchReq.HealthCheck.Timeout = healthCheckAttributesMap["timeout"].String()
-	}
-	if !healthCheckAttributesMap["port"].IsNull() && !healthCheckAttributesMap["port"].IsUnknown() {
-		patchReq.HealthCheck.Port = healthCheckAttributesMap["port"].String()
-	}
-	if !healthCheckAttributesMap["interval"].IsNull() && !healthCheckAttributesMap["interval"].IsUnknown() {
-		patchReq.HealthCheck.Interval = healthCheckAttributesMap["interval"].String()
-	}
-	if !healthCheckAttributesMap["success_count"].IsNull() && !healthCheckAttributesMap["success_count"].IsUnknown() {
-		patchReq.HealthCheck.SuccessCount = healthCheckAttributesMap["success_count"].String()
-	}
-	if !healthCheckAttributesMap["failure_count"].IsNull() && !healthCheckAttributesMap["failure_count"].IsUnknown() {
-		patchReq.HealthCheck.FailureCount = healthCheckAttributesMap["failure_count"].String()
+	patchReq.HealthCheck = healthCheckToSwagger(ctx, plan.HealthCheck, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.PatchLoadBalancer(ctx,
@@ -444,7 +423,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
 	})
 	if err != nil {
@@ -453,6 +432,8 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 
 		return
 	}
+
+	loadBalancerUpdateTerraformState(ctx, loadBalancer, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
