@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -205,4 +206,74 @@ func validateNodeTaintDuplicates(taints []swagger.KubernetesNodeTaint) error {
 	default:
 		return fmt.Errorf("duplicate taints:\n  - %s", strings.Join(dups, "\n  - "))
 	}
+}
+
+// nodePoolToResourceModel maps an API node pool onto model, following the CCX-4492
+// convention that the API object is the source of truth. It is called from Create,
+// Read, and Update so the three previously-duplicated mappings stay in sync — in
+// particular the instance_ids sort (CCX-4394) and the nvlink_domain_id
+// empty-to-null normalization now live in exactly one place.
+//
+// The Terraform-only fields the API does not return (ib_partition_id, ssh_key,
+// requested_node_labels, batch_size, batch_percentage) are taken from ref: the
+// plan in Create/Update, the prior state in Read.
+func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNodePool,
+	ref, model *kubernetesNodePoolResourceModel, diags *diag.Diagnostics,
+) {
+	model.ID = types.StringValue(nodePool.Id)
+	model.ProjectID = types.StringValue(nodePool.ProjectId)
+	model.InstanceCount = types.Int64Value(nodePool.Count)
+	model.Version = types.StringValue(nodePool.ImageId)
+	model.Type = types.StringValue(nodePool.Type_)
+	model.ClusterID = types.StringValue(nodePool.ClusterId)
+	model.SubnetID = types.StringValue(nodePool.SubnetId)
+	model.State = types.StringValue(nodePool.State)
+	model.Name = types.StringValue(nodePool.Name)
+	model.EphemeralStorageForContainerd = types.BoolValue(nodePool.EphemeralStorageForContainerd)
+	model.PublicIPType = types.StringValue(nodePool.PublicIpType)
+	model.NvlinkDomainID = stringOrNull(nodePool.NvlinkDomainId)
+
+	allNodeLabels, d := common.StringMapToTFMap(nodePool.NodeLabels)
+	diags.Append(d...)
+	model.AllNodeLabels = allNodeLabels
+
+	nodeTaints, d := nodeTaintsToTFSet(ctx, nodePool.NodeTaints)
+	diags.Append(d...)
+	model.NodeTaints = nodeTaints
+
+	instanceIDs, d := common.StringSliceToTFList(sortedInstanceIDs(nodePool.InstanceIds))
+	diags.Append(d...)
+	model.InstanceIDs = instanceIDs
+
+	// Terraform-only fields (not returned by the API) come from the reference model.
+	model.IBPartitionID = ref.IBPartitionID
+	model.SSHKey = ref.SSHKey
+	model.BatchSize = ref.BatchSize
+	model.BatchPercentage = ref.BatchPercentage
+	if ref.RequestedNodeLabels.IsUnknown() {
+		model.RequestedNodeLabels = types.MapNull(types.StringType)
+	} else {
+		model.RequestedNodeLabels = ref.RequestedNodeLabels
+	}
+}
+
+// stringOrNull maps an empty API string to a null value, matching how the nullable
+// nvlink_domain_id attribute is represented in Terraform state.
+func stringOrNull(s string) types.String {
+	if s == "" {
+		return types.StringNull()
+	}
+
+	return types.StringValue(s)
+}
+
+// sortedInstanceIDs returns the instance IDs in a deterministic (lexical) order.
+// instance_ids is a Computed, API-ordered list of opaque IDs and the API does not
+// guarantee a stable order, so sorting prevents CCX-4394-class spurious diffs. The
+// input slice is not mutated.
+func sortedInstanceIDs(instanceIDs []string) []string {
+	sorted := append([]string(nil), instanceIDs...)
+	slices.Sort(sorted)
+
+	return sorted
 }

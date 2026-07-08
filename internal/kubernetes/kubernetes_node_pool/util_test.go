@@ -2,13 +2,111 @@ package kubernetes_node_pool
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
+
+func TestStringOrNull(t *testing.T) {
+	if got := stringOrNull(""); !got.IsNull() {
+		t.Errorf("stringOrNull(\"\") = %v, want null", got)
+	}
+	if got := stringOrNull("nvlink-1"); got.ValueString() != "nvlink-1" {
+		t.Errorf("stringOrNull(%q) = %q, want %q", "nvlink-1", got.ValueString(), "nvlink-1")
+	}
+}
+
+func TestSortedInstanceIDs(t *testing.T) {
+	got := sortedInstanceIDs([]string{"i-c", "i-a", "i-b"})
+	if want := []string{"i-a", "i-b", "i-c"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("sortedInstanceIDs = %v, want %v", got, want)
+	}
+
+	// The input slice must not be mutated.
+	in := []string{"z", "a"}
+	_ = sortedInstanceIDs(in)
+	if !reflect.DeepEqual(in, []string{"z", "a"}) {
+		t.Errorf("input was mutated: %v", in)
+	}
+}
+
+// Test_nodePoolToResourceModel covers the shared transform all CRUD paths use:
+// instance_ids sorted (CCX-4394), nvlink_domain_id empty→null (the normalization
+// the data source previously omitted), API fields mapped, and the Terraform-only
+// fields sourced from the reference model.
+func Test_nodePoolToResourceModel(t *testing.T) {
+	nodePool := &swagger.KubernetesNodePool{
+		Id:             "np-1",
+		ProjectId:      "proj-1",
+		Count:          3,
+		ImageId:        "1.2.3-cmk.4",
+		Type_:          "a100.1x",
+		ClusterId:      "cluster-1",
+		InstanceIds:    []string{"i-c", "i-a", "i-b"},
+		NvlinkDomainId: "", // absent → must normalize to null
+	}
+	ref := &kubernetesNodePoolResourceModel{
+		IBPartitionID:   types.StringValue("ibp-1"),
+		SSHKey:          types.StringValue("ssh-key"),
+		BatchSize:       types.Int64Value(2),
+		BatchPercentage: types.Int64Null(),
+	}
+
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolResourceModel
+	nodePoolToResourceModel(context.Background(), nodePool, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if got := model.ID.ValueString(); got != "np-1" {
+		t.Errorf("id = %q, want %q", got, "np-1")
+	}
+	if !model.NvlinkDomainID.IsNull() {
+		t.Errorf("nvlink_domain_id = %v, want null (empty API value normalizes to null)", model.NvlinkDomainID)
+	}
+	var ids []string
+	if d := model.InstanceIDs.ElementsAs(context.Background(), &ids, false); d.HasError() {
+		t.Fatalf("reading instance_ids: %v", d)
+	}
+	if want := []string{"i-a", "i-b", "i-c"}; !reflect.DeepEqual(ids, want) {
+		t.Errorf("instance_ids = %v, want %v (sorted)", ids, want)
+	}
+	if got := model.IBPartitionID.ValueString(); got != "ibp-1" {
+		t.Errorf("ib_partition_id = %q, want it preserved from ref", got)
+	}
+}
+
+// Test_nodePoolToResourceModel_createReadIdentical asserts the CCX-4492 criterion:
+// given the same API object and reference, the transform now shared by Create,
+// Read, and Update produces identical state.
+func Test_nodePoolToResourceModel_createReadIdentical(t *testing.T) {
+	nodePool := &swagger.KubernetesNodePool{
+		Id:          "np-1",
+		InstanceIds: []string{"i-2", "i-1"},
+	}
+	ref := &kubernetesNodePoolResourceModel{
+		SSHKey:              types.StringValue("ssh-key"),
+		RequestedNodeLabels: types.MapNull(types.StringType),
+	}
+
+	var d1, d2 diag.Diagnostics
+	var createModel, readModel kubernetesNodePoolResourceModel
+	nodePoolToResourceModel(context.Background(), nodePool, ref, &createModel, &d1)
+	nodePoolToResourceModel(context.Background(), nodePool, ref, &readModel, &d2)
+	if d1.HasError() || d2.HasError() {
+		t.Fatalf("unexpected diagnostics: create=%v read=%v", d1, d2)
+	}
+
+	if !reflect.DeepEqual(createModel, readModel) {
+		t.Errorf("Create and Read produced different state:\n create = %+v\n read   = %+v", createModel, readModel)
+	}
+}
 
 func TestTfSetToNodeTaints(t *testing.T) {
 	ctx := context.Background()

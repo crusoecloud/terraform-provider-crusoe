@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -317,51 +316,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	var state kubernetesNodePoolResourceModel
-
-	// Update state from API response
-	state.ID = types.StringValue(kubernetesNodePoolResponse.NodePool.Id)
-	state.ProjectID = types.StringValue(kubernetesNodePoolResponse.NodePool.ProjectId)
-	state.InstanceCount = types.Int64Value(kubernetesNodePoolResponse.NodePool.Count)
-	state.Version = types.StringValue(kubernetesNodePoolResponse.NodePool.ImageId)
-	state.Type = types.StringValue(kubernetesNodePoolResponse.NodePool.Type_)
-	state.ClusterID = types.StringValue(kubernetesNodePoolResponse.NodePool.ClusterId)
-	state.SubnetID = types.StringValue(kubernetesNodePoolResponse.NodePool.SubnetId)
-	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePoolResponse.NodePool.NodeLabels)
-	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePoolResponse.NodePool.NodeTaints)
-	resp.Diagnostics.Append(diags...)
-	slices.Sort(kubernetesNodePoolResponse.NodePool.InstanceIds)
-	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
-	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
-	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
-	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePoolResponse.NodePool.EphemeralStorageForContainerd)
-	state.PublicIPType = types.StringValue(kubernetesNodePoolResponse.NodePool.PublicIpType)
-
-	if kubernetesNodePoolResponse.NodePool.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(kubernetesNodePoolResponse.NodePool.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
-
-	// Preserve Terraform-only fields from prior state (not in API)
-	state.IBPartitionID = plan.IBPartitionID
-	state.SSHKey = plan.SSHKey
-	if plan.RequestedNodeLabels.IsUnknown() {
-		state.RequestedNodeLabels = types.MapNull(types.StringType)
-	} else {
-		state.RequestedNodeLabels = plan.RequestedNodeLabels
-	}
-	if plan.BatchSize.IsNull() {
-		state.BatchSize = types.Int64Null()
-	} else {
-		state.BatchSize = plan.BatchSize
-	}
-	if plan.BatchPercentage.IsNull() {
-		state.BatchPercentage = types.Int64Null()
-	} else {
-		state.BatchPercentage = plan.BatchPercentage
-	}
+	nodePoolToResourceModel(ctx, kubernetesNodePoolResponse.NodePool, &plan, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -397,47 +352,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	}
 
 	var state kubernetesNodePoolResourceModel
-
-	// Update state from API response
-	state.ID = types.StringValue(kubernetesNodePool.Id)
-	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
-	state.Version = types.StringValue(kubernetesNodePool.ImageId)
-	state.Type = types.StringValue(kubernetesNodePool.Type_)
-	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
-	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
-	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
-	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
-	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
-	resp.Diagnostics.Append(diags...)
-	slices.Sort(kubernetesNodePool.InstanceIds)
-	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
-	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(kubernetesNodePool.State)
-	state.Name = types.StringValue(kubernetesNodePool.Name)
-	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
-	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
-
-	if kubernetesNodePool.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
-
-	// Preserve Terraform-only fields from prior state (not in API)
-	state.IBPartitionID = stored.IBPartitionID
-	state.RequestedNodeLabels = stored.RequestedNodeLabels
-	state.SSHKey = stored.SSHKey
-	if stored.BatchSize.IsNull() {
-		state.BatchSize = types.Int64Null()
-	} else {
-		state.BatchSize = stored.BatchSize
-	}
-	if stored.BatchPercentage.IsNull() {
-		state.BatchPercentage = types.Int64Null()
-	} else {
-		state.BatchPercentage = stored.BatchPercentage
-	}
+	nodePoolToResourceModel(ctx, &kubernetesNodePool, &stored, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -647,43 +562,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	}
 
 	var state kubernetesNodePoolResourceModel
-
-	// Populate state with values from API response
-	state.ID = types.StringValue(updatedNodePool.Id)
-	state.ProjectID = types.StringValue(updatedNodePool.ProjectId)
-	state.InstanceCount = types.Int64Value(updatedNodePool.Count)
-	state.Version = types.StringValue(updatedNodePool.ImageId)
-	state.Type = types.StringValue(updatedNodePool.Type_)
-	state.ClusterID = types.StringValue(updatedNodePool.ClusterId)
-	state.SubnetID = types.StringValue(updatedNodePool.SubnetId)
-	state.AllNodeLabels, diags = common.StringMapToTFMap(updatedNodePool.NodeLabels)
-	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, updatedNodePool.NodeTaints)
-	resp.Diagnostics.Append(diags...)
-	slices.Sort(updatedNodePool.InstanceIds)
-	state.InstanceIDs, diags = common.StringSliceToTFList(updatedNodePool.InstanceIds)
-	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(updatedNodePool.State)
-	state.Name = types.StringValue(updatedNodePool.Name)
-	state.EphemeralStorageForContainerd = types.BoolValue(updatedNodePool.EphemeralStorageForContainerd)
-	state.PublicIPType = types.StringValue(updatedNodePool.PublicIpType)
-
-	if updatedNodePool.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(updatedNodePool.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
-
-	// Preserve fields not returned by API
-	if plan.RequestedNodeLabels.IsUnknown() {
-		state.RequestedNodeLabels = types.MapNull(types.StringType)
-	} else {
-		state.RequestedNodeLabels = plan.RequestedNodeLabels
-	}
-	state.IBPartitionID = plan.IBPartitionID
-	state.SSHKey = plan.SSHKey
-	state.BatchSize = plan.BatchSize
-	state.BatchPercentage = plan.BatchPercentage
+	nodePoolToResourceModel(ctx, &updatedNodePool, &plan, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
