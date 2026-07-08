@@ -184,12 +184,10 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	var state repositoryResourceModel
-	state.Location = types.StringValue(repository.Location)
-	state.Name = types.StringValue(repository.Name)
-	state.Mode = types.StringValue(repository.Mode)
-	state.ProjectID = types.StringValue(projectID)
-	state.UpstreamRegistry = plan.UpstreamRegistry
+	// Seed credentials from the plan; repositoryToResourceModel preserves them.
+	state := repositoryResourceModel{UpstreamRegistry: plan.UpstreamRegistry}
+	repositoryToResourceModel(&repository, &state, projectID)
+
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
 }
@@ -224,35 +222,10 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 
 		return
 	}
-	var state repositoryResourceModel
+	// stored carries prior-state credentials, which repositoryToResourceModel preserves.
+	repositoryToResourceModel(&repository, &stored, projectID)
 
-	diags = response.State.Get(ctx, &state)
-	response.Diagnostics.Append(diags...)
-
-	if response.Diagnostics.HasError() {
-		return
-	}
-
-	state.Location = types.StringValue(repository.Location)
-	state.ProjectID = types.StringValue(projectID)
-	state.Name = types.StringValue(repository.Name)
-	state.Mode = types.StringValue(repository.Mode)
-	state.UpstreamRegistry = nil
-	// Set UpstreamRegistry from API response if present
-	if repository.UpstreamRegistry != nil {
-		state.UpstreamRegistry = &upstreamRegistryResourceModel{
-			Provider: types.StringValue(repository.UpstreamRegistry.Provider),
-			Url:      types.StringValue(repository.UpstreamRegistry.Url),
-		}
-		if repository.UpstreamRegistry.UpstreamRegistryCredentials != nil {
-			state.UpstreamRegistry.UpstreamRegistryCrdentials = &upstreamRegistryCredentialsResourceModel{
-				Username: types.StringValue(repository.UpstreamRegistry.UpstreamRegistryCredentials.Username),
-				Password: types.StringValue(repository.UpstreamRegistry.UpstreamRegistryCredentials.Password),
-			}
-		}
-	}
-
-	diags = response.State.Set(ctx, &state)
+	diags = response.State.Set(ctx, &stored)
 	response.Diagnostics.Append(diags...)
 }
 
