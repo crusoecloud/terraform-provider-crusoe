@@ -180,7 +180,7 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 	resp.Diagnostics.Append(diags...)
 	state.Location = types.StringValue(kubernetesCluster.Location)
 	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
-	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
+	state.NodePoolIds, diags = common.StringSliceToTFList(sortedNodePools(kubernetesCluster.NodePools))
 	resp.Diagnostics.Append(diags...)
 	state.Private = types.BoolValue(kubernetesCluster.Private)
 	state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)

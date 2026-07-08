@@ -272,34 +272,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	var state kubernetesClusterResourceModel
-
-	state.ID = types.StringValue(kubernetesCluster.Id)
-	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
-	state.Name = types.StringValue(kubernetesCluster.Name)
-	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
-	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
-	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
-	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
-	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
-	resp.Diagnostics.Append(diags...)
-	state.Location = types.StringValue(kubernetesCluster.Location)
-	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
-	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
-	resp.Diagnostics.Append(diags...)
-	state.OIDCIssuerURL = plan.OIDCIssuerURL
-	state.OIDCClientID = plan.OIDCClientID
-	state.OIDCUsernameClaim = plan.OIDCUsernameClaim
-	state.OIDCUsernamePrefix = plan.OIDCUsernamePrefix
-	state.OIDCGroupsClaim = plan.OIDCGroupsClaim
-	state.OIDCCACert = plan.OIDCCACert
-	state.Private = types.BoolValue(kubernetesCluster.Private)
-	state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
-	resp.Diagnostics.Append(diags...)
+	clusterToResourceModel(kubernetesCluster, &plan, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -333,45 +306,12 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	var state kubernetesClusterResourceModel
-
-	diags = resp.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-
+	clusterToResourceModel(&kubernetesCluster, &stored, &stored, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	state.ID = types.StringValue(kubernetesCluster.Id)
-	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
-	state.Name = types.StringValue(kubernetesCluster.Name)
-	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
-	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
-	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
-	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
-	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
-	resp.Diagnostics.Append(diags...)
-	state.Location = types.StringValue(kubernetesCluster.Location)
-	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
-	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
-	resp.Diagnostics.Append(diags...)
-	state.OIDCIssuerURL = stored.OIDCIssuerURL
-	state.OIDCClientID = stored.OIDCClientID
-	state.OIDCUsernameClaim = stored.OIDCUsernameClaim
-	state.OIDCUsernamePrefix = stored.OIDCUsernamePrefix
-	state.OIDCGroupsClaim = stored.OIDCGroupsClaim
-	state.OIDCCACert = stored.OIDCCACert
-	state.Private = types.BoolValue(kubernetesCluster.Private)
-
-	state.ApiserverExtraArgs, diags = resolveExtraArg(stored.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = resolveExtraArg(stored.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = resolveExtraArg(stored.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
-	resp.Diagnostics.Append(diags...)
-
-	diags = resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &stored)
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -467,30 +407,7 @@ func (r *kubernetesClusterResource) Update(
 		return
 	}
 
-	state.ID = types.StringValue(kubernetesCluster.Id)
-	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
-	state.Name = types.StringValue(kubernetesCluster.Name)
-	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
-	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
-	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
-	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
-	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
-	response.Diagnostics.Append(diags...)
-	state.Location = types.StringValue(kubernetesCluster.Location)
-	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
-	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
-	response.Diagnostics.Append(diags...)
-	state.Private = types.BoolValue(kubernetesCluster.Private)
-
-	// For null plan fields, preserve null in state so the field stays unmanaged.
-	// For non-null plan fields, use the server response to reflect actual state.
-	state.ApiserverExtraArgs, diags = resolveExtraArg(plan.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
-	response.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = resolveExtraArg(plan.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
-	response.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = resolveExtraArg(plan.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
-	response.Diagnostics.Append(diags...)
+	clusterToResourceModel(&kubernetesCluster, &plan, &state, &response.Diagnostics)
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
