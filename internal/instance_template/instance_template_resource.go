@@ -257,13 +257,14 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	plan.ID = types.StringValue(dataResp.Id)
-	plan.ProjectID = types.StringValue(dataResp.ProjectId)
-	plan.PublicIpAddressType = types.StringValue(dataResp.PublicIpAddressType)
-	plan.Location = types.StringValue(dataResp.Location)
-	plan.Image = types.StringValue(dataResp.ImageName)
-	plan.PlacementPolicy = types.StringValue(dataResp.PlacementPolicy)
+	instanceTemplateToResourceModel(ctx, &dataResp, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
+	// reservation_id is deprecated and plan-owned, so it is handled here, not in the
+	// shared transform: prefer the API value, warn if a requested reservation was
+	// ignored, otherwise null it.
 	if dataResp.ReservationId != "" {
 		plan.ReservationID = types.StringValue(dataResp.ReservationId)
 	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
@@ -271,27 +272,6 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 			"Reservation assignment during instance template creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
 	} else {
 		plan.ReservationID = types.StringNull()
-	}
-
-	if dataResp.NvlinkDomainId != "" {
-		plan.NvlinkDomainID = types.StringValue(dataResp.NvlinkDomainId)
-	} else {
-		plan.NvlinkDomainID = types.StringNull()
-	}
-
-	disksToCreateResource := make([]diskToCreateResourceModel, 0, len(dataResp.Disks))
-	for _, diskToCreate := range disksToCreate {
-		disksToCreateResource = append(disksToCreateResource, diskToCreateResourceModel{
-			Size: types.StringValue(diskToCreate.Size),
-			Type: types.StringValue(diskToCreate.Type_),
-		})
-	}
-	if len(disksToCreateResource) > 0 {
-		plan.DisksToCreate, _ = types.SetValueFrom(ctx, diskToCreateSchema, disksToCreateResource)
-	} else if plan.DisksToCreate.IsNull() {
-		plan.DisksToCreate = types.SetNull(diskToCreateSchema)
-	} else {
-		plan.DisksToCreate, _ = types.SetValueFrom(ctx, diskToCreateSchema, []diskToCreateResourceModel{})
 	}
 
 	diags = resp.State.Set(ctx, &plan)
@@ -325,57 +305,9 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	disks := make([]diskToCreateResourceModel, 0, len(instanceTemplate.Disks))
-	for i := range instanceTemplate.Disks {
-		disk := instanceTemplate.Disks[i]
-		disks = append(disks, diskToCreateResourceModel{
-			Size: types.StringValue(disk.Size),
-			Type: types.StringValue(disk.Type_),
-		})
-	}
-	if len(disks) > 0 {
-		tDisks, _ := types.SetValueFrom(context.Background(), diskToCreateSchema, disks)
-		state.DisksToCreate = tDisks
-	} else if state.DisksToCreate.IsNull() {
-		state.DisksToCreate = types.SetNull(diskToCreateSchema)
-	} else {
-		state.DisksToCreate, _ = types.SetValueFrom(context.Background(), diskToCreateSchema, []diskToCreateResourceModel{})
-	}
-
-	state.Name = types.StringValue(instanceTemplate.Name)
-	state.Location = types.StringValue(instanceTemplate.Location)
-	state.Type = types.StringValue(instanceTemplate.Type_)
-	state.Image = types.StringValue(instanceTemplate.ImageName)
-	state.SSHKey = types.StringValue(instanceTemplate.SshPublicKey)
-	state.Subnet = types.StringValue(instanceTemplate.SubnetId)
-	state.ProjectID = types.StringValue(instanceTemplate.ProjectId)
-	state.PublicIpAddressType = types.StringValue(instanceTemplate.PublicIpAddressType)
-	state.ID = types.StringValue(instanceTemplate.Id)
-
-	if instanceTemplate.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(instanceTemplate.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
-	if instanceTemplate.IbPartitionId != "" {
-		state.IBPartition = types.StringValue(instanceTemplate.IbPartitionId)
-	} else {
-		state.IBPartition = types.StringNull()
-	}
-	if instanceTemplate.StartupScript != "" {
-		state.StartupScript = types.StringValue(instanceTemplate.StartupScript)
-	} else {
-		state.StartupScript = types.StringNull()
-	}
-	if instanceTemplate.ShutdownScript != "" {
-		state.ShutdownScript = types.StringValue(instanceTemplate.ShutdownScript)
-	} else {
-		state.ShutdownScript = types.StringNull()
-	}
-	if instanceTemplate.PlacementPolicy != "" {
-		state.PlacementPolicy = types.StringValue(instanceTemplate.PlacementPolicy)
-	} else {
-		state.PlacementPolicy = types.StringValue("unspecified")
+	instanceTemplateToResourceModel(ctx, &instanceTemplate, &state, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	diags = resp.State.Set(ctx, &state)
