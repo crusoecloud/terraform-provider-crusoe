@@ -24,6 +24,8 @@ import (
 const (
 	spreadPlacementPolicy      = "spread"
 	unspecifiedPlacementPolicy = "unspecified"
+	persistentSSD              = "persistent-ssd"
+	sharedVolume               = "shared-volume"
 )
 
 type instanceTemplateResource struct {
@@ -159,8 +161,8 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 							},
 						},
 						"type": schema.StringAttribute{
-							Optional: true,
-							Computed: true,
+							Required:   true,
+							Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.RequiresReplace(), // cannot be updated in place
 							},

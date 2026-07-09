@@ -78,9 +78,6 @@ resource "crusoe_instance_template" "example" {
 Required:
 
 - `size` (String)
-
-Optional:
-
 - `type` (String)
 
 ## Import
