@@ -43,4 +43,6 @@ terraform
 .vscode
 
 # Claude Code local config
-.claude
+.claude/**
+!.claude/skills/
+!.claude/skills/**

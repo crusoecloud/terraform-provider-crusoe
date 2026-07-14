@@ -76,20 +76,24 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Computed: true,
-				Optional: true,
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"mode": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescMode,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators: []validator.String{
 					stringvalidator.OneOf("pull-through-cache", "standard"),
 				},
@@ -98,20 +102,24 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 				Optional: true,
 				Attributes: map[string]schema.Attribute{
 					"provider": schema.StringAttribute{
-						Required: true,
+						Required:            true,
+						MarkdownDescription: apiDescUpstreamProvider,
 					},
 					"url": schema.StringAttribute{
-						Required: true,
+						Required:            true,
+						MarkdownDescription: apiDescUpstreamURL,
 					},
 					"upstream_registry_credentials": schema.SingleNestedAttribute{
 						Optional: true,
 						Attributes: map[string]schema.Attribute{
 							"username": schema.StringAttribute{
-								Required: true,
+								Required:            true,
+								MarkdownDescription: apiDescUpstreamCredsUsername,
 							},
 							"password": schema.StringAttribute{
-								Required:  true,
-								Sensitive: true,
+								Required:            true,
+								Sensitive:           true,
+								MarkdownDescription: apiDescUpstreamCredsPassword,
 							},
 						},
 					},

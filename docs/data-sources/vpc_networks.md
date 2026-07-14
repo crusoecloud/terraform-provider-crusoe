@@ -21,7 +21,7 @@ data "crusoe_vpc_networks" "example" {}
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) ID of the project the VPC network belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
@@ -32,14 +32,14 @@ data "crusoe_vpc_networks" "example" {}
 
 Required:
 
-- `cidr` (String)
-- `gateway` (String)
-- `name` (String)
+- `cidr` (String) Address range of the VPC network, in CIDR notation.
+- `gateway` (String) ID of the VPC network's gateway.
+- `name` (String) Name of the VPC network.
 
 Optional:
 
-- `subnets` (List of String)
+- `subnets` (List of String) IDs of the subnets that belong to the VPC network. Empty if the network has none.
 
 Read-Only:
 
-- `id` (String)
+- `id` (String) ID of the VPC network.

@@ -79,13 +79,13 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descID,
+				MarkdownDescription: apiDescID,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descProjectID + " " + descProjectIDInference,
+				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -93,18 +93,18 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"location": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descLocation,
+				MarkdownDescription: apiDescLocation,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descName,
+				MarkdownDescription: apiDescName,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"type": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descType + " " + descTypeRequired,
+				MarkdownDescription: apiDescType + " " + providerDescTypeRequired,
 				Default:             stringdefault.StaticString(defaultDiskType),
 				Validators:          []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 				PlanModifiers: []planmodifier.String{
@@ -114,18 +114,18 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"size": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descSize,
+				MarkdownDescription: apiDescSize,
 				Validators:          []validator.String{validators.StorageSizeValidator{}},
 			},
 			"serial_number": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descSerialNumber,
+				MarkdownDescription: apiDescSerialNumber,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"block_size": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descBlockSize,
+				MarkdownDescription: apiDescBlockSize,
 				DeprecationMessage:  blockSizeDeprecationMessage,
 				Validators:          []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)},
 				PlanModifiers: []planmodifier.Int64{
@@ -135,13 +135,13 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"dns_name": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descDNSName,
+				MarkdownDescription: apiDescDNSName + " " + providerDescSharedVolumeEmpty,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"vips": schema.ListAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: descVips,
+				MarkdownDescription: apiDescVips + " " + providerDescSharedVolumeEmpty,
 				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 		},

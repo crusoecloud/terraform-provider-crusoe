@@ -58,19 +58,23 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"name": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescName,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"ib_network_id": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescIBNetworkID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:    true,
+				Computed:    true,
+				Description: providerDescProjectID,
 				// cannot be updated in place
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),

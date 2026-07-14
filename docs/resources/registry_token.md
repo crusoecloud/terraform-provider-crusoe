@@ -29,7 +29,7 @@ resource "crusoe_registry_token" "example" {
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `token` (String, Sensitive)
+- `token` (String, Sensitive) Token used to authenticate to the container registry.
 
 ## Import
 

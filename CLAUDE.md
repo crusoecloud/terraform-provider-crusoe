@@ -185,7 +185,16 @@ Always use `common.UnpackAPIError(err)` for API errors (not `err.Error()`).
 
 ### Schema Descriptions
 
-Extract shared descriptions to constants in `util.go` when the same description is used in both resource and data source schemas.
+**Source of truth:** Attribute descriptions come from the `github.com/crusoecloud/client-go` swagger spec (`swagger/v1/swagger.json`) — a Swagger 2.0 document that `client-go` is generated from (CCX-2836). When adding or changing schema fields, derive the description from the spec instead of hand-writing prose: run the `/derive-schema-descriptions` skill, which resolves the spec for the pinned client-go version, maps Terraform attributes to spec properties, and flags anything the spec doesn't describe (e.g. provider-only fields like `project_id`) rather than inventing text. Re-run it after bumping client-go.
+
+Descriptions live in `util.go`, split into two origin-denoting constant blocks that both the resource and data source schemas reference:
+
+- **`apiDesc*`** — derived verbatim from the swagger spec (mechanical style normalization only).
+- **`providerDesc*`** — provider-specific text with no spec basis (Terraform behavior, deprecation notes, `project_id` inference, `common.DevelopmentMessage`, etc.).
+
+Every attribute's description is a named, origin-prefixed constant (no inline strings) so its origin is explicit. When an attribute mixes both, keep the constants separate and compose them in the schema: `apiDescX + " " + providerDescX`.
+
+`project_id` is provider-side: `providerDescProjectID = "<spec text, or the house phrase \"ID of the project the <resource> belongs to.\"> " + project.ProviderDescProjectIDFallback` (the shared inference suffix lives once in `internal/project`). Reference implementation: `internal/disk`.
 
 **Style guidelines** (following patterns from popular Terraform providers):
 
@@ -193,22 +202,27 @@ Extract shared descriptions to constants in `util.go` when the same description 
 - Use "of the [resource]" pattern for clarity
 - Keep descriptions concise - one sentence when possible
 - List possible values inline with backticks: `Possible values: \`value1\`, \`value2\`.`
-- Split default/inference behavior into separate constants that can be appended
+- Put spec-derived text in `apiDesc*` and provider-specific text in `providerDesc*`; compose mixed-origin attributes in the schema
+- If the spec has no description for a mapped attribute, leave it undescribed and flag it — never invent (the `/derive-schema-descriptions` skill does this automatically)
 
 ```go
+// apiDesc* — schema descriptions derived from the client-go swagger spec (DiskV1).
 const (
-    descID                 = "Unique identifier of the disk."
-    descName               = "Name of the disk."
-    descProjectID          = "ID of the project the disk belongs to."
-    descProjectIDInference = "If not specified, the project ID will be inferred from the Crusoe configuration."
-    descType               = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
-    descSize               = "Storage capacity of the disk (e.g., `100GiB`, `1TiB`)."
+    apiDescID      = "ID of the disk."
+    apiDescName    = "Name of the disk."
+    apiDescType    = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
+    apiDescDNSName = "DNS name used to mount the disk. Populated only for `shared-volume` disks."
 )
 
-// Usage in schema - combine base description with inference note
-"project_id": schema.StringAttribute{
-    MarkdownDescription: descProjectID + " " + descProjectIDInference,
-}
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+    providerDescProjectID         = "ID of the project the disk belongs to. " + project.ProviderDescProjectIDFallback
+    providerDescSharedVolumeEmpty = "Empty for other disk types."
+)
+
+// Usage in schema — pure spec text references apiDesc*; mixed origin composes both.
+"project_id": schema.StringAttribute{MarkdownDescription: providerDescProjectID},
+"dns_name":   schema.StringAttribute{MarkdownDescription: apiDescDNSName + " " + providerDescSharedVolumeEmpty},
 ```
 
 ### Deprecated Fields

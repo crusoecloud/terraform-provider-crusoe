@@ -141,20 +141,24 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: providerDescProjectID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescType,
 				// Resize in place within the same product family; recreate the VM when the family changes.
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIf(
 					resizeRequiresReplace,
@@ -163,45 +167,55 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				)},
 			},
 			"ssh_key": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.String{validators.SSHKeyValidator{}},
+				Required:            true,
+				MarkdownDescription: apiDescSSHKey,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:          []validator.String{validators.SSHKeyValidator{}},
 			},
 			"location": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"image": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescImage,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"custom_image": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescCustomImage,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescStartupScript,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"shutdown_script": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescShutdownScript,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"disks": schema.SetNestedAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescDisks,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Required: true,
+							Required:            true,
+							MarkdownDescription: apiDescDiskID,
 						},
 						"attachment_type": schema.StringAttribute{
-							Required: true,
+							Required:            true,
+							MarkdownDescription: apiDescDiskAttachmentType,
 						},
 						"mode": schema.StringAttribute{
-							Required:   true,
-							Validators: []validator.String{validators.StorageModeValidator{}},
+							Required:            true,
+							MarkdownDescription: apiDescDiskMode,
+							Validators:          []validator.String{validators.StorageModeValidator{}},
 						},
 					},
 				},
@@ -219,55 +233,65 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"external_dns_name": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescExternalDNSName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: apiDescNetworkInterfaces,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNIID,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"name": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNIName,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"network": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNINetwork,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"subnet": schema.StringAttribute{
-							Computed: true,
-							Optional: true,
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescNISubnet,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
 								stringplanmodifier.RequiresReplace(),
 							}, // cannot be updated in place
 						},
 						"interface_type": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNIInterfaceType,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"public_ipv4": schema.SingleNestedAttribute{
 							Computed: true,
 							Optional: true,
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIpv4ID,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"address": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIpv4Address,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"type": schema.StringAttribute{
-									Computed: true,
-									Optional: true,
+									Computed:            true,
+									Optional:            true,
+									MarkdownDescription: apiDescPublicIpv4Type,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -276,7 +300,8 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
 								"address": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescPrivateIpv4Address,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -285,34 +310,35 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: apiDescHostChannelAdapters,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
-							Optional:    true,
-							Description: "Infiniband Partition ID",
+							Optional:            true,
+							MarkdownDescription: providerDescIBPartitionID,
 						},
 					},
 				},
 			},
 			"reservation_id": schema.StringAttribute{
-				Optional:           true,
-				Computed:           true,
-				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				Description:        "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
-				DeprecationMessage: "This field is deprecated and will be removed in a future release. Please remove it from your configuration.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				MarkdownDescription: providerDescReservationID,
+				DeprecationMessage:  "This field is deprecated and will be removed in a future release. Please remove it from your configuration.",
 			},
 			"nvlink_domain_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-				Description:   "NVLink domain ID to use for NVLink communication.",
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescNvlinkDomainID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"install_crusoe_watch_agent": schema.BoolAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
-				Description:   "Whether to install the Crusoe Watch Agent on the VM. Defaults to true.",
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescInstallCrusoeWatchAgent,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}

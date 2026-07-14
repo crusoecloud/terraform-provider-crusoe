@@ -61,26 +61,32 @@ func (ds *vpcNetworksDataSource) Schema(ctx context.Context, request datasource.
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"id": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescID,
 					},
 					"name": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescName,
 					},
 					"cidr": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescCIDR,
 					},
 					"gateway": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescGateway,
 					},
 					"subnets": schema.ListAttribute{
 						ElementType: types.StringType,
 						Optional:    true,
+						Description: apiDescSubnets,
 					},
 				},
 			},
 		},
 		"project_id": schema.StringAttribute{
-			Optional: true,
+			Optional:    true,
+			Description: providerDescProjectID,
 		},
 	}}
 }

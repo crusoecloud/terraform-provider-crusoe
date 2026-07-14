@@ -72,13 +72,13 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descID,
+				MarkdownDescription: apiDescID,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descProjectID + " " + descProjectIDInference,
+				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -86,21 +86,21 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descName,
+				MarkdownDescription: apiDescName,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"instance_template_id": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descInstanceTemplateID,
+				MarkdownDescription: apiDescInstanceTemplateID,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"running_instance_count": schema.Int64Attribute{
 				Computed:            true,
-				MarkdownDescription: descRunningInstanceCount,
+				MarkdownDescription: apiDescRunningInstanceCount,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -108,7 +108,7 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 			"active_instance_ids": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
-				MarkdownDescription: descActiveInstanceIDs,
+				MarkdownDescription: apiDescActiveInstanceIDs,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
@@ -116,31 +116,31 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 			"inactive_instance_ids": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
-				MarkdownDescription: descInactiveInstanceIDs,
+				MarkdownDescription: apiDescInactiveInstanceIDs,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"state": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descState,
+				MarkdownDescription: apiDescState + " " + providerDescState,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"desired_count": schema.Int64Attribute{
 				Required:            true,
-				MarkdownDescription: descDesiredCount,
+				MarkdownDescription: apiDescDesiredCount,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descCreatedAt,
+				MarkdownDescription: apiDescCreatedAt,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descUpdatedAt,
+				MarkdownDescription: apiDescUpdatedAt,
 			},
 		},
 	}

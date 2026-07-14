@@ -4,6 +4,28 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec
+// (Repository, with nested UpstreamRegistry and UpstreamRegistryCredentials).
+const (
+	apiDescLocation         = "Location the repository is hosted in."
+	apiDescName             = "Name of the repository."
+	apiDescMode             = "Mode of the repository, which determines how images are stored and served."
+	apiDescState            = "State of the repository."
+	apiDescURL              = "URL at which the repository can be accessed."
+	apiDescUpstreamProvider = "Provider of the upstream registry."
+	apiDescUpstreamURL      = "Base URL of the upstream registry that the repository caches images from."
+	//nolint:gosec // G101: This is a description string, not actual credentials
+	apiDescUpstreamCredsUsername = "Username used to authenticate to the upstream registry."
+	//nolint:gosec // G101: This is a description string, not actual credentials
+	apiDescUpstreamCredsPassword = "Password used to authenticate to the upstream registry."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project the repository belongs to. " + project.ProviderDescProjectIDFallback
 )
 
 // repositoryToResourceModel maps the API-owned fields of a repository onto model:

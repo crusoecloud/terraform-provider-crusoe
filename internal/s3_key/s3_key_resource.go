@@ -65,14 +65,14 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 		Attributes: map[string]schema.Attribute{
 			"key_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descKeyID,
+				MarkdownDescription: apiDescKeyID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"access_key_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descAccessKeyID,
+				MarkdownDescription: apiDescAccessKeyID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -80,14 +80,14 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			"secret_access_key": schema.StringAttribute{
 				Computed:            true,
 				Sensitive:           true,
-				MarkdownDescription: descSecretAccessKey,
+				MarkdownDescription: apiDescSecretAccessKey,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"alias": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: descAlias,
+				MarkdownDescription: apiDescAlias,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -95,7 +95,7 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			"organization_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descOrganizationID + " If not specified, inferred from the authenticated user.",
+				MarkdownDescription: providerDescOrganizationID + " " + providerDescOrganizationIDInference,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -103,25 +103,25 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			},
 			"expire_at": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: descExpireAt + " Must be in RFC3339 format (e.g., `2025-12-31T23:59:59Z`).",
+				MarkdownDescription: apiDescExpireAt + " " + providerDescExpireAtExample,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"status": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descStatus,
+				MarkdownDescription: apiDescStatus,
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descCreatedAt,
+				MarkdownDescription: apiDescCreatedAt,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"user_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descUserID,
+				MarkdownDescription: apiDescUserID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},

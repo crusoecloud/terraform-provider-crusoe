@@ -9,6 +9,16 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
+// ProviderDescProjectIDFallback is the shared project_id fallback suffix appended to each
+// resource's project_id description (project_id is provider-side; no swagger property).
+const ProviderDescProjectIDFallback = "If not specified, the project ID will be inferred from the Crusoe configuration."
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (Project).
+const (
+	apiDescID   = "ID of the project."
+	apiDescName = "Name of the project."
+)
+
 // projectToResourceModel maps an API project onto the resource model. All CRUD
 // paths use it so id/name are always sourced from the API response.
 func projectToResourceModel(project *swagger.Project, projectModel *projectResourceModel) {

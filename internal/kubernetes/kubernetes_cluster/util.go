@@ -8,6 +8,44 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec
+// (KubernetesCluster definition; oidc_* fields from OidcAuthConfig).
+const (
+	apiDescID                    = "ID of the Kubernetes cluster."
+	apiDescName                  = "Name of the Kubernetes cluster."
+	apiDescVersion               = "Version of the Crusoe Kubernetes image the cluster runs."
+	apiDescSubnetID              = "ID of the subnet the Kubernetes cluster belongs to."
+	apiDescClusterCidr           = "Range of IP addresses allocated to pods scheduled on worker nodes, in CIDR notation."
+	apiDescNodeCidrMaskSize      = "Mask size for the cluster CIDR."
+	apiDescServiceClusterIPRange = "Range of IP addresses allocated to Kubernetes services, in CIDR notation."
+	apiDescAddOns                = "Add-ons associated with the cluster."
+	apiDescLocation              = "Location of the Kubernetes cluster."
+	apiDescDNSName               = "DNS name of the cluster."
+	apiDescNodePoolIDs           = "IDs of the node pools within the Kubernetes cluster."
+	apiDescPrivate               = "Whether the cluster is private (without a public IP)."
+
+	apiDescApiserverExtraArgs         = "Extra arguments passed to the kube-apiserver control plane component."
+	apiDescSchedulerExtraArgs         = "Extra arguments passed to the kube-scheduler control plane component."
+	apiDescControllerManagerExtraArgs = "Extra arguments passed to the kube-controller-manager control plane component."
+
+	apiDescOIDCIssuerURL      = "URL of the OpenID Connect issuer."
+	apiDescOIDCClientID       = "Client ID for the OpenID Connect client."
+	apiDescOIDCUsernameClaim  = "Claim used to identify the user. Defaults to `sub`."
+	apiDescOIDCUsernamePrefix = "Prefix added before the username to avoid name conflicts."
+	apiDescOIDCGroupsClaim    = "Claim used to identify the user's groups."
+	apiDescOIDCCACert         = "PEM-encoded certificate authority certificate used to validate the OIDC server's certificate."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project that owns the Kubernetes cluster. " + project.ProviderDescProjectIDFallback
+
+	// providerDescExtraArgsNote is appended (resource-side only) to the *_extra_args
+	// descriptions to document Crusoe-specific update behavior.
+	providerDescExtraArgsNote = "Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI."
 )
 
 // clusterToResourceModel maps an API Kubernetes cluster onto model, with the API

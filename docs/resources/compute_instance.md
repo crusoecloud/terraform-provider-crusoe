@@ -60,30 +60,30 @@ resource "crusoe_compute_instance" "example" {
 
 ### Required
 
-- `name` (String)
-- `ssh_key` (String)
-- `type` (String)
+- `name` (String) Name of the VM.
+- `ssh_key` (String) SSH public key to grant access to the new VM.
+- `type` (String) Product name of the VM type.
 
 ### Optional
 
-- `custom_image` (String)
-- `disks` (Attributes Set) (see [below for nested schema](#nestedatt--disks))
-- `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
-- `image` (String)
+- `custom_image` (String) ID of a custom image to use for the new VM. Either `image` or `custom_image` should be supplied, not both.
+- `disks` (Attributes Set) Disks attached to the VM. (see [below for nested schema](#nestedatt--disks))
+- `host_channel_adapters` (Attributes List) Host channel adapters attached to the VM. (see [below for nested schema](#nestedatt--host_channel_adapters))
+- `image` (String) Name of the OS image to use for the new VM. Either `image` or `custom_image` should be supplied, not both.
 - `install_crusoe_watch_agent` (Boolean) Whether to install the Crusoe Watch Agent on the VM. Defaults to true.
-- `location` (String)
-- `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
-- `nvlink_domain_id` (String) NVLink domain ID to use for NVLink communication.
-- `project_id` (String)
+- `location` (String) Location the VM runs in.
+- `network_interfaces` (Attributes List) Network interfaces attached to the VM. (see [below for nested schema](#nestedatt--network_interfaces))
+- `nvlink_domain_id` (String) ID of the NVLink domain the VM belongs to, if any.
+- `project_id` (String) ID of the project that owns the VM. If not specified, the project ID will be inferred from the Crusoe configuration.
 - `reservation_id` (String, Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.
-- `shutdown_script` (String)
-- `startup_script` (String)
+- `shutdown_script` (String) Script to run when the VM shuts down.
+- `startup_script` (String) Script to run when the VM starts.
 
 ### Read-Only
 
-- `external_dns_name` (String)
+- `external_dns_name` (String) External DNS name of the network interface.
 - `fqdn` (String, Deprecated)
-- `id` (String) The ID of this resource.
+- `id` (String) ID of the VM.
 - `internal_dns_name` (String)
 
 <a id="nestedatt--disks"></a>
@@ -91,9 +91,9 @@ resource "crusoe_compute_instance" "example" {
 
 Required:
 
-- `attachment_type` (String)
-- `id` (String)
-- `mode` (String)
+- `attachment_type` (String) Role the disk plays for the VM. Possible values: `os`, `data`.
+- `id` (String) ID of the disk to attach.
+- `mode` (String) Access mode to attach the disk with. Possible values: `read-only`, `read-write`.
 
 
 <a id="nestedatt--host_channel_adapters"></a>
@@ -101,7 +101,7 @@ Required:
 
 Optional:
 
-- `ib_partition_id` (String) Infiniband Partition ID
+- `ib_partition_id` (String) Infiniband Partition ID.
 
 
 <a id="nestedatt--network_interfaces"></a>
@@ -110,14 +110,14 @@ Optional:
 Optional:
 
 - `public_ipv4` (Attributes) (see [below for nested schema](#nestedatt--network_interfaces--public_ipv4))
-- `subnet` (String)
+- `subnet` (String) ID of the VPC subnet the interface is attached to.
 
 Read-Only:
 
-- `id` (String)
-- `interface_type` (String)
-- `name` (String)
-- `network` (String)
+- `id` (String) ID of the network interface.
+- `interface_type` (String) Type of the network interface.
+- `name` (String) Name of the network interface.
+- `network` (String) ID of the VPC network the interface is attached to.
 - `private_ipv4` (Attributes) (see [below for nested schema](#nestedatt--network_interfaces--private_ipv4))
 
 <a id="nestedatt--network_interfaces--public_ipv4"></a>
@@ -125,12 +125,12 @@ Read-Only:
 
 Optional:
 
-- `type` (String)
+- `type` (String) Allocation type of the public IPv4 address (for example, `dynamic`).
 
 Read-Only:
 
-- `address` (String)
-- `id` (String)
+- `address` (String) Public IPv4 address.
+- `id` (String) ID of the public IPv4 address.
 
 
 <a id="nestedatt--network_interfaces--private_ipv4"></a>
@@ -138,7 +138,7 @@ Read-Only:
 
 Read-Only:
 
-- `address` (String)
+- `address` (String) Private IPv4 address.
 
 ## Import
 

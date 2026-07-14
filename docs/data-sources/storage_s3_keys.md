@@ -35,10 +35,10 @@ data "crusoe_storage_s3_keys" "example" {}
 
 Read-Only:
 
-- `access_key_id` (String) S3-compatible access key ID (format: `S3U_...`).
-- `alias` (String) Human-readable alias for the key.
-- `created_at` (String) Timestamp when the key was created (RFC3339 format).
-- `expire_at` (String) Expiration timestamp for the key (RFC3339 format).
-- `key_id` (String) Unique identifier of the S3 key.
-- `status` (String) Status of the key. Possible values: `enabled`, `disabled`.
-- `user_id` (String) ID of the user who owns the key.
+- `access_key_id` (String) Access key ID used to authenticate S3 requests.
+- `alias` (String) Human-readable alias for the S3 access key.
+- `created_at` (String) Creation timestamp of the S3 access key, in RFC3339 format.
+- `expire_at` (String) Expiration timestamp of the S3 access key, in RFC3339 format.
+- `key_id` (String) ID of the S3 access key.
+- `status` (String) Status of the S3 access key. Possible values: `enabled`, `disabled`.
+- `user_id` (String) ID of the user that owns the S3 access key.

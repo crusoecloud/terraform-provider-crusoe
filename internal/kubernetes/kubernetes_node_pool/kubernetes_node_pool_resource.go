@@ -106,79 +106,89 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
 			},
 			"version": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescVersion,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
 			},
 			"type": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescType,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"instance_count": schema.Int64Attribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescInstanceCount,
 			},
 			"cluster_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescClusterID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"subnet_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescSubnetID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
 			},
 			"ib_partition_id": schema.StringAttribute{
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"requested_node_labels": schema.MapAttribute{
-				ElementType:   types.StringType,
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()}, // maintain across updates
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescRequestedNodeLabels,
+				PlanModifiers:       []planmodifier.Map{mapplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"all_node_labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: apiDescNodeLabels,
 			},
 			"instance_ids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: apiDescInstanceIDs,
 			},
 			"ssh_key": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescSSHKey,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"state": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: apiDescState,
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"ephemeral_storage_for_containerd": schema.BoolAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescEphemeralStorageForContainerd,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"batch_size": schema.Int64Attribute{
-				Optional: true,
-				MarkdownDescription: common.DevelopmentMessage + " " +
-					"Number of nodes to update at a time during rollout (minimum 1, maximum 10). " +
-					"Mutually exclusive with batch_percentage. " +
-					"If both this and batch_percentage are omitted, existing nodes will not be updated, " +
-					"but new nodes will use the new configuration.",
+				Optional:            true,
+				MarkdownDescription: providerDescBatchSize,
 				Validators: []validator.Int64{
 					int64validator.Between(1, 10),
 				},
@@ -187,12 +197,8 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"batch_percentage": schema.Int64Attribute{
-				Optional: true,
-				MarkdownDescription: common.DevelopmentMessage + " " +
-					"Percentage of nodes to update concurrently during rollout. " +
-					"The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. " +
-					"If both this and batch_size are omitted, existing nodes will not be updated, " +
-					"but new nodes will use the new configuration.",
+				Optional:            true,
+				MarkdownDescription: providerDescBatchPercentage,
 				Validators: []validator.Int64{
 					int64validator.Between(1, 100),
 				},
@@ -201,13 +207,15 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"nvlink_domain_id": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place & maintain across updates
+				Optional:            true,
+				MarkdownDescription: apiDescNvlinkDomainID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place & maintain across updates
 			},
 			"public_ip_type": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  stringdefault.StaticString("dynamic"), // Default to dynamic
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescPublicIPType,
+				Default:             stringdefault.StaticString("dynamic"), // Default to dynamic
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					common.NewPrivateNodePoolsWarningModifier(),
@@ -216,11 +224,12 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 		},
 		Blocks: map[string]schema.Block{
 			"node_taints": schema.SetNestedBlock{
+				MarkdownDescription: apiDescNodeTaints,
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Taint key. Follows the Kubernetes qualified-name format (optional DNS subdomain prefix, name segment up to 63 chars). Must be non-empty.",
+							MarkdownDescription: apiDescTaintKey,
 							Validators: []validator.String{
 								stringvalidator.LengthAtLeast(1),
 							},
@@ -229,14 +238,14 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 							Optional:            true,
 							Computed:            true,
 							Default:             stringdefault.StaticString(""),
-							MarkdownDescription: "Taint value. Defaults to empty string if omitted. Must be at most 63 characters.",
+							MarkdownDescription: apiDescTaintValue,
 							Validators: []validator.String{
 								stringvalidator.LengthAtMost(63),
 							},
 						},
 						"effect": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Taint effect. Possible values: `NoSchedule`, `PreferNoSchedule`, `NoExecute`.",
+							MarkdownDescription: apiDescTaintEffect,
 							Validators: []validator.String{
 								stringvalidator.OneOf("NoSchedule", "PreferNoSchedule", "NoExecute"),
 							},

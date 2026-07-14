@@ -25,7 +25,7 @@ data "crusoe_compute_custom_image" "example" {
 
 - `name` (String) Filter custom images by name. This is a case-sensitive exact match.
 - `name_prefix` (String) Filter custom images by name prefix. This is case-sensitive and does not require trailing dashes.
-- `project_id` (String)
+- `project_id` (String) ID of the project the custom images belong to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
@@ -37,12 +37,12 @@ data "crusoe_compute_custom_image" "example" {
 
 Read-Only:
 
-- `created_at` (String)
-- `description` (String)
-- `id` (String)
-- `locations` (List of String)
-- `name` (String)
-- `tags` (List of String)
+- `created_at` (String) Creation timestamp of the image, in RFC3339 format.
+- `description` (String) Description of the image.
+- `id` (String) ID of the image.
+- `locations` (List of String) Locations where the image is available.
+- `name` (String) Name of the image.
+- `tags` (List of String) Tags associated with the image.
 
 
 <a id="nestedatt--newest_image"></a>
@@ -50,9 +50,9 @@ Read-Only:
 
 Read-Only:
 
-- `created_at` (String)
-- `description` (String)
-- `id` (String)
-- `locations` (List of String)
-- `name` (String)
-- `tags` (List of String)
+- `created_at` (String) Creation timestamp of the image, in RFC3339 format.
+- `description` (String) Description of the image.
+- `id` (String) ID of the image.
+- `locations` (List of String) Locations where the image is available.
+- `name` (String) Name of the image.
+- `tags` (List of String) Tags associated with the image.

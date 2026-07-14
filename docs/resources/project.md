@@ -23,11 +23,11 @@ resource "crusoe_project" "example" {
 
 ### Required
 
-- `name` (String)
+- `name` (String) Name of the project.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
+- `id` (String) ID of the project.
 
 ## Import
 

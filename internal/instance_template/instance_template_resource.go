@@ -94,19 +94,23 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"name": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescName,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
+				Description:   providerDescProjectID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescType,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators:    []validator.String{
 					// TODO: re-enable once instance types are stabilized
@@ -115,29 +119,35 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 			},
 			"ssh_key": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescSSHKey,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators:    []validator.String{validators.SSHKeyValidator{}},
 			},
 			"location": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
+				Description:   apiDescLocation,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"image": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
+				Description:   apiDescImage,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
 				Optional:      true,
+				Description:   apiDescStartupScript,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"shutdown_script": schema.StringAttribute{
 				Optional:      true,
+				Description:   apiDescShutdownScript,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"subnet": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescSubnet,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"ib_partition": schema.StringAttribute{
@@ -147,22 +157,26 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 			"public_ip_address_type": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
+				Description:   apiDescPublicIPAddressType,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"disks": schema.SetNestedAttribute{
-				Optional: true,
+				Optional:    true,
+				Description: apiDescDisks,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"size": schema.StringAttribute{
-							Required:   true,
-							Validators: []validator.String{validators.StorageSizeValidator{}},
+							Required:    true,
+							Description: apiDescDiskSize,
+							Validators:  []validator.String{validators.StorageSizeValidator{}},
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.RequiresReplace(), // cannot be updated in place
 							},
 						},
 						"type": schema.StringAttribute{
-							Required:   true,
-							Validators: []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
+							Required:    true,
+							Description: apiDescDiskType,
+							Validators:  []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.RequiresReplace(), // cannot be updated in place
 							},
@@ -174,11 +188,12 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Optional:      true,
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-				Description:   "(Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
+				Description:   providerDescReservationID,
 			},
 			"placement_policy": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
+				Description:   apiDescPlacementPolicy,
 				Default:       stringdefault.StaticString("unspecified"),
 				Validators:    []validator.String{stringvalidator.OneOf(spreadPlacementPolicy, unspecifiedPlacementPolicy)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
@@ -186,8 +201,8 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 			"nvlink_domain_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
+				Description:   apiDescNvlinkDomainID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-				Description:   "NVLink domain ID to use for NVLink communication.",
 			},
 		},
 	}

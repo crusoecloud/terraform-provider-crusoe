@@ -81,14 +81,17 @@ func (ds *manifestsDataSource) Schema(ctx context.Context, request datasource.Sc
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"digest": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescDigest,
 						},
 						"size": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescSize,
 						},
 						"tags": schema.ListAttribute{
-							Computed:    true,
-							ElementType: types.StringType,
+							Computed:            true,
+							ElementType:         types.StringType,
+							MarkdownDescription: apiDescTags,
 						},
 					},
 				},

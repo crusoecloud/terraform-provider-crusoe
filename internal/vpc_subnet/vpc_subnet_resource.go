@@ -73,11 +73,13 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:    true,
+				Computed:    true,
+				Description: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -85,47 +87,54 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"cidr": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescCIDR,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescName,
 			},
 			"location": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescLocation,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				}, // maintain across updates
 			},
 			"network": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescNetwork,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				}, // maintain across updates
 			},
 			"nat_gateway_enabled": schema.BoolAttribute{
-				MarkdownDescription: common.DevelopmentMessage,
+				MarkdownDescription: apiDescNATGatewayEnabled + " " + common.DevelopmentMessage,
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"nat_gateways": schema.ListNestedAttribute{
-				MarkdownDescription: common.DevelopmentMessage,
+				MarkdownDescription: apiDescNATGateways + " " + common.DevelopmentMessage,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed: true,
+							Computed:    true,
+							Description: apiDescNATGatewayID,
 						},
 						"public_ipv4_address": schema.StringAttribute{
-							Computed: true,
+							Computed:    true,
+							Description: apiDescNATGatewayPublicIPv4Address,
 						},
 						"public_ipv4_id": schema.StringAttribute{
-							Computed: true,
+							Computed:    true,
+							Description: apiDescNATGatewayPublicIPv4ID,
 						},
 					},
 				},

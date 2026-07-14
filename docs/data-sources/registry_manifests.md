@@ -43,6 +43,6 @@ data "crusoe_registry_manifests" "example" {
 
 Read-Only:
 
-- `digest` (String)
-- `size` (String)
-- `tags` (List of String)
+- `digest` (String) Content-addressable digest that uniquely identifies the manifest.
+- `size` (String) Total size of the manifest, in bytes.
+- `tags` (List of String) Tags that point to the manifest.

@@ -33,23 +33,23 @@ resource "crusoe_storage_s3_bucket" "example" {
 
 ### Required
 
-- `location` (String) Location/region where the bucket will be created.
-- `name` (String) Name of the bucket. Must be DNS-compliant: 3-63 characters, lowercase letters, numbers, and hyphens.
+- `location` (String) Location where the bucket is hosted.
+- `name` (String) Name of the bucket. Must be DNS-compliant: 3-63 characters, using lowercase letters, numbers, and hyphens.
 
 ### Optional
 
 - `object_lock_enabled` (Boolean) Enable object lock for the bucket. Requires `versioning_enabled` to be set. Once enabled, cannot be disabled.
-- `project_id` (String) The project ID. If not specified, uses the provider's default project.
-- `retention_period` (Number) Retention period for object lock. Only applicable when `object_lock_enabled` is `true`.
+- `project_id` (String) ID of the project that owns the bucket. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `retention_period` (Number) Length of the object lock retention period, in the unit given by retention_period_unit. Only applicable when `object_lock_enabled` is `true`.
 - `retention_period_unit` (String) Unit for retention period: `days` or `years`. Only applicable when `object_lock_enabled` is `true`.
 - `tags` (Map of String) Tags applied to the bucket as key-value pairs.
 - `versioning_enabled` (Boolean) Enable versioning for the bucket. Once enabled, cannot be disabled.
 
 ### Read-Only
 
-- `created_at` (String) Timestamp when the bucket was created (RFC3339 format).
-- `s3_url` (String) S3 endpoint URL for accessing the bucket.
-- `updated_at` (String) Timestamp when the bucket was last updated (RFC3339 format).
+- `created_at` (String) Creation timestamp of the bucket, in RFC3339 format.
+- `s3_url` (String) Endpoint URL for accessing the bucket.
+- `updated_at` (String) Last update timestamp of the bucket, in RFC3339 format.
 
 ## Import
 

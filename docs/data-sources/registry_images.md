@@ -40,7 +40,7 @@ data "crusoe_registry_images" "example" {
 
 Read-Only:
 
-- `manifest_count` (Number)
-- `name` (String)
-- `pull_count` (Number)
-- `url` (String)
+- `manifest_count` (Number) Number of manifests in the image.
+- `name` (String) Name of the image.
+- `pull_count` (Number) Number of times the image has been pulled.
+- `url` (String) URL at which the image can be accessed.

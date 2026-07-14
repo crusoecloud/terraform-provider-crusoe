@@ -30,13 +30,13 @@ resource "crusoe_registry_repository" "example" {
 
 ### Required
 
-- `location` (String)
-- `mode` (String)
-- `name` (String)
+- `location` (String) Location the repository is hosted in.
+- `mode` (String) Mode of the repository, which determines how images are stored and served.
+- `name` (String) Name of the repository.
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) ID of the project the repository belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 - `upstream_registry` (Attributes) (see [below for nested schema](#nestedatt--upstream_registry))
 
 <a id="nestedatt--upstream_registry"></a>
@@ -44,8 +44,8 @@ resource "crusoe_registry_repository" "example" {
 
 Required:
 
-- `provider` (String)
-- `url` (String)
+- `provider` (String) Provider of the upstream registry.
+- `url` (String) Base URL of the upstream registry that the repository caches images from.
 
 Optional:
 
@@ -56,8 +56,8 @@ Optional:
 
 Required:
 
-- `password` (String, Sensitive)
-- `username` (String)
+- `password` (String, Sensitive) Password used to authenticate to the upstream registry.
+- `username` (String) Username used to authenticate to the upstream registry.
 
 ## Import
 

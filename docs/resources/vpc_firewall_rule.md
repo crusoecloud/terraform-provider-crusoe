@@ -36,23 +36,23 @@ resource "crusoe_vpc_firewall_rule" "example" {
 
 ### Required
 
-- `action` (String)
-- `destination` (String)
-- `destination_ports` (String)
-- `direction` (String)
-- `name` (String)
-- `network` (String)
-- `protocols` (String)
-- `source` (String)
-- `source_ports` (String)
+- `action` (String) Action applied to traffic that matches the rule. Possible values: `allow`, `deny`.
+- `destination` (String) Destinations the rule matches, given as CIDR blocks or resource IDs.
+- `destination_ports` (String) Destination ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`).
+- `direction` (String) Direction of traffic the rule applies to. Possible values: `ingress` (inbound), `egress` (outbound).
+- `name` (String) Name of the firewall rule.
+- `network` (String) ID of the VPC network the rule belongs to.
+- `protocols` (String) Network protocols the rule matches (for example, `tcp`, `udp`).
+- `source` (String) Sources the rule matches, given as CIDR blocks or resource IDs.
+- `source_ports` (String) Source ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`).
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) ID of the project the firewall rule belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
+- `id` (String) ID of the firewall rule.
 
 ## Import
 

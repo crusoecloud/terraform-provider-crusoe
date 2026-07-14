@@ -21,7 +21,7 @@ data "crusoe_ib_networks" "example" {}
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) ID of the project the InfiniBand network belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
@@ -32,15 +32,15 @@ data "crusoe_ib_networks" "example" {}
 
 Read-Only:
 
-- `capacities` (Attributes List) (see [below for nested schema](#nestedatt--ib_networks--capacities))
-- `id` (String)
-- `location` (String)
-- `name` (String)
+- `capacities` (Attributes List) Available capacity in the network, broken down by VM slice type. (see [below for nested schema](#nestedatt--ib_networks--capacities))
+- `id` (String) ID of the InfiniBand network.
+- `location` (String) Location of the InfiniBand network.
+- `name` (String) Name of the InfiniBand network.
 
 <a id="nestedatt--ib_networks--capacities"></a>
 ### Nested Schema for `ib_networks.capacities`
 
 Read-Only:
 
-- `quantity` (Number)
-- `slice_type` (String)
+- `quantity` (Number) Number of slices of the given slice type.
+- `slice_type` (String) VM slice type the capacity applies to.

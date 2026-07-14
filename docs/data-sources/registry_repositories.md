@@ -21,7 +21,7 @@ data "crusoe_registry_repositories" "example" {}
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) ID of the project the repository belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
@@ -32,8 +32,8 @@ data "crusoe_registry_repositories" "example" {}
 
 Read-Only:
 
-- `location` (String)
-- `mode` (String)
-- `name` (String)
-- `state` (String)
-- `url` (String)
+- `location` (String) Location the repository is hosted in.
+- `mode` (String) Mode of the repository, which determines how images are stored and served.
+- `name` (String) Name of the repository.
+- `state` (String) State of the repository.
+- `url` (String) URL at which the repository can be accessed.

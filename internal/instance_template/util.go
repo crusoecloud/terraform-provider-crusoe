@@ -7,6 +7,38 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (InstanceTemplate).
+const (
+	apiDescID                  = "ID of the instance template."
+	apiDescName                = "Name of the instance template. (This is not the name of the VMs created from this instance template.)"
+	apiDescType                = "Product name of the VM type we want to create from this instance template."
+	apiDescSSHKey              = "SSH public key to use for all VMs created from this instance template."
+	apiDescLocation            = "Location to use for all VMs created from this instance template. May be empty if we do not want to bind this template to a location."
+	apiDescImage               = "OS Image to use for all VMs created from this instance template."
+	apiDescStartupScript       = "Startup script to use for all VMs created from this instance template."
+	apiDescShutdownScript      = "Shutdown script to use for all VMs created from this instance template."
+	apiDescSubnet              = "SubnetID to use for all VMs created from this instance template. Only used if template has a location."
+	apiDescPublicIPAddressType = "Public IP address type to use for all VMs created from this instance template. Must either be `static` or `dynamic`."
+	apiDescPlacementPolicy     = "Placement policy controlling how VMs created from this instance template are distributed across hosts. Possible values: `spread`, `unspecified`."
+	apiDescDisks               = "Disks attached to all VMs created from this instance template."
+	apiDescNvlinkDomainID      = "NVLink domain assigned to all VMs created from this instance template."
+
+	// Nested DiskTemplate attributes.
+	apiDescDiskSize = "Size of the disk, including a unit suffix."
+	apiDescDiskType = "Type of disk to create. Possible values: `persistent-ssd`, `shared-volume`."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project this instance template belongs to. " + project.ProviderDescProjectIDFallback
+
+	// providerDescReservationID is provider-side deprecation/behavior text for the
+	// resource-only, plan-owned reservation_id attribute. It is intentionally not
+	// sourced from the spec.
+	providerDescReservationID = "(Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string."
 )
 
 // instanceTemplateToResourceModel maps an API instance template onto model, with

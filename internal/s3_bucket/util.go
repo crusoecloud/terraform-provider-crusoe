@@ -8,21 +8,33 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
+// apiDesc* — schema descriptions derived from the client-go swagger spec (S3Bucket;
+// the name constraint is sourced from the CreateS3BucketRequest name property).
 const (
-	descName                = "Name of the bucket. Must be DNS-compliant: 3-63 characters, lowercase letters, numbers, and hyphens."
-	descProjectID           = "The project ID. If not specified, uses the provider's default project."
-	descLocation            = "Location/region where the bucket will be created."
-	descVersioningEnabled   = "Enable versioning for the bucket. Once enabled, cannot be disabled."
-	descVersioningState     = "Versioning state of the bucket: `disabled`, `enabled`, or `suspended`."
-	descObjectLockEnabled   = "Enable object lock for the bucket. Requires `versioning_enabled` to be set. Once enabled, cannot be disabled."
-	descRetentionPeriod     = "Retention period for object lock. Only applicable when `object_lock_enabled` is `true`."
-	descRetentionPeriodUnit = "Unit for retention period: `days` or `years`. Only applicable when `object_lock_enabled` is `true`."
-	descTags                = "Tags applied to the bucket as key-value pairs."
-	descCreatedAt           = "Timestamp when the bucket was created (RFC3339 format)."
-	descUpdatedAt           = "Timestamp when the bucket was last updated (RFC3339 format)."
-	descS3URL               = "S3 endpoint URL for accessing the bucket."
+	apiDescName            = "Name of the bucket."
+	apiDescNameConstraint  = "Must be DNS-compliant: 3-63 characters, using lowercase letters, numbers, and hyphens."
+	apiDescLocation        = "Location where the bucket is hosted."
+	apiDescRetentionPeriod = "Length of the object lock retention period, in the unit given by retention_period_unit."
+	apiDescTags            = "Tags applied to the bucket as key-value pairs."
+	apiDescCreatedAt       = "Creation timestamp of the bucket, in RFC3339 format."
+	apiDescUpdatedAt       = "Last update timestamp of the bucket, in RFC3339 format."
+	apiDescS3URL           = "Endpoint URL for accessing the bucket."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	// The S3Bucket read model describes project_id as "ID of the project that owns the
+	// bucket."; the fallback clause is provider-specific.
+	providerDescProjectID           = "ID of the project that owns the bucket. " + project.ProviderDescProjectIDFallback
+	providerDescVersioningEnabled   = "Enable versioning for the bucket. Once enabled, cannot be disabled."
+	providerDescVersioningState     = "Versioning state of the bucket: `disabled`, `enabled`, or `suspended`."
+	providerDescObjectLockEnabled   = "Enable object lock for the bucket. Requires `versioning_enabled` to be set. Once enabled, cannot be disabled."
+	providerDescObjectLockClause    = "Only applicable when `object_lock_enabled` is `true`."
+	providerDescRetentionPeriodUnit = "Unit for retention period: `days` or `years`. " + providerDescObjectLockClause
+	providerDescBuckets             = "List of buckets in the project."
 )
 
 // bucketNameRegex validates DNS-compliant bucket names.

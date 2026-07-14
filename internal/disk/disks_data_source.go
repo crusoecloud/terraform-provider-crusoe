@@ -68,46 +68,46 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 			},
 			"disks": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "List of disks in the project.",
+				MarkdownDescription: providerDescDisks,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descID,
+							MarkdownDescription: apiDescID,
 						},
 						"name": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descName,
+							MarkdownDescription: apiDescName,
 						},
 						"location": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descLocation,
+							MarkdownDescription: apiDescLocation,
 						},
 						"type": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descType,
+							MarkdownDescription: apiDescType,
 						},
 						"size": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descSize,
+							MarkdownDescription: apiDescSize,
 						},
 						"serial_number": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descSerialNumber,
+							MarkdownDescription: apiDescSerialNumber,
 						},
 						"block_size": schema.Int64Attribute{
 							Computed:            true,
-							MarkdownDescription: descBlockSize,
+							MarkdownDescription: apiDescBlockSize,
 							DeprecationMessage:  blockSizeDeprecationMessage,
 						},
 						"dns_name": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descDNSName,
+							MarkdownDescription: apiDescDNSName + " " + providerDescSharedVolumeEmpty,
 						},
 						"vips": schema.ListAttribute{
 							Computed:            true,
 							ElementType:         types.StringType,
-							MarkdownDescription: descVips,
+							MarkdownDescription: apiDescVips + " " + providerDescSharedVolumeEmpty,
 						},
 					},
 				},

@@ -1,0 +1,25 @@
+{
+  "_comment": "Maps each provider resource/data source package to the client-go swagger read model its descriptions derive from, plus any nested/request definitions that also supply descriptions. Consumed by swagger_descriptions.py --all. Add a line when a resource package is added.",
+  "resources": {
+    "custom_image": {"read_model": "Image"},
+    "disk": {"read_model": "DiskV1"},
+    "firewall_rule": {"read_model": "VpcFirewallRule"},
+    "ib_network": {"read_model": "IbNetwork", "extra": ["IBNetworkCapacity"]},
+    "ib_partition": {"read_model": "IbPartition"},
+    "instance_group": {"read_model": "InstanceGroup"},
+    "instance_template": {"read_model": "InstanceTemplate", "extra": ["DiskTemplate"]},
+    "kubernetes_cluster": {"read_model": "KubernetesCluster", "extra": ["OidcAuthConfig"]},
+    "kubernetes_node_pool": {"read_model": "KubernetesNodePool", "extra": ["KubernetesNodeTaint", "KubernetesNodePoolPostRequest"]},
+    "load_balancer": {"read_model": "LoadBalancer", "extra": ["LoadBalancerNetworkInterface", "NetworkTarget", "HealthCheckOptions", "PublicIpv4Address", "PrivateIpv4Address"]},
+    "project": {"read_model": "Project"},
+    "registry/repository": {"read_model": "Repository", "extra": ["UpstreamRegistry", "UpstreamRegistryCredentials"]},
+    "registry/image": {"read_model": "CcrImage"},
+    "registry/manifest": {"read_model": "Manifest"},
+    "registry/token": {"read_model": "LimitedUsageApiKeyInfo", "extra": ["CcrTokenResponse"]},
+    "s3_bucket": {"read_model": "S3Bucket", "extra": ["CreateS3BucketRequest"]},
+    "s3_key": {"read_model": "S3Key", "extra": ["CreateS3KeyResponse"]},
+    "vm": {"read_model": "InstanceV1", "extra": ["DiskAttachment", "NetworkInterface", "PublicIpv4Address", "PrivateIpv4Address", "InstancesPostRequestV1"]},
+    "vpc_network": {"read_model": "VpcNetwork"},
+    "vpc_subnet": {"read_model": "VpcSubnet", "extra": ["NatGateway", "VpcSubnetPostRequest"]}
+  }
+}

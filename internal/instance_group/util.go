@@ -8,22 +8,28 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
-// Shared schema descriptions for resource and data source
+// apiDesc* — schema descriptions derived from the client-go swagger spec (InstanceGroup).
 const (
-	descID                   = "The unique identifier of the instance group."
-	descName                 = "The name of the instance group."
-	descProjectID            = "The ID of the project this instance group belongs to."
-	descProjectIDInference   = "If not specified, the project ID will be inferred from the Crusoe configuration."
-	descInstanceTemplateID   = "The ID of the instance template used for creating instances in this group."
-	descRunningInstanceCount = "The number of running instances currently in the instance group."
-	descDesiredCount         = "The desired number of VMs for the instance group."
-	descState                = "The current state of the instance group. Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count)."
-	descActiveInstanceIDs    = "A list of IDs of running instances in the instance group."
-	descInactiveInstanceIDs  = "A list of IDs of non-running instances in the instance group."
-	descCreatedAt            = "The timestamp when the instance group was created."
-	descUpdatedAt            = "The timestamp when the instance group was most recently updated."
+	apiDescID                   = "ID of the instance group."
+	apiDescName                 = "Name of the instance group."
+	apiDescInstanceTemplateID   = "ID of the instance template currently associated with the instance group."
+	apiDescRunningInstanceCount = "Number of running instances currently in the instance group."
+	apiDescDesiredCount         = "Desired number of instances for the instance group."
+	apiDescState                = "Current state of the instance group."
+	apiDescActiveInstanceIDs    = "List of IDs of running instances in the instance group."
+	apiDescInactiveInstanceIDs  = "List of IDs of non-running instances in the instance group."
+	apiDescCreatedAt            = "Creation timestamp of the instance group, in RFC3339 format."
+	apiDescUpdatedAt            = "Last update timestamp of the instance group, in RFC3339 format."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID      = "ID of the project that owns the instance group. " + project.ProviderDescProjectIDFallback
+	providerDescState          = "Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count)."
+	providerDescInstanceGroups = "List of instance groups in the project."
 )
 
 func instanceGroupToResourceModel(instanceGroup *swagger.InstanceGroup, state *instanceGroupResourceModel, diags *diag.Diagnostics) {

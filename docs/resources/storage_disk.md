@@ -25,22 +25,22 @@ resource "crusoe_storage_disk" "example" {
 
 ### Required
 
-- `location` (String) Location where the disk is deployed.
+- `location` (String) Location where the disk is provisioned.
 - `name` (String) Name of the disk.
-- `size` (String) Storage capacity of the disk (e.g., `100GiB`, `1TiB`).
+- `size` (String) Storage capacity of the disk, given as a size and unit in the format `[Size][Unit]`, for example `100GiB` or `1TiB`.
 
 ### Optional
 
-- `block_size` (Number, Deprecated) Block size of the disk in bytes. Possible values: `512`, `4096`.
+- `block_size` (Number, Deprecated) Block size of the disk, in bytes. Possible values: `512`, `4096`.
 - `project_id` (String) ID of the project the disk belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 - `type` (String) Type of the disk. Possible values: `persistent-ssd`, `shared-volume`. This field will be required in a future release.
 
 ### Read-Only
 
-- `dns_name` (String) DNS name used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types.
-- `id` (String) Unique identifier of the disk.
+- `dns_name` (String) DNS name used to mount the disk. Populated only for `shared-volume` disks. Empty for other disk types.
+- `id` (String) ID of the disk.
 - `serial_number` (String) Serial number assigned to the disk.
-- `vips` (List of String) Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types.
+- `vips` (List of String) Virtual IP addresses used to mount the disk. Populated only for `shared-volume` disks. Empty for other disk types.
 
 ## Import
 

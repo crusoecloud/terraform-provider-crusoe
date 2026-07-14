@@ -81,31 +81,31 @@ resource "crusoe_load_balancer" "example" {
 
 ### Required
 
-- `algorithm` (String)
-- `destinations` (Attributes List) (see [below for nested schema](#nestedatt--destinations))
-- `location` (String)
-- `name` (String)
-- `network_interfaces` (Attributes List) (see [below for nested schema](#nestedatt--network_interfaces))
-- `protocols` (List of String)
+- `algorithm` (String) Load balancing algorithm used to distribute traffic across destinations (for example, `random`).
+- `destinations` (Attributes List) Backend targets the load balancer forwards traffic to, given as CIDR blocks or resource IDs. (see [below for nested schema](#nestedatt--destinations))
+- `location` (String) Location of the load balancer.
+- `name` (String) Name of the load balancer.
+- `network_interfaces` (Attributes List) Network interfaces the load balancer is attached to. (see [below for nested schema](#nestedatt--network_interfaces))
+- `protocols` (List of String) Network protocols the load balancer handles. Possible values: `tcp`, `udp`.
 
 ### Optional
 
 - `health_check` (Attributes) (see [below for nested schema](#nestedatt--health_check))
-- `project_id` (String)
-- `type` (String)
+- `project_id` (String) ID of the project the load balancer belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `type` (String) Type of the load balancer (for example, `internal_ipv4`).
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `ips` (Attributes List) (see [below for nested schema](#nestedatt--ips))
+- `id` (String) ID of the load balancer.
+- `ips` (Attributes List) IP addresses assigned to the load balancer. (see [below for nested schema](#nestedatt--ips))
 
 <a id="nestedatt--destinations"></a>
 ### Nested Schema for `destinations`
 
 Optional:
 
-- `cidr` (String)
-- `resource_id` (String)
+- `cidr` (String) CIDR block, or an IP address that is converted to a CIDR. Mutually exclusive with resource_id.
+- `resource_id` (String) ID of a backend resource. Mutually exclusive with cidr.
 
 
 <a id="nestedatt--network_interfaces"></a>
@@ -113,8 +113,8 @@ Optional:
 
 Optional:
 
-- `network` (String)
-- `subnet` (String)
+- `network` (String) ID of the VPC network for the interface.
+- `subnet` (String) ID of the subnet for the interface.
 
 
 <a id="nestedatt--health_check"></a>
@@ -122,11 +122,11 @@ Optional:
 
 Read-Only:
 
-- `failure_count` (String)
-- `interval` (String)
-- `port` (String)
-- `success_count` (String)
-- `timeout` (String)
+- `failure_count` (String) Number of allowed failures before considering a backend unhealthy.
+- `interval` (String) Interval between health checks, in seconds.
+- `port` (String) Port on which to perform health checks.
+- `success_count` (String) Number of successful checks required to consider a backend healthy.
+- `timeout` (String) Timeout for a health check response, in seconds.
 
 
 <a id="nestedatt--ips"></a>
@@ -142,7 +142,7 @@ Read-Only:
 
 Read-Only:
 
-- `address` (String)
+- `address` (String) Private IPv4 address.
 
 
 <a id="nestedatt--ips--public_ipv4"></a>
@@ -150,9 +150,9 @@ Read-Only:
 
 Read-Only:
 
-- `address` (String)
-- `id` (String)
-- `type` (String)
+- `address` (String) Public IPv4 address.
+- `id` (String) ID of the public IPv4 address.
+- `type` (String) Allocation type of the public IPv4 address (for example, `dynamic`).
 
 ## Import
 

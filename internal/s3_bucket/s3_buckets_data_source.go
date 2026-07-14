@@ -66,57 +66,57 @@ func (ds *s3BucketsDataSource) Schema(ctx context.Context, request datasource.Sc
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: descProjectID,
+				MarkdownDescription: providerDescProjectID,
 			},
 			"buckets": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "List of S3 buckets.",
+				MarkdownDescription: providerDescBuckets,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descName,
+							MarkdownDescription: apiDescName + " " + apiDescNameConstraint,
 						},
 						"project_id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descProjectID,
+							MarkdownDescription: providerDescProjectID,
 						},
 						"location": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descLocation,
+							MarkdownDescription: apiDescLocation,
 						},
 						"versioning_state": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descVersioningState,
+							MarkdownDescription: providerDescVersioningState,
 						},
 						"object_lock_enabled": schema.BoolAttribute{
 							Computed:            true,
-							MarkdownDescription: descObjectLockEnabled,
+							MarkdownDescription: providerDescObjectLockEnabled,
 						},
 						"retention_period": schema.Int64Attribute{
 							Computed:            true,
-							MarkdownDescription: descRetentionPeriod,
+							MarkdownDescription: apiDescRetentionPeriod + " " + providerDescObjectLockClause,
 						},
 						"retention_period_unit": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descRetentionPeriodUnit,
+							MarkdownDescription: providerDescRetentionPeriodUnit,
 						},
 						"tags": schema.MapAttribute{
 							Computed:            true,
 							ElementType:         types.StringType,
-							MarkdownDescription: descTags,
+							MarkdownDescription: apiDescTags,
 						},
 						"created_at": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descCreatedAt,
+							MarkdownDescription: apiDescCreatedAt,
 						},
 						"updated_at": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descUpdatedAt,
+							MarkdownDescription: apiDescUpdatedAt,
 						},
 						"s3_url": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descS3URL,
+							MarkdownDescription: apiDescS3URL,
 						},
 					},
 				},

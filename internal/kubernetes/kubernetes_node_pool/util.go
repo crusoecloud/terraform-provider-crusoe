@@ -16,11 +16,55 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
 var (
 	ErrFailedDemarshal = errors.New("failed to demarshal node pool operation into either node pool or node pool response")
 	ErrNodePoolBothNil = errors.New("neither node pool nor node pool response found")
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec
+// (KubernetesNodePool / KubernetesNodeTaint definitions; version,
+// requested_node_labels, and ssh_key from KubernetesNodePoolPostRequest).
+const (
+	apiDescID                            = "ID of the node pool."
+	apiDescVersion                       = "Version of the Kubernetes node pool."
+	apiDescImageID                       = "ID of the image used for the node pool."
+	apiDescType                          = "VM type of the node pool."
+	apiDescInstanceCount                 = "Number of nodes in the node pool."
+	apiDescClusterID                     = "ID of the Kubernetes cluster the node pool belongs to."
+	apiDescSubnetID                      = "ID of the subnet the node pool belongs to."
+	apiDescRequestedNodeLabels           = "Labels to assign to nodes in the new node pool."
+	apiDescNodeLabels                    = "Labels assigned to nodes in the node pool."
+	apiDescInstanceIDs                   = "IDs of the instances within the node pool."
+	apiDescSSHKey                        = "SSH public key to use for all VMs created from the new node pool."
+	apiDescState                         = "Current state of the node pool."
+	apiDescName                          = "Name of the node pool."
+	apiDescEphemeralStorageForContainerd = "Whether the first local ephemeral NVMe disk is used for containerd storage."
+	apiDescNvlinkDomainID                = "NVLink domain ID assigned to the node pool."
+	apiDescPublicIPType                  = "Public IP type for the node pool's nodes. Possible values: `dynamic`, `static`, `none`."
+	apiDescNodeTaints                    = "Taints applied to nodes in the node pool."
+
+	apiDescTaintKey    = "Taint key. Follows the Kubernetes qualified-name format: an optional DNS subdomain prefix (up to 253 characters) followed by a `/`, then a name segment (up to 63 characters). Allowed characters: alphanumerics, `-`, `_`, and `.`. Must start and end with an alphanumeric character. Keys beginning with `crusoe.ai/` are reserved for internal use."
+	apiDescTaintValue  = "Taint value. May be empty. Follows the same format rules as a Kubernetes label value: up to 63 characters, alphanumerics and `-`, `_`, `.`."
+	apiDescTaintEffect = "Taint effect, controlling how pods are treated on matching nodes. `NoSchedule`: new pods are not scheduled unless they tolerate. `PreferNoSchedule`: new pods avoid the node if possible. `NoExecute`: new pods are not scheduled and existing non-tolerating pods are evicted."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project that owns the node pool. " + project.ProviderDescProjectIDFallback
+
+	providerDescBatchSize = common.DevelopmentMessage + " " +
+		"Number of nodes to update at a time during rollout (minimum 1, maximum 10). " +
+		"Mutually exclusive with batch_percentage. " +
+		"If both this and batch_percentage are omitted, existing nodes will not be updated, " +
+		"but new nodes will use the new configuration."
+	providerDescBatchPercentage = common.DevelopmentMessage + " " +
+		"Percentage of nodes to update concurrently during rollout. " +
+		"The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. " +
+		"If both this and batch_size are omitted, existing nodes will not be updated, " +
+		"but new nodes will use the new configuration."
 )
 
 func ParseOpResultStrict[T any](opResult interface{}) (*T, error) {

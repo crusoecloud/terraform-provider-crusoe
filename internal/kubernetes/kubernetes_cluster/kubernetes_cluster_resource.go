@@ -92,20 +92,24 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"version": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescVersion,
 				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
 					"Kubernetes Version Change Not Supported",
 					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
@@ -117,74 +121,88 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				)},
 			},
 			"subnet_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescSubnetID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
 			},
 			"cluster_cidr": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescClusterCidr,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"node_cidr_mask_size": schema.Int64Attribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown(), int64planmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.Int64{int64validator.AtMost(math.MaxInt32)},
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescNodeCidrMaskSize,
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown(), int64planmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:          []validator.Int64{int64validator.AtMost(math.MaxInt32)},
 			},
 			"service_cluster_ip_range": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescServiceClusterIPRange,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"add_ons": schema.ListAttribute{
-				Computed:      true,
-				Optional:      true,
-				ElementType:   types.StringType,
-				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Default:       listdefault.StaticValue(emptyStringList),
+				Computed:            true,
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescAddOns,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Default:             listdefault.StaticValue(emptyStringList),
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"dns_name": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{},
+				Computed:            true,
+				MarkdownDescription: apiDescDNSName,
+				PlanModifiers:       []planmodifier.String{},
 			},
 			"nodepool_ids": schema.ListAttribute{
-				ElementType:   types.StringType,
-				Computed:      true,
-				PlanModifiers: []planmodifier.List{},
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: apiDescNodePoolIDs,
+				PlanModifiers:       []planmodifier.List{},
 			},
 			"oidc_issuer_url": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCIssuerURL,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_client_id": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCClientID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_username_claim": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCUsernameClaim,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_username_prefix": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCUsernamePrefix,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_groups_claim": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCGroupsClaim,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_ca_cert": schema.StringAttribute{
-				Optional:      true,
-				Description:   "CA certificate used to verify the OIDC server (optional).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCCACert,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"private": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescPrivate,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 					common.NewPrivateControlPlaneWarningModifier(),
@@ -192,19 +210,19 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Default: booldefault.StaticBool(false), // Default to false
 			},
 			"apiserver_extra_args": schema.MapAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescApiserverExtraArgs + " " + providerDescExtraArgsNote,
 			},
 			"scheduler_extra_args": schema.MapAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescSchedulerExtraArgs + " " + providerDescExtraArgsNote,
 			},
 			"controller_manager_extra_args": schema.MapAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescControllerManagerExtraArgs + " " + providerDescExtraArgsNote,
 			},
 		},
 	}

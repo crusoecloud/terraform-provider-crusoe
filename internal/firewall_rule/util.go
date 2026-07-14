@@ -10,6 +10,26 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (VpcFirewallRule).
+const (
+	apiDescID               = "ID of the firewall rule."
+	apiDescName             = "Name of the firewall rule."
+	apiDescNetwork          = "ID of the VPC network the rule belongs to."
+	apiDescAction           = "Action applied to traffic that matches the rule. Possible values: `allow`, `deny`."
+	apiDescDirection        = "Direction of traffic the rule applies to. Possible values: `ingress` (inbound), `egress` (outbound)."
+	apiDescProtocols        = "Network protocols the rule matches (for example, `tcp`, `udp`)."
+	apiDescSource           = "Sources the rule matches, given as CIDR blocks or resource IDs."
+	apiDescSourcePorts      = "Source ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`)."
+	apiDescDestination      = "Destinations the rule matches, given as CIDR blocks or resource IDs."
+	apiDescDestinationPorts = "Destination ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`)."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project the firewall rule belongs to. " + project.ProviderDescProjectIDFallback
 )
 
 var whitespaceRegex = regexp.MustCompile(`\s*`)

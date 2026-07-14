@@ -65,14 +65,17 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescName,
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:    true,
+				Computed:    true,
+				Description: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -80,36 +83,44 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"network": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescNetwork,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"action": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescAction,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^allow$"}}, // TODO: support deny once supported by API
+				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(allow|deny)$"}},
 			},
 			"direction": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescDirection,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(ingress|egress)"}},
 			},
 			"protocols": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescProtocols,
 				// TODO: add validator
 			},
 			"source": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescSource,
 				// TODO: add validator
 			},
 			"source_ports": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescSourcePorts,
 				// TODO: add validator
 			},
 			"destination": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescDestination,
 				// TODO: add validator
 			},
 			"destination_ports": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescDestinationPorts,
 				// TODO: add validator
 			},
 		},

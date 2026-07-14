@@ -100,76 +100,90 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 		Version:             1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(), // cannot be updated in place
 				},
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescName,
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescNetworkInterfaces,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"network": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescNetwork,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"subnet": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescSubnet,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
 			},
 			"destinations": schema.ListNestedAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescDestinations,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"cidr": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},                                                   // maintain across updates
-							Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/32)?$"}}, // load balancers only support the /32 mask
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescCidr,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},                                                   // maintain across updates
+							Validators:          []validator.String{validators.RegexValidator{RegexPattern: "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/32)?$"}}, // load balancers only support the /32 mask
 						},
 						"resource_id": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescResourceID,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"protocols": schema.ListAttribute{
-				ElementType: types.StringType,
-				Required:    true,
+				ElementType:         types.StringType,
+				Required:            true,
+				MarkdownDescription: apiDescProtocols,
 			},
 			"algorithm": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.String{stringvalidator.OneOf("random")},         // we currently only support random
+				Required:            true,
+				MarkdownDescription: apiDescAlgorithm,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:          []validator.String{stringvalidator.OneOf("random")},         // we currently only support random
 			},
 			"type": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescType,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"ips": schema.ListNestedAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescIPs,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
@@ -177,15 +191,18 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIPv4ID,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"address": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIPv4Address,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"type": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIPv4Type,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -194,7 +211,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
 								"address": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescPrivateIPv4Address,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -208,24 +226,29 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Attributes: map[string]schema.Attribute{
 					"timeout": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckTimeout,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"port": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckPort,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"interval": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckInterval,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"success_count": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckSuccessCount,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"failure_count": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckFailureCount,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 				},
 			},

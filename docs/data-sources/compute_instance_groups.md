@@ -24,7 +24,7 @@ data "crusoe_compute_instance_groups" "example" {}
 
 ### Optional
 
-- `project_id` (String) The ID of the project this instance group belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `project_id` (String) ID of the project that owns the instance group. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
@@ -35,14 +35,14 @@ data "crusoe_compute_instance_groups" "example" {}
 
 Read-Only:
 
-- `active_instance_ids` (List of String) A list of IDs of running instances in the instance group.
-- `created_at` (String) The timestamp when the instance group was created.
-- `desired_count` (Number) The desired number of VMs for the instance group.
-- `id` (String) The unique identifier of the instance group.
-- `inactive_instance_ids` (List of String) A list of IDs of non-running instances in the instance group.
-- `instance_template_id` (String) The ID of the instance template used for creating instances in this group.
-- `name` (String) The name of the instance group.
-- `project_id` (String) The ID of the project this instance group belongs to.
-- `running_instance_count` (Number) The number of running instances currently in the instance group.
-- `state` (String) The current state of the instance group. Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count).
-- `updated_at` (String) The timestamp when the instance group was most recently updated.
+- `active_instance_ids` (List of String) List of IDs of running instances in the instance group.
+- `created_at` (String) Creation timestamp of the instance group, in RFC3339 format.
+- `desired_count` (Number) Desired number of instances for the instance group.
+- `id` (String) ID of the instance group.
+- `inactive_instance_ids` (List of String) List of IDs of non-running instances in the instance group.
+- `instance_template_id` (String) ID of the instance template currently associated with the instance group.
+- `name` (String) Name of the instance group.
+- `project_id` (String) ID of the project that owns the instance group. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `running_instance_count` (Number) Number of running instances currently in the instance group.
+- `state` (String) Current state of the instance group. Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count).
+- `updated_at` (String) Last update timestamp of the instance group, in RFC3339 format.

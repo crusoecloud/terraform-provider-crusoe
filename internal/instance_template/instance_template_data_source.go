@@ -79,65 +79,81 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"id": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescID,
 					},
 					"name": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescName,
 					},
 					"project_id": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Optional:    true,
+						Computed:    true,
+						Description: providerDescProjectID,
 					},
 					"type": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescType,
 					},
 					"ssh_key": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescSSHKey,
 					},
 					"location": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Optional:    true,
+						Computed:    true,
+						Description: apiDescLocation,
 					},
 					"image": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Optional:    true,
+						Computed:    true,
+						Description: apiDescImage,
 					},
 					"startup_script": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescStartupScript,
 					},
 					"shutdown_script": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescShutdownScript,
 					},
 					"subnet": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescSubnet,
 					},
 					"ib_partition": schema.StringAttribute{
 						Computed: true,
 					},
 					"public_ip_address_type": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Optional:    true,
+						Computed:    true,
+						Description: apiDescPublicIPAddressType,
 					},
 					"disks": schema.ListNestedAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescDisks,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"size": schema.StringAttribute{
-									Computed: true,
+									Computed:    true,
+									Description: apiDescDiskSize,
 								},
 								"type": schema.StringAttribute{
-									Computed: true,
+									Computed:    true,
+									Description: apiDescDiskType,
 								},
 							},
 						},
 					},
 					"placement_policy": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Optional:    true,
+						Computed:    true,
+						Description: apiDescPlacementPolicy,
 					},
 					"nvlink_domain_id": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Optional:    true,
+						Computed:    true,
+						Description: apiDescNvlinkDomainID,
 					},
 				},
 			},

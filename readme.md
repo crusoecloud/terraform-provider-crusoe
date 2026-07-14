@@ -122,6 +122,8 @@ Run `make install` to build a provider and install it into your go-path. Then, y
 
 Other common commands are: `terraform init` to initialize your working directory, and `terraform plan` to preview changes without applying them. 
 
+Schema attribute descriptions are derived from the `github.com/crusoecloud/client-go` swagger spec (the source of truth). When adding schema fields, generate the text with the `/derive-schema-descriptions` Claude Code skill instead of hand-writing it, then regenerate docs with `make docs`.
+
 ## Versioning
 
 A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub.

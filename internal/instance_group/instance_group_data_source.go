@@ -67,61 +67,61 @@ func (ds *instanceGroupsDataSource) Schema(ctx context.Context, request datasour
 		Attributes: map[string]schema.Attribute{
 			"instance_groups": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "List of instance groups in the project.",
+				MarkdownDescription: providerDescInstanceGroups,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descID,
+							MarkdownDescription: apiDescID,
 						},
 						"name": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descName,
+							MarkdownDescription: apiDescName,
 						},
 						"instance_template_id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descInstanceTemplateID,
+							MarkdownDescription: apiDescInstanceTemplateID,
 						},
 						"running_instance_count": schema.Int64Attribute{
 							Computed:            true,
-							MarkdownDescription: descRunningInstanceCount,
+							MarkdownDescription: apiDescRunningInstanceCount,
 						},
 						"desired_count": schema.Int64Attribute{
 							Computed:            true,
-							MarkdownDescription: descDesiredCount,
+							MarkdownDescription: apiDescDesiredCount,
 						},
 						"state": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descState,
+							MarkdownDescription: apiDescState + " " + providerDescState,
 						},
 						"project_id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descProjectID,
+							MarkdownDescription: providerDescProjectID,
 						},
 						"active_instance_ids": schema.ListAttribute{
 							ElementType:         types.StringType,
 							Computed:            true,
-							MarkdownDescription: descActiveInstanceIDs,
+							MarkdownDescription: apiDescActiveInstanceIDs,
 						},
 						"inactive_instance_ids": schema.ListAttribute{
 							ElementType:         types.StringType,
 							Computed:            true,
-							MarkdownDescription: descInactiveInstanceIDs,
+							MarkdownDescription: apiDescInactiveInstanceIDs,
 						},
 						"created_at": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descCreatedAt,
+							MarkdownDescription: apiDescCreatedAt,
 						},
 						"updated_at": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descUpdatedAt,
+							MarkdownDescription: apiDescUpdatedAt,
 						},
 					},
 				},
 			},
 			"project_id": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: descProjectID + " " + descProjectIDInference,
+				MarkdownDescription: providerDescProjectID,
 			},
 		},
 	}

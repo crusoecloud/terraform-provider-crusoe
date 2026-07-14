@@ -26,16 +26,16 @@ resource "crusoe_ib_partition" "example" {
 
 ### Required
 
-- `ib_network_id` (String)
-- `name` (String)
+- `ib_network_id` (String) ID of the InfiniBand network the partition belongs to.
+- `name` (String) Name of the InfiniBand partition.
 
 ### Optional
 
-- `project_id` (String)
+- `project_id` (String) ID of the project the InfiniBand partition belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
+- `id` (String) ID of the InfiniBand partition.
 
 ## Import
 

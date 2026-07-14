@@ -83,8 +83,9 @@ func (r *tokenResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"token": schema.StringAttribute{
-				Computed:  true,
-				Sensitive: true,
+				Computed:            true,
+				Sensitive:           true,
+				MarkdownDescription: apiDescToken,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(), // maintain across updates
 				},

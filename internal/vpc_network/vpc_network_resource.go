@@ -62,11 +62,13 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:    true,
+				Computed:    true,
+				Description: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -74,19 +76,23 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 			},
 			"cidr": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescCIDR,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescName,
 			},
 			"gateway": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescGateway,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 
 			},
 			"subnets": schema.ListAttribute{
 				ElementType:   types.StringType,
 				Computed:      true,
+				Description:   apiDescSubnets,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 		},

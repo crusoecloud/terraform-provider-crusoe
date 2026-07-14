@@ -8,6 +8,21 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (VpcNetwork).
+const (
+	apiDescID      = "ID of the VPC network."
+	apiDescName    = "Name of the VPC network."
+	apiDescCIDR    = "Address range of the VPC network, in CIDR notation."
+	apiDescGateway = "ID of the VPC network's gateway."
+	apiDescSubnets = "IDs of the subnets that belong to the VPC network. Empty if the network has none."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project the VPC network belongs to. " + project.ProviderDescProjectIDFallback
 )
 
 func findVpcNetwork(ctx context.Context, client *swagger.APIClient, vpcNetworkID string) (*swagger.VpcNetwork, string, error) {

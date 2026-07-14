@@ -74,16 +74,20 @@ func (ds *imagesDataSource) Schema(ctx context.Context, request datasource.Schem
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"manifest_count": schema.Int64Attribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescManifestCount,
 						},
 						"name": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescName,
 						},
 						"pull_count": schema.Int64Attribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescPullCount,
 						},
 						"url": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescURL,
 						},
 					},
 				},

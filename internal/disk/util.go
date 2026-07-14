@@ -11,24 +11,30 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
 const gibInTib = 1024
 
-// Shared schema descriptions for resource and data source
+// apiDesc* — schema descriptions derived from the client-go swagger spec (DiskV1).
 const (
-	descID                 = "Unique identifier of the disk."
-	descName               = "Name of the disk."
-	descProjectID          = "ID of the project the disk belongs to."
-	descProjectIDInference = "If not specified, the project ID will be inferred from the Crusoe configuration."
-	descType               = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
-	descTypeRequired       = "This field will be required in a future release."
-	descSize               = "Storage capacity of the disk (e.g., `100GiB`, `1TiB`)."
-	descLocation           = "Location where the disk is deployed."
-	descSerialNumber       = "Serial number assigned to the disk."
-	descBlockSize          = "Block size of the disk in bytes. Possible values: `512`, `4096`."
-	descDNSName            = "DNS name used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
-	descVips               = "Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
+	apiDescID           = "ID of the disk."
+	apiDescName         = "Name of the disk."
+	apiDescType         = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
+	apiDescSize         = "Storage capacity of the disk, given as a size and unit in the format `[Size][Unit]`, for example `100GiB` or `1TiB`."
+	apiDescLocation     = "Location where the disk is provisioned."
+	apiDescSerialNumber = "Serial number assigned to the disk."
+	apiDescBlockSize    = "Block size of the disk, in bytes. Possible values: `512`, `4096`."
+	apiDescDNSName      = "DNS name used to mount the disk. Populated only for `shared-volume` disks."
+	apiDescVips         = "Virtual IP addresses used to mount the disk. Populated only for `shared-volume` disks."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID         = "ID of the project the disk belongs to. " + project.ProviderDescProjectIDFallback
+	providerDescTypeRequired      = "This field will be required in a future release."
+	providerDescSharedVolumeEmpty = "Empty for other disk types."
+	providerDescDisks             = "List of disks in the project."
 )
 
 // blockSizeDeprecationMessage marks the deprecated block_size attribute on both

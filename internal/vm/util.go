@@ -12,6 +12,7 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
 const (
@@ -19,6 +20,62 @@ const (
 	StateRunning = "STATE_RUNNING"
 	StateStopped = "STATE_STOPPED"
 	StateShutoff = "STATE_SHUTOFF"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (InstanceV1).
+// Config-only inputs (ssh_key, image, custom_image, startup_script, shutdown_script,
+// install_crusoe_watch_agent) are derived from InstancesPostRequestV1; nested attributes
+// come from DiskAttachment, NetworkInterface, PublicIpv4Address, and PrivateIpv4Address.
+const (
+	apiDescID       = "ID of the VM."
+	apiDescName     = "Name of the VM."
+	apiDescType     = "Product name of the VM type."
+	apiDescLocation = "Location the VM runs in."
+
+	// disks (InstanceV1.disks -> DiskAttachment)
+	apiDescDisks              = "Disks attached to the VM."
+	apiDescDiskID             = "ID of the disk to attach."
+	apiDescDiskAttachmentType = "Role the disk plays for the VM. Possible values: `os`, `data`."
+	apiDescDiskMode           = "Access mode to attach the disk with. Possible values: `read-only`, `read-write`."
+
+	// network_interfaces (InstanceV1.network_interfaces -> NetworkInterface)
+	apiDescNetworkInterfaces = "Network interfaces attached to the VM."
+	apiDescNIID              = "ID of the network interface."
+	apiDescNIName            = "Name of the network interface."
+	apiDescNINetwork         = "ID of the VPC network the interface is attached to."
+	apiDescNISubnet          = "ID of the VPC subnet the interface is attached to."
+	apiDescNIInterfaceType   = "Type of the network interface."
+	apiDescExternalDNSName   = "External DNS name of the network interface."
+
+	// public_ipv4 (NetworkInterface.ips[].public_ipv4 -> PublicIpv4Address)
+	apiDescPublicIpv4ID      = "ID of the public IPv4 address."
+	apiDescPublicIpv4Address = "Public IPv4 address."
+	apiDescPublicIpv4Type    = "Allocation type of the public IPv4 address (for example, `dynamic`)."
+
+	// private_ipv4 (NetworkInterface.ips[].private_ipv4 -> PrivateIpv4Address)
+	apiDescPrivateIpv4Address = "Private IPv4 address."
+
+	// host_channel_adapters (InstanceV1.host_channel_adapters)
+	apiDescHostChannelAdapters = "Host channel adapters attached to the VM."
+
+	apiDescNvlinkDomainID = "ID of the NVLink domain the VM belongs to, if any."
+
+	// config-only inputs (InstancesPostRequestV1)
+	apiDescSSHKey                  = "SSH public key to grant access to the new VM."
+	apiDescImage                   = "Name of the OS image to use for the new VM. Either `image` or `custom_image` should be supplied, not both."
+	apiDescCustomImage             = "ID of a custom image to use for the new VM. Either `image` or `custom_image` should be supplied, not both."
+	apiDescStartupScript           = "Script to run when the VM starts."
+	apiDescShutdownScript          = "Script to run when the VM shuts down."
+	apiDescInstallCrusoeWatchAgent = "Whether to install the Crusoe Watch Agent on the VM. Defaults to true."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project that owns the VM. " + project.ProviderDescProjectIDFallback
+	// reservation_id keeps the existing provider deprecation/behavior wording rather than
+	// the spec text; the field is deprecated and its behavior is provider-specific.
+	providerDescReservationID = "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string."
+	providerDescIBPartitionID = "Infiniband Partition ID."
 )
 
 // instanceTypeFamily returns the product-family prefix of an instance type,

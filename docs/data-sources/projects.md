@@ -28,5 +28,5 @@ data "crusoe_projects" "example" {}
 
 Read-Only:
 
-- `id` (String)
-- `name` (String)
+- `id` (String) ID of the project.
+- `name` (String) Name of the project.

@@ -9,18 +9,26 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
-// Description constants for S3 key schema attributes.
+// apiDesc* — schema descriptions derived from the client-go swagger spec
+// (S3Key; secret_access_key from CreateS3KeyResponse.secret_key).
 const (
-	descKeyID       = "Unique identifier of the S3 key."
-	descAccessKeyID = "S3-compatible access key ID (format: `S3U_...`)."
+	apiDescKeyID       = "ID of the S3 access key."
+	apiDescAccessKeyID = "Access key ID used to authenticate S3 requests."
 	//nolint:gosec // G101: This is a description string, not actual credentials
-	descSecretAccessKey = "S3-compatible secret access key. **Only returned once on creation** - store securely."
-	descAlias           = "Human-readable alias for the key."
-	descStatus          = "Status of the key. Possible values: `enabled`, `disabled`."
-	descCreatedAt       = "Timestamp when the key was created (RFC3339 format)."
-	descExpireAt        = "Expiration timestamp for the key (RFC3339 format)."
-	descUserID          = "ID of the user who owns the key."
-	descOrganizationID  = "ID of the organization the key belongs to."
+	apiDescSecretAccessKey = "Secret access key paired with the access key ID. Returned only once, at creation."
+	apiDescAlias           = "Human-readable alias for the S3 access key."
+	apiDescStatus          = "Status of the S3 access key. Possible values: `enabled`, `disabled`."
+	apiDescCreatedAt       = "Creation timestamp of the S3 access key, in RFC3339 format."
+	apiDescExpireAt        = "Expiration timestamp of the S3 access key, in RFC3339 format."
+	apiDescUserID          = "ID of the user that owns the S3 access key."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescOrganizationID          = "ID of the organization the key belongs to."
+	providerDescOrganizationIDInference = "If not specified, inferred from the authenticated user."
+	providerDescExpireAtExample         = "For example, `2025-12-31T23:59:59Z`."
+	providerDescKeys                    = "List of S3 access keys."
 )
 
 var (

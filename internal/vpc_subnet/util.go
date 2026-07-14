@@ -9,6 +9,28 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (VpcSubnet;
+// nested NatGateway; nat_gateway_enabled from VpcSubnetPostRequest).
+const (
+	apiDescID                = "ID of the VPC subnet."
+	apiDescName              = "Name of the VPC subnet."
+	apiDescCIDR              = "Address range of the VPC subnet, in CIDR notation."
+	apiDescLocation          = "Location of the VPC subnet."
+	apiDescNetwork           = "ID of the VPC network that the subnet belongs to."
+	apiDescNATGatewayEnabled = "Whether to create a NAT gateway for the subnet."
+	apiDescNATGateways       = "NAT gateways attached to the subnet. Empty unless a NAT gateway is enabled for the subnet."
+
+	apiDescNATGatewayID                = "ID of the NAT gateway."
+	apiDescNATGatewayPublicIPv4Address = "Public IPv4 address assigned to the NAT gateway."
+	apiDescNATGatewayPublicIPv4ID      = "ID of the public IPv4 address assigned to the NAT gateway."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID = "ID of the project the VPC subnet belongs to. " + project.ProviderDescProjectIDFallback
 )
 
 var vpcSubnetNatGatewaySchema = types.ObjectType{

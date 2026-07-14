@@ -62,16 +62,16 @@ func (ds *tokensDataSource) Schema(ctx context.Context, request datasource.Schem
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Optional:           true,
-				DeprecationMessage: common.FormatDeprecation("v0.6.0") + " This field has no effect; registry tokens are org-scoped, not project-scoped.",
+				DeprecationMessage: providerDescProjectIDDeprecated,
 			},
 			"tokens": schema.ListNestedAttribute{
-				Computed:    true,
-				Description: "List of container registry tokens.",
+				Computed:            true,
+				MarkdownDescription: providerDescTokensList,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed:    true,
-							Description: "Unique identifier for the token.",
+							Computed:            true,
+							MarkdownDescription: providerDescTokenID,
 						},
 						"alias": schema.StringAttribute{
 							Computed: true,

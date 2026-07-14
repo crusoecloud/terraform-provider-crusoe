@@ -32,29 +32,29 @@ data "crusoe_instance_templates" "example" {}
 
 Optional:
 
-- `image` (String)
-- `location` (String)
-- `nvlink_domain_id` (String)
-- `placement_policy` (String)
-- `project_id` (String)
-- `public_ip_address_type` (String)
+- `image` (String) OS Image to use for all VMs created from this instance template.
+- `location` (String) Location to use for all VMs created from this instance template. May be empty if we do not want to bind this template to a location.
+- `nvlink_domain_id` (String) NVLink domain assigned to all VMs created from this instance template.
+- `placement_policy` (String) Placement policy controlling how VMs created from this instance template are distributed across hosts. Possible values: `spread`, `unspecified`.
+- `project_id` (String) ID of the project this instance template belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `public_ip_address_type` (String) Public IP address type to use for all VMs created from this instance template. Must either be `static` or `dynamic`.
 
 Read-Only:
 
-- `disks` (Attributes List) (see [below for nested schema](#nestedatt--instance_templates--disks))
+- `disks` (Attributes List) Disks attached to all VMs created from this instance template. (see [below for nested schema](#nestedatt--instance_templates--disks))
 - `ib_partition` (String)
-- `id` (String)
-- `name` (String)
-- `shutdown_script` (String)
-- `ssh_key` (String)
-- `startup_script` (String)
-- `subnet` (String)
-- `type` (String)
+- `id` (String) ID of the instance template.
+- `name` (String) Name of the instance template. (This is not the name of the VMs created from this instance template.)
+- `shutdown_script` (String) Shutdown script to use for all VMs created from this instance template.
+- `ssh_key` (String) SSH public key to use for all VMs created from this instance template.
+- `startup_script` (String) Startup script to use for all VMs created from this instance template.
+- `subnet` (String) SubnetID to use for all VMs created from this instance template. Only used if template has a location.
+- `type` (String) Product name of the VM type we want to create from this instance template.
 
 <a id="nestedatt--instance_templates--disks"></a>
 ### Nested Schema for `instance_templates.disks`
 
 Read-Only:
 
-- `size` (String)
-- `type` (String)
+- `size` (String) Size of the disk, including a unit suffix.
+- `type` (String) Type of disk to create. Possible values: `persistent-ssd`, `shared-volume`.
