@@ -1,3 +1,38 @@
+## 1.1.0
+
+NEW FEATURES:
+
+- Added `crusoe_kubeconfig` data source for reading a Kubernetes cluster's kubeconfig.
+
+ENHANCEMENTS:
+
+- `terraform import` now accepts an optional project ID as `<resource_id>,<project_id>`, so resources in a non-default project can be imported without changing your default project. The plain `<resource_id>` form still works and falls back to the default project.
+- `crusoe_compute_instance` instance `type` can now be changed in place for resizes within the same product family (the VM is stopped, resized, and started again if it was running). Changes across product families still replace the instance.
+- Schema attribute descriptions are now derived from the Crusoe API spec and surfaced in the registry documentation.
+- Upgraded the Terraform Plugin Framework/SDK.
+
+BUG FIXES:
+
+- Fixed list data sources re-ordering their results between reads, which produced spurious diffs; results are now sorted deterministically.
+- Fixed data sources silently dropping API-returned values from state by marking API-populated fields `Computed`: `crusoe_instance_templates`, `crusoe_compute_instance` (`disks`), `crusoe_kubernetes_cluster`, and `crusoe_kubernetes_node_pool` (also corrects the node pool `image_id` mapping).
+- Fixed drift and perpetual diffs by mapping CRUD state consistently from the API response across `crusoe_compute_instance`, `crusoe_kubernetes_cluster`, `crusoe_kubernetes_node_pool`, `crusoe_load_balancer`, `crusoe_project`, `crusoe_vpc_network`, `crusoe_vpc_subnet`, `crusoe_instance_template`, `crusoe_registry_repository`, `crusoe_storage_s3_key`, `crusoe_ib_partition`, `crusoe_storage_disk`, and `crusoe_vpc_firewall_rule`.
+- Fixed `crusoe_load_balancer` health check handling that could panic or drop configured values.
+- Preserved the user-configured port/protocol list format on `crusoe_vpc_firewall_rule` across create and update.
+- Replaced `panic()` calls in the `crusoe_kubernetes_cluster`, registry repository, and kubeconfig update paths with proper error diagnostics.
+- Fixed `crusoe_compute_custom_image` data source to surface API errors clearly.
+- Added a nil-response check in HTTP status validation to prevent a potential panic on empty responses.
+
+UPGRADE NOTES:
+
+- `crusoe_instance_template`: disk `type` is now a required field. It was already required by the Crusoe API (a config omitting it previously failed at apply); add `type = "persistent-ssd"` (or `"shared-volume"`) to any disk block that omits it.
+- `crusoe_storage_disk`: the `block_size` attribute (resource and data source) is deprecated and will be removed in a future release.
+
+## 1.0.1
+
+ENHANCEMENTS:
+
+- The Crusoe Watch Agent is now installed by default on new VMs (`install_crusoe_watch_agent` defaults to `true`); set it to `false` to opt out. Existing VMs are unaffected.
+
 ## 1.0.0
 
 ENHANCEMENTS:

@@ -467,9 +467,9 @@ Watch out for these frequently triggered lint errors:
 
 ## Changelog and Versioning
 
-Update `CHANGELOG.md` and `versions.env` **only when merging to the `release` branch**, not when merging to `main`.
+When preparing a release, commit the `CHANGELOG.md` and `versions.env` updates **to `main` first** (a dedicated release-prep commit), **then** open the `main → release` MR. Do **not** edit these files on the `release` branch or as part of the release MR, and don't squash the release MR — release-only commits make `release` diverge from `main` and cause conflicts on the next `main → release` merge. Ordinary feature merges into `main` should not touch these files; only the release-prep commit does.
 
-See [readme.md](readme.md) (Versioning and Maintaining Changelog sections) for full details on semantic versioning rules, `versions.env` format, changelog categories, and examples.
+See [readme.md](readme.md) (Contributing, Versioning, and Maintaining Changelog sections) for full details on semantic versioning rules, `versions.env` format, changelog categories, and examples.
 
 ## Creating Merge Request Descriptions
 

@@ -74,6 +74,11 @@ func (r *repositoryResource) Metadata(ctx context.Context, request resource.Meta
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		// DO NOT lower or remove, or Terraform rejects existing state as "managed
+		// by a newer provider version" and breaks upgrades. This resource was
+		// born at Version 2 (its very first release); no state upgrader exists
+		// or is needed.
+		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Computed:            true,

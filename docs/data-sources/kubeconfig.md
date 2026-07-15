@@ -28,7 +28,7 @@ data "crusoe_kubeconfig" "example" {
 ### Optional
 
 - `auth_type` (String) Authentication type for fetching kubeconfig. Possible values: `admin_cert`, `oidc`. If unset, defaults to `admin_cert`.
-- `project_id` (String) ID of the project the Kubernetes cluster belongs to.
+- `project_id` (String) ID of the project the Kubernetes cluster belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 
 ### Read-Only
 

@@ -156,7 +156,7 @@ export MAJOR_VERSION=0
 export MINOR_VERSION=6
 ```
 
-Update this file **only for major or minor version bumps** when merging to `release`. Patch versions are auto-incremented by the release pipeline.
+Update this file **only for major or minor version bumps**, in the same release-prep commit on `main` that adds the changelog entry (before the release MR is opened) — not on the `release` branch. Patch versions are auto-incremented by the release pipeline.
 
 ## Contributing
 
@@ -172,7 +172,7 @@ Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 
 The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
 
-**Every merge to the `release` branch must include a changelog entry.** To add an entry:
+**Every release must include a changelog entry, committed to `main` *before* the release MR is opened** (see the Contributing steps above) — do not add it on the `release` branch or inside the release MR, which would make `release` diverge from `main` and conflict on the next merge. To add an entry:
 
 1. Open `CHANGELOG.md` and add a new version section at the top
 2. Increment the version number from the previous release (e.g., `0.5.45` → `0.5.46`)
