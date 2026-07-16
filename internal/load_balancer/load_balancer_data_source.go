@@ -90,56 +90,70 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 		MarkdownDescription: common.DevelopmentMessage,
 		Attributes: map[string]schema.Attribute{
 			"load_balancers": schema.ListNestedAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: providerDescLoadBalancers,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescID,
 						},
 						"name": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescName,
 						},
 						"network_interfaces": schema.ListNestedAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescNetworkInterfaces,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"network": schema.StringAttribute{
-										Computed: true,
+										Computed:            true,
+										MarkdownDescription: apiDescNetwork,
 									},
 									"subnet": schema.StringAttribute{
-										Computed: true,
+										Computed:            true,
+										MarkdownDescription: apiDescSubnet,
 									},
 								},
 							},
 						},
 						"destinations": schema.ListNestedAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescDestinations,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"cidr": schema.StringAttribute{
-										Computed: true,
+										Computed:            true,
+										MarkdownDescription: apiDescCidr,
 									},
 									"resource_id": schema.StringAttribute{
-										Computed: true,
+										Computed:            true,
+										MarkdownDescription: apiDescResourceID,
 									},
 								},
 							},
 						},
 						"location": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescLocation,
 						},
 						"protocols": schema.ListAttribute{
-							ElementType: types.StringType,
-							Computed:    true,
+							ElementType:         types.StringType,
+							Computed:            true,
+							MarkdownDescription: apiDescProtocols,
 						},
 						"algorithm": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescAlgorithm,
 						},
 						"type": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescType,
 						},
 						"ips": schema.ListNestedAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescIPs,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"public_ipv4": schema.SingleNestedAttribute{
@@ -147,7 +161,8 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 										Optional: true,
 										Attributes: map[string]schema.Attribute{
 											"address": schema.StringAttribute{
-												Computed: true,
+												Computed:            true,
+												MarkdownDescription: apiDescPublicIPv4Address,
 											},
 										},
 									},
@@ -155,7 +170,8 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 										Computed: true,
 										Attributes: map[string]schema.Attribute{
 											"address": schema.StringAttribute{
-												Computed: true,
+												Computed:            true,
+												MarkdownDescription: apiDescPrivateIPv4Address,
 											},
 										},
 									},
@@ -166,19 +182,24 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
 								"timeout": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescHealthCheckTimeout,
 								},
 								"port": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescHealthCheckPort,
 								},
 								"interval": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescHealthCheckInterval,
 								},
 								"success_count": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescHealthCheckSuccessCount,
 								},
 								"failure_count": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescHealthCheckFailureCount,
 								},
 							},
 						},
@@ -186,7 +207,8 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 				},
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
 			},
 		},
 	}
@@ -234,6 +256,12 @@ func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadR
 			},
 		})
 	}
+
+	// Sort load balancers deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.LoadBalancers,
+		func(lb loadBalancerModel) string { return lb.Name },
+		func(lb loadBalancerModel) string { return lb.ID },
+	)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

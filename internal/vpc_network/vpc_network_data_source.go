@@ -2,6 +2,7 @@ package vpc_network
 
 import (
 	"context"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -60,26 +61,32 @@ func (ds *vpcNetworksDataSource) Schema(ctx context.Context, request datasource.
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"id": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescID,
 					},
 					"name": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescName,
 					},
 					"cidr": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescCIDR,
 					},
 					"gateway": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescGateway,
 					},
 					"subnets": schema.ListAttribute{
 						ElementType: types.StringType,
 						Optional:    true,
+						Description: apiDescSubnets,
 					},
 				},
 			},
 		},
 		"project_id": schema.StringAttribute{
-			Optional: true,
+			Optional:    true,
+			Description: providerDescProjectID,
 		},
 	}}
 }
@@ -107,14 +114,23 @@ func (ds *vpcNetworksDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	var state vpcNetworksDataSourceModel
 	for i := range dataResp.Items {
+		// Sort subnet IDs for deterministic ordering; the API does not guarantee a stable order.
+		subnets := dataResp.Items[i].Subnets
+		slices.Sort(subnets)
 		state.VPCNetworks = append(state.VPCNetworks, vpcNetworksModel{
 			ID:      dataResp.Items[i].Id,
 			Name:    dataResp.Items[i].Name,
 			CIDR:    dataResp.Items[i].Cidr,
 			Gateway: dataResp.Items[i].Gateway,
-			Subnets: dataResp.Items[i].Subnets,
+			Subnets: subnets,
 		})
 	}
+
+	// Sort VPC networks deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.VPCNetworks,
+		func(n vpcNetworksModel) string { return n.Name },
+		func(n vpcNetworksModel) string { return n.ID },
+	)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

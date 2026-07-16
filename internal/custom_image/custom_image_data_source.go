@@ -2,6 +2,7 @@ package custom_image
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -58,38 +59,39 @@ func (ds *customImageDataSource) Metadata(_ context.Context, request datasource.
 func (ds *customImageDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
 		"project_id": schema.StringAttribute{
-			Optional: true,
+			Optional:    true,
+			Description: providerDescProjectID,
 		},
 		"name": schema.StringAttribute{
 			Optional:    true,
-			Description: "Filter custom images by name. This is a case-sensitive exact match.",
+			Description: providerDescNameFilter,
 		},
 		"name_prefix": schema.StringAttribute{
 			Optional:    true,
-			Description: "Filter custom images by name prefix. This is case-sensitive and does not require trailing dashes.",
+			Description: providerDescNamePrefixFilter,
 		},
 		"custom_images": schema.ListNestedAttribute{
 			Computed: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
-					"id":          schema.StringAttribute{Computed: true},
-					"name":        schema.StringAttribute{Computed: true},
-					"description": schema.StringAttribute{Computed: true},
-					"locations":   schema.ListAttribute{ElementType: types.StringType, Computed: true},
-					"tags":        schema.ListAttribute{ElementType: types.StringType, Computed: true},
-					"created_at":  schema.StringAttribute{Computed: true},
+					"id":          schema.StringAttribute{Computed: true, Description: apiDescID},
+					"name":        schema.StringAttribute{Computed: true, Description: apiDescName},
+					"description": schema.StringAttribute{Computed: true, Description: apiDescDescription},
+					"locations":   schema.ListAttribute{ElementType: types.StringType, Computed: true, Description: apiDescLocations},
+					"tags":        schema.ListAttribute{ElementType: types.StringType, Computed: true, Description: apiDescTags},
+					"created_at":  schema.StringAttribute{Computed: true, Description: apiDescCreatedAt},
 				},
 			},
 		},
 		"newest_image": schema.SingleNestedAttribute{
 			Computed: true,
 			Attributes: map[string]schema.Attribute{
-				"id":          schema.StringAttribute{Computed: true},
-				"name":        schema.StringAttribute{Computed: true},
-				"description": schema.StringAttribute{Computed: true},
-				"locations":   schema.ListAttribute{ElementType: types.StringType, Computed: true},
-				"tags":        schema.ListAttribute{ElementType: types.StringType, Computed: true},
-				"created_at":  schema.StringAttribute{Computed: true},
+				"id":          schema.StringAttribute{Computed: true, Description: apiDescID},
+				"name":        schema.StringAttribute{Computed: true, Description: apiDescName},
+				"description": schema.StringAttribute{Computed: true, Description: apiDescDescription},
+				"locations":   schema.ListAttribute{ElementType: types.StringType, Computed: true, Description: apiDescLocations},
+				"tags":        schema.ListAttribute{ElementType: types.StringType, Computed: true, Description: apiDescTags},
+				"created_at":  schema.StringAttribute{Computed: true, Description: apiDescCreatedAt},
 			},
 		},
 	}}
@@ -111,12 +113,23 @@ func (ds *customImageDataSource) Read(ctx context.Context, req datasource.ReadRe
 		defer httpResp.Body.Close()
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch custom images", err.Error())
+		resp.Diagnostics.AddError(
+			"Failed to fetch custom images",
+			fmt.Sprintf("Could not fetch custom images: %s", common.UnpackAPIError(err)),
+		)
 
 		return
 	}
 
 	filteredImages := filterCustomImagesListResponse(&apiResp, config)
+
+	// Sort images deterministically so repeated reads produce a stable ordering.
+	// newest_image is computed independently below via its own copy-sort.
+	common.SortByKeys(filteredImages,
+		func(img customImageModel) string { return img.Name },
+		func(img customImageModel) string { return img.CreatedAt },
+		func(img customImageModel) string { return img.ID },
+	)
 
 	var state customImageDataSourceModel
 	state.Name = config.Name

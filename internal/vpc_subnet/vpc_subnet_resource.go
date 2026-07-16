@@ -73,11 +73,13 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:    true,
+				Computed:    true,
+				Description: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -85,47 +87,54 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"cidr": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescCIDR,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescName,
 			},
 			"location": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescLocation,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				}, // maintain across updates
 			},
 			"network": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescNetwork,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				}, // maintain across updates
 			},
 			"nat_gateway_enabled": schema.BoolAttribute{
-				MarkdownDescription: common.DevelopmentMessage,
+				MarkdownDescription: apiDescNATGatewayEnabled + " " + common.DevelopmentMessage,
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"nat_gateways": schema.ListNestedAttribute{
-				MarkdownDescription: common.DevelopmentMessage,
+				MarkdownDescription: apiDescNATGateways + " " + common.DevelopmentMessage,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed: true,
+							Computed:    true,
+							Description: apiDescNATGatewayID,
 						},
 						"public_ipv4_address": schema.StringAttribute{
-							Computed: true,
+							Computed:    true,
+							Description: apiDescNATGatewayPublicIPv4Address,
 						},
 						"public_ipv4_id": schema.StringAttribute{
-							Computed: true,
+							Computed:    true,
+							Description: apiDescNATGatewayPublicIPv4ID,
 						},
 					},
 				},
@@ -135,15 +144,21 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 }
 
 func (r *vpcSubnetResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "vpc_subnet_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import VPC Subnet", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan vpcSubnetResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -166,32 +181,19 @@ func (r *vpcSubnetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	plan.ID = types.StringValue(dataResp.Subnet.Id)
-	plan.Name = types.StringValue(dataResp.Subnet.Name)
-	plan.CIDR = types.StringValue(dataResp.Subnet.Cidr)
-	plan.Location = types.StringValue(dataResp.Subnet.Location)
-	plan.Network = types.StringValue(dataResp.Subnet.VpcNetworkId)
+	vpcSubnetToTerraformResourceModel(ctx, dataResp.Subnet, &plan, &resp.Diagnostics)
 	plan.ProjectID = types.StringValue(projectID)
-
-	natGatewaysList, natDiags := natGatewaysToTerraformResourceModel(ctx, dataResp.Subnet.NatGateways)
-	if natDiags.HasError() {
-		resp.Diagnostics.Append(natDiags...)
-
+	if resp.Diagnostics.HasError() {
 		return
 	}
-	plan.NATGateways = natGatewaysList
-	plan.NATGatewayEnabled = types.BoolValue(len(natGatewaysList.Elements()) > 0)
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state vpcSubnetResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -217,23 +219,18 @@ func (r *vpcSubnetResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	vpcSubnetToTerraformResourceModel(ctx, &vpcSubnet, &state, &resp.Diagnostics)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state vpcSubnetResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan vpcSubnetResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -261,7 +258,7 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.VpcSubnet](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+	vpcSubnet, _, err := common.AwaitOperationAndResolve[swagger.VpcSubnet](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCSubnetOperationsApi.GetNetworkingVPCSubnetsOperation(ctx, projectID, opID)
 	})
 	if err != nil {
@@ -271,16 +268,18 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	vpcSubnetToTerraformResourceModel(ctx, vpcSubnet, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcSubnetResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state vpcSubnetResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

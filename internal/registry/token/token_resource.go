@@ -83,8 +83,9 @@ func (r *tokenResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"token": schema.StringAttribute{
-				Computed:  true,
-				Sensitive: true,
+				Computed:            true,
+				Sensitive:           true,
+				MarkdownDescription: apiDescToken,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(), // maintain across updates
 				},
@@ -139,16 +140,16 @@ func (r *tokenResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	var tokenID string
-	for _, listToken := range tokens.Items {
-		if listToken.Usage == keyUsageRegistry && listToken.Alias == plan.Alias.ValueString() {
-			tokenID = listToken.KeyId
+	var createdToken *swagger.LimitedUsageApiKeyInfo
+	for i := range tokens.Items {
+		if tokens.Items[i].Usage == keyUsageRegistry && tokens.Items[i].Alias == plan.Alias.ValueString() {
+			createdToken = &tokens.Items[i]
 
 			break
 		}
 	}
 
-	if tokenID == "" {
+	if createdToken == nil {
 		response.Diagnostics.AddError("Failed to find created token",
 			"Could not find the newly created token in the token list")
 
@@ -157,9 +158,20 @@ func (r *tokenResource) Create(ctx context.Context, request resource.CreateReque
 
 	var state tokenResourceModel
 	// Update the state with the created token
-	state.ID = types.StringValue(tokenID)
-	state.Alias = types.StringValue(plan.Alias.ValueString())
-	state.ExpiresAt = types.StringValue(plan.ExpiresAt.ValueString())
+	state.ID = types.StringValue(createdToken.KeyId)
+	// alias is Optional (not Computed): keep the plan value so an omitted alias stays null.
+	state.Alias = plan.Alias
+	// expires_at is Optional+Computed: echo the plan value when set (config must match
+	// state after apply); when omitted, source the API's default (~3mo) expiry rather
+	// than an empty string.
+	state.ExpiresAt = plan.ExpiresAt
+	if plan.ExpiresAt.IsNull() || plan.ExpiresAt.IsUnknown() {
+		if createdToken.ExpiresAt != "" {
+			state.ExpiresAt = types.StringValue(createdToken.ExpiresAt)
+		} else {
+			state.ExpiresAt = types.StringNull()
+		}
+	}
 	state.Token = types.StringValue(token.Token)
 
 	diags = response.State.Set(ctx, state)

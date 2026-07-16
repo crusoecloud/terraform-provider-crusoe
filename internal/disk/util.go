@@ -2,55 +2,47 @@ package disk
 
 import (
 	"context"
-	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
 const gibInTib = 1024
 
-// Shared schema descriptions for resource and data source
+// apiDesc* — schema descriptions derived from the client-go swagger spec (DiskV1).
 const (
-	descID                 = "Unique identifier of the disk."
-	descName               = "Name of the disk."
-	descProjectID          = "ID of the project the disk belongs to."
-	descProjectIDInference = "If not specified, the project ID will be inferred from the Crusoe configuration."
-	descType               = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
-	descTypeRequired       = "This field will be required in a future release."
-	descSize               = "Storage capacity of the disk (e.g., `100GiB`, `1TiB`)."
-	descLocation           = "Location where the disk is deployed."
-	descSerialNumber       = "Serial number assigned to the disk."
-	descBlockSize          = "Block size of the disk in bytes. Possible values: `512`, `4096`."
-	descDNSName            = "DNS name used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
-	descVips               = "Virtual IP addresses used to mount the shared volume. Populated only for `shared-volume` disks; empty for other disk types."
+	apiDescID           = "ID of the disk."
+	apiDescName         = "Name of the disk."
+	apiDescType         = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
+	apiDescSize         = "Storage capacity of the disk, given as a size and unit in the format `[Size][Unit]`, for example `100GiB` or `1TiB`."
+	apiDescLocation     = "Location where the disk is provisioned."
+	apiDescSerialNumber = "Serial number assigned to the disk."
+	apiDescBlockSize    = "Block size of the disk, in bytes. Possible values: `512`, `4096`."
+	apiDescDNSName      = "DNS name used to mount the disk. Populated only for `shared-volume` disks."
+	apiDescVips         = "Virtual IP addresses used to mount the disk. Populated only for `shared-volume` disks."
 )
 
-var errGetResourceModel = errors.New("unable to get resource model")
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID         = "ID of the project the disk belongs to. " + project.ProviderDescProjectIDFallback
+	providerDescTypeRequired      = "This field will be required in a future release."
+	providerDescSharedVolumeEmpty = "Empty for other disk types."
+	providerDescDisks             = "List of disks in the project."
+)
 
-// tfDataGetter is implemented by tfsdk.State and tfsdk.Plan
-type tfDataGetter interface {
-	Get(ctx context.Context, target interface{}) diag.Diagnostics
-}
-
-// getResourceModel extracts the resource model from state or plan.
-// Returns errGetResourceModel if there were errors (diagnostics already appended to respDiags).
-func getResourceModel(ctx context.Context, source tfDataGetter, dest *diskResourceModel, respDiags *diag.Diagnostics) error {
-	diags := source.Get(ctx, dest)
-	respDiags.Append(diags...)
-
-	if respDiags.HasError() {
-		return errGetResourceModel
-	}
-
-	return nil
-}
+// blockSizeDeprecationMessage marks the deprecated block_size attribute on both
+// the resource and the data source. All persistent disks now use a 512-byte block
+// size; any value set on create is ignored. Shared by both schemas so the wording
+// stays consistent.
+var blockSizeDeprecationMessage = common.FormatDeprecation("v0.6.0") +
+	" All persistent disks now use a 512-byte block size; any value set here is ignored."
 
 func findDisk(ctx context.Context, client *swagger.APIClient, diskID string) (*swagger.DiskV1, string, error) {
 	args := common.FindResourceArgs[swagger.DiskV1]{
@@ -71,9 +63,28 @@ func diskToTerraformResourceModel(disk *swagger.DiskV1, state *diskResourceModel
 	state.Type = types.StringValue(disk.Type_)
 	state.Size = types.StringValue(preserveSizeFormat(sizeFormat, disk.Size))
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
-	state.BlockSize = types.Int64Value(disk.BlockSize)
+	// block_size is deprecated and intentionally not sourced from the API here; callers
+	// preserve the planned/prior value via preserveDeprecatedBlockSize so the deprecated
+	// attribute never triggers a spurious replacement when the backend standardizes it.
 	state.DNSName = types.StringValue(disk.DnsName)
+	// Sort VIPs for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(disk.Vips)
 	state.Vips = stringSliceToList(disk.Vips)
+}
+
+// preserveDeprecatedBlockSize keeps a user-configured block_size value in state.
+// block_size is deprecated and no longer sent on create, so retaining the planned
+// (Create) or prior-state (Read) value keeps Terraform's Computed-consistency check
+// satisfied and prevents the RequiresReplaceIfConfigured plan modifier from spuriously
+// replacing the disk if the backend reports a different block size. When the value is
+// unset (e.g. omitted on create, or a freshly imported disk), it reflects what the API
+// assigned.
+func preserveDeprecatedBlockSize(planned types.Int64, apiBlockSize int64) types.Int64 {
+	if planned.IsNull() || planned.IsUnknown() {
+		return types.Int64Value(apiBlockSize)
+	}
+
+	return planned
 }
 
 // stringSliceToList converts a Go slice of strings into a Terraform list value.

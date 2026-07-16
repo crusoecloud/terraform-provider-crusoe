@@ -74,23 +74,31 @@ func (r *repositoryResource) Metadata(ctx context.Context, request resource.Meta
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		// DO NOT lower or remove, or Terraform rejects existing state as "managed
+		// by a newer provider version" and breaks upgrades. This resource was
+		// born at Version 2 (its very first release); no state upgrader exists
+		// or is needed.
 		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Computed: true,
-				Optional: true,
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"mode": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescMode,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators: []validator.String{
 					stringvalidator.OneOf("pull-through-cache", "standard"),
 				},
@@ -99,20 +107,24 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 				Optional: true,
 				Attributes: map[string]schema.Attribute{
 					"provider": schema.StringAttribute{
-						Required: true,
+						Required:            true,
+						MarkdownDescription: apiDescUpstreamProvider,
 					},
 					"url": schema.StringAttribute{
-						Required: true,
+						Required:            true,
+						MarkdownDescription: apiDescUpstreamURL,
 					},
 					"upstream_registry_credentials": schema.SingleNestedAttribute{
 						Optional: true,
 						Attributes: map[string]schema.Attribute{
 							"username": schema.StringAttribute{
-								Required: true,
+								Required:            true,
+								MarkdownDescription: apiDescUpstreamCredsUsername,
 							},
 							"password": schema.StringAttribute{
-								Required:  true,
-								Sensitive: true,
+								Required:            true,
+								Sensitive:           true,
+								MarkdownDescription: apiDescUpstreamCredsPassword,
 							},
 						},
 					},
@@ -184,12 +196,10 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	var state repositoryResourceModel
-	state.Location = types.StringValue(repository.Location)
-	state.Name = types.StringValue(repository.Name)
-	state.Mode = types.StringValue(repository.Mode)
-	state.ProjectID = types.StringValue(projectID)
-	state.UpstreamRegistry = plan.UpstreamRegistry
+	// Seed credentials from the plan; repositoryToResourceModel preserves them.
+	state := repositoryResourceModel{UpstreamRegistry: plan.UpstreamRegistry}
+	repositoryToResourceModel(&repository, &state, projectID)
+
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
 }
@@ -224,41 +234,19 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 
 		return
 	}
-	var state repositoryResourceModel
+	// stored carries prior-state credentials, which repositoryToResourceModel preserves.
+	repositoryToResourceModel(&repository, &stored, projectID)
 
-	diags = response.State.Get(ctx, &state)
-	response.Diagnostics.Append(diags...)
-
-	if response.Diagnostics.HasError() {
-		return
-	}
-
-	state.Location = types.StringValue(repository.Location)
-	state.ProjectID = types.StringValue(projectID)
-	state.Name = types.StringValue(repository.Name)
-	state.Mode = types.StringValue(repository.Mode)
-	state.UpstreamRegistry = nil
-	// Set UpstreamRegistry from API response if present
-	if repository.UpstreamRegistry != nil {
-		state.UpstreamRegistry = &upstreamRegistryResourceModel{
-			Provider: types.StringValue(repository.UpstreamRegistry.Provider),
-			Url:      types.StringValue(repository.UpstreamRegistry.Url),
-		}
-		if repository.UpstreamRegistry.UpstreamRegistryCredentials != nil {
-			state.UpstreamRegistry.UpstreamRegistryCrdentials = &upstreamRegistryCredentialsResourceModel{
-				Username: types.StringValue(repository.UpstreamRegistry.UpstreamRegistryCredentials.Username),
-				Password: types.StringValue(repository.UpstreamRegistry.UpstreamRegistryCredentials.Password),
-			}
-		}
-	}
-
-	diags = response.State.Set(ctx, &state)
+	diags = response.State.Set(ctx, &stored)
 	response.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	panic("Updating repository is not currently supported")
+	response.Diagnostics.AddError(
+		"Updating Repository Not Supported",
+		"Updating an existing repository is not currently supported. To change its configuration, the repository must be destroyed and recreated.",
+	)
 }
 
 //nolint:gocritic // Implements Terraform defined interface

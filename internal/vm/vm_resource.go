@@ -103,71 +103,125 @@ func (r *vmResource) Metadata(ctx context.Context, req resource.MetadataRequest,
 	resp.TypeName = req.ProviderTypeName + "_compute_instance"
 }
 
+// resizeRequiresReplace forces a resource replacement only when an instance type change
+// crosses product families (e.g. c1a -> a100). Changes within the same family (e.g.
+// c1a.2x -> c1a.4x) are applied in place via the Update method; the backend validates
+// whether the specific size is supported.
+//
+//nolint:gocritic // hugeParam: req signature required by stringplanmodifier.RequiresReplaceIfFunc
+func resizeRequiresReplace(_ context.Context, req planmodifier.StringRequest,
+	resp *stringplanmodifier.RequiresReplaceIfFuncResponse,
+) {
+	// Only relevant on update with a known, changing value.
+	if req.StateValue.IsNull() || req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+	if req.StateValue.ValueString() == req.PlanValue.ValueString() {
+		return
+	}
+
+	oldFamily, oldOK := instanceTypeFamily(req.StateValue.ValueString())
+	newFamily, newOK := instanceTypeFamily(req.PlanValue.ValueString())
+	if !oldOK || !newOK || oldFamily != newFamily {
+		resp.RequiresReplace = true // different family -> destroy & recreate (preserves prior behavior)
+
+		return
+	}
+
+	// Same family -> in-place resize. The API requires the VM to be stopped first.
+	resp.Diagnostics.AddWarning(
+		"VM will be stopped to resize",
+		"Changing the instance type resizes the VM in place. The VM will be stopped to "+
+			"apply the resize, then started again if it was running before the update.",
+	)
+}
+
 func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version: 2,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: providerDescProjectID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"type": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescType,
+				// Resize in place within the same product family; recreate the VM when the family changes.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIf(
+					resizeRequiresReplace,
+					"Recreates the VM when the instance type's product family changes; resizes in place within the same family.",
+					"Recreates the VM when the instance type's product family changes; resizes in place within the same family.",
+				)},
 			},
 			"ssh_key": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.String{validators.SSHKeyValidator{}},
+				Required:            true,
+				MarkdownDescription: apiDescSSHKey,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:          []validator.String{validators.SSHKeyValidator{}},
 			},
 			"location": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"image": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescImage,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"custom_image": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescCustomImage,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"startup_script": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescStartupScript,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"shutdown_script": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				MarkdownDescription: apiDescShutdownScript,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"disks": schema.SetNestedAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescDisks,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Required: true,
+							Required:            true,
+							MarkdownDescription: apiDescDiskID,
 						},
 						"attachment_type": schema.StringAttribute{
-							Required: true,
+							Required:            true,
+							MarkdownDescription: apiDescDiskAttachmentType,
 						},
 						"mode": schema.StringAttribute{
-							Required:   true,
-							Validators: []validator.String{validators.StorageModeValidator{}},
+							Required:            true,
+							MarkdownDescription: apiDescDiskMode,
+							Validators:          []validator.String{validators.StorageModeValidator{}},
 						},
 					},
 				},
-				Default: setdefault.StaticValue(types.Set{}),
+				// Empty set must carry the correct element type; an untyped types.Set{}
+				// fails schema validation in terraform-plugin-framework >= v1.15.
+				Default: setdefault.StaticValue(types.SetValueMust(vmDiskAttachmentSchema, nil)),
 			},
 			"fqdn": schema.StringAttribute{
 				Computed:           true,
@@ -179,55 +233,65 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"external_dns_name": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescExternalDNSName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: apiDescNetworkInterfaces,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNIID,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"name": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNIName,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"network": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNINetwork,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"subnet": schema.StringAttribute{
-							Computed: true,
-							Optional: true,
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescNISubnet,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.UseStateForUnknown(),
 								stringplanmodifier.RequiresReplace(),
 							}, // cannot be updated in place
 						},
 						"interface_type": schema.StringAttribute{
-							Computed:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							MarkdownDescription: apiDescNIInterfaceType,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"public_ipv4": schema.SingleNestedAttribute{
 							Computed: true,
 							Optional: true,
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIpv4ID,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"address": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIpv4Address,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"type": schema.StringAttribute{
-									Computed: true,
-									Optional: true,
+									Computed:            true,
+									Optional:            true,
+									MarkdownDescription: apiDescPublicIpv4Type,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -236,7 +300,8 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
 								"address": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescPrivateIpv4Address,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -245,57 +310,61 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Optional:            true,
+				MarkdownDescription: apiDescHostChannelAdapters,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
-							Optional:      true,
-							Description:   "Infiniband Partition ID",
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Optional:            true,
+							MarkdownDescription: providerDescIBPartitionID,
 						},
 					},
 				},
 			},
 			"reservation_id": schema.StringAttribute{
-				Optional:           true,
-				Computed:           true,
-				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				Description:        "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.",
-				DeprecationMessage: "This field is deprecated and will be removed in a future release. Please remove it from your configuration.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				MarkdownDescription: providerDescReservationID,
+				DeprecationMessage:  "This field is deprecated and will be removed in a future release. Please remove it from your configuration.",
 			},
 			"nvlink_domain_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-				Description:   "NVLink domain ID to use for NVLink communication.",
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescNvlinkDomainID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"install_crusoe_watch_agent": schema.BoolAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
-				Description:   "Whether to install the Crusoe Watch Agent on the VM. Defaults to true.",
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescInstallCrusoeWatchAgent,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
 }
 
 func (r *vmResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "vm_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import VM", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan vmResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	tDisks := make([]vmDiskResourceModel, 0, len(plan.Disks.Elements()))
-	diags = plan.Disks.ElementsAs(ctx, &tDisks, true)
+	diags := plan.Disks.ElementsAs(ctx, &tDisks, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -389,52 +458,22 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		return
 	}
 
-	plan.ID = types.StringValue(instance.Id)
+	// Capture the requested reservation_id before the transform overwrites it: it is
+	// deprecated and plan-owned, so a requested-but-ignored value must be preserved
+	// below to avoid an inconsistent-result error.
+	requestedReservationID := plan.ReservationID
 
-	// install_crusoe_watch_agent is a create-time-only flag not returned by the API;
-	// preserve the user's chosen value, defaulting to true (the API default) when unset.
-	if plan.InstallCrusoeWatchAgent.IsNull() || plan.InstallCrusoeWatchAgent.IsUnknown() {
-		plan.InstallCrusoeWatchAgent = types.BoolValue(true)
-	}
+	vmToTerraformResourceModel(instance, &plan)
 
-	if instance.ReservationId != "" {
-		plan.ReservationID = types.StringValue(instance.ReservationId)
-	} else if !plan.ReservationID.IsNull() && !plan.ReservationID.IsUnknown() && plan.ReservationID.ValueString() != "" {
+	// reservation_id is deprecated: when the backend ignores a requested reservation
+	// (the transform then stored the empty API value), warn and keep the requested
+	// value so it still matches the practitioner's config.
+	if instance.ReservationId == "" &&
+		!requestedReservationID.IsNull() && !requestedReservationID.IsUnknown() && requestedReservationID.ValueString() != "" {
+
 		resp.Diagnostics.AddWarning("Reservation Assignment Deprecated",
 			"Reservation assignment during VM creation is deprecated. The requested reservation_id was ignored by the backend. Please remove reservation_id from your configuration to suppress this warning.")
-	} else {
-		plan.ReservationID = types.StringNull()
-	}
-
-	internalDNSName := types.StringValue(fmt.Sprintf("%s.%s.compute.internal", instance.Name, instance.Location))
-	plan.InternalDNSName = internalDNSName
-	plan.FQDN = internalDNSName // fqdn is deprecated but kept for backward compatibility
-
-	if instance.NvlinkDomainId != "" {
-		plan.NvlinkDomainID = types.StringValue(instance.NvlinkDomainId)
-	} else {
-		plan.NvlinkDomainID = types.StringNull()
-	}
-
-	if len(instance.NetworkInterfaces) > 0 {
-		plan.ExternalDNSName = types.StringValue(instance.NetworkInterfaces[0].ExternalDnsName)
-	} else {
-		plan.ExternalDNSName = types.StringNull()
-	}
-
-	plan.ProjectID = types.StringValue(projectID)
-
-	networkInterfaces, networkDiags := vmNetworkInterfacesToTerraformResourceModel(instance.NetworkInterfaces)
-	resp.Diagnostics.Append(networkDiags...)
-	plan.NetworkInterfaces = networkInterfaces
-	if len(diskIds) > 0 {
-		disks, diag := vmDiskAttachmentToTerraformResourceModel(diskIds)
-		resp.Diagnostics.Append(diag...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		plan.Disks = disks
+		plan.ReservationID = requestedReservationID
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -444,9 +483,7 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state vmResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -464,8 +501,7 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 
 	vmToTerraformResourceModel(instance, &state)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Update attempts to update a VM. Currently only supports attaching/detaching disks, and requires that the
@@ -551,8 +587,12 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		return
 	}
 
-	// handle updating public IP type
-	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 {
+	// handle updating public IP type, but only when the network interface configuration
+	// actually changed. This avoids a redundant (and running-only) public IP update on
+	// every apply - e.g. a type-only resize, which would otherwise fail here if the VM
+	// is stopped (resizing leaves the VM stopped).
+	if !plan.NetworkInterfaces.IsUnknown() && len(plan.NetworkInterfaces.Elements()) == 1 &&
+		!plan.NetworkInterfaces.Equal(state.NetworkInterfaces) {
 		// instances must be running to update public IP type
 		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 		if httpResp != nil {
@@ -622,6 +662,103 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		state.NetworkInterfaces = plan.NetworkInterfaces
 		diags = resp.State.Set(ctx, &state)
 		resp.Diagnostics.Append(diags...)
+	}
+
+	// resize the instance in place if the type changed within the same product family.
+	// (Cross-family changes trigger a replace via the schema plan modifier and never reach here.)
+	if !plan.Type.IsUnknown() && !plan.Type.IsNull() && plan.Type.ValueString() != state.Type.ValueString() {
+		// fetch the current power state; the backend requires the VM to be stopped before a resize.
+		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error fetching the instance's current state: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		// stop the VM first if it isn't already stopped.
+		wasRunning := instance.State != StateStopped && instance.State != StateShutoff
+		if wasRunning {
+			stopResp, stopHTTPResp, stopErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+				Action: "STOP",
+			}, state.ProjectID.ValueString(), state.ID.ValueString())
+			if stopHTTPResp != nil {
+				defer stopHTTPResp.Body.Close()
+			}
+			if stopErr != nil {
+				resp.Diagnostics.AddError("Failed to resize instance",
+					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
+
+				return
+			}
+
+			_, stopErr = common.AwaitOperation(ctx, stopResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+			if stopErr != nil {
+				resp.Diagnostics.AddError("Failed to resize instance",
+					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
+
+				return
+			}
+		}
+
+		resizeResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+			Action: "UPDATE",
+			Type_:  plan.Type.ValueString(),
+		}, state.ProjectID.ValueString(), state.ID.ValueString())
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error requesting to resize the instance: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		_, err = common.AwaitOperation(ctx, resizeResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to resize instance",
+				fmt.Sprintf("There was an error resizing the instance: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+
+		// Persist the new type before attempting the restart, so a restart failure
+		// does not lose the completed resize from state.
+		state.Type = plan.Type
+		diags = resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// restore the prior power state: resizing leaves the VM stopped, so start it
+		// again if it was running before the resize.
+		if wasRunning {
+			startResp, startHTTPResp, startErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
+				Action: "START",
+			}, state.ProjectID.ValueString(), state.ID.ValueString())
+			if startHTTPResp != nil {
+				defer startHTTPResp.Body.Close()
+			}
+			if startErr != nil {
+				resp.Diagnostics.AddError("Failed to start instance after resize",
+					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
+
+				return
+			}
+
+			_, startErr = common.AwaitOperation(ctx, startResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+			if startErr != nil {
+				resp.Diagnostics.AddError("Failed to start instance after resize",
+					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
+
+				return
+			}
+		}
 	}
 
 	//  Reservation ID is deprecated

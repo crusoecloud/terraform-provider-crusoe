@@ -62,11 +62,13 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:    true,
+				Computed:    true,
+				Description: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -74,19 +76,23 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 			},
 			"cidr": schema.StringAttribute{
 				Required:      true,
+				Description:   apiDescCIDR,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Required:    true,
+				Description: apiDescName,
 			},
 			"gateway": schema.StringAttribute{
 				Computed:      true,
+				Description:   apiDescGateway,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 
 			},
 			"subnets": schema.ListAttribute{
 				ElementType:   types.StringType,
 				Computed:      true,
+				Description:   apiDescSubnets,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 		},
@@ -94,15 +100,21 @@ func (r *vpcNetworkResource) Schema(ctx context.Context, req resource.SchemaRequ
 }
 
 func (r *vpcNetworkResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "vpc_network_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import VPC Network", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcNetworkResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan vpcNetworkResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -122,25 +134,16 @@ func (r *vpcNetworkResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	plan.ID = types.StringValue(dataResp.Network.Id)
-	plan.Name = types.StringValue(dataResp.Network.Name)
-	plan.CIDR = types.StringValue(dataResp.Network.Cidr)
+	vpcNetworkToTerraformResourceModel(dataResp.Network, &plan)
 	plan.ProjectID = types.StringValue(projectID)
-	plan.Gateway = types.StringValue(dataResp.Network.Gateway)
 
-	subnets, _ := types.ListValueFrom(context.Background(), types.StringType, dataResp.Network.Subnets)
-	plan.Subnets = subnets
-
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcNetworkResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state vpcNetworkResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -164,30 +167,20 @@ func (r *vpcNetworkResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	state.Name = types.StringValue(vpcNetwork.Name)
-	state.CIDR = types.StringValue(vpcNetwork.Cidr)
-	state.Gateway = types.StringValue(vpcNetwork.Gateway)
+	vpcNetworkToTerraformResourceModel(&vpcNetwork, &state)
 
-	subnets, _ := types.ListValueFrom(context.Background(), types.StringType, vpcNetwork.Subnets)
-	state.Subnets = subnets
-
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state vpcNetworkResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan vpcNetworkResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -206,7 +199,7 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+	vpcNetwork, _, err := common.AwaitOperationAndResolve[swagger.VpcNetwork](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.VPCNetworkOperationsApi.GetNetworkingVPCNetworksOperation(ctx, projectID, opID)
 	})
 	if err != nil {
@@ -216,16 +209,15 @@ func (r *vpcNetworkResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	vpcNetworkToTerraformResourceModel(vpcNetwork, &plan)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vpcNetworkResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state vpcNetworkResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

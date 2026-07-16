@@ -80,7 +80,7 @@ func (r *s3BucketResource) Schema(ctx context.Context, req resource.SchemaReques
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descName,
+				MarkdownDescription: apiDescName + " " + apiDescNameConstraint,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -92,7 +92,7 @@ func (r *s3BucketResource) Schema(ctx context.Context, req resource.SchemaReques
 			"project_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descProjectID,
+				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -100,7 +100,7 @@ func (r *s3BucketResource) Schema(ctx context.Context, req resource.SchemaReques
 			},
 			"location": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descLocation,
+				MarkdownDescription: apiDescLocation,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -109,18 +109,18 @@ func (r *s3BucketResource) Schema(ctx context.Context, req resource.SchemaReques
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: descVersioningEnabled,
+				MarkdownDescription: providerDescVersioningEnabled,
 			},
 			"object_lock_enabled": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: descObjectLockEnabled,
+				MarkdownDescription: providerDescObjectLockEnabled,
 			},
 			"retention_period": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descRetentionPeriod,
+				MarkdownDescription: apiDescRetentionPeriod + " " + providerDescObjectLockClause,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
@@ -128,7 +128,7 @@ func (r *s3BucketResource) Schema(ctx context.Context, req resource.SchemaReques
 			"retention_period_unit": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descRetentionPeriodUnit,
+				MarkdownDescription: providerDescRetentionPeriodUnit,
 				Validators: []validator.String{
 					stringvalidator.OneOf("days", "years"),
 				},
@@ -136,22 +136,22 @@ func (r *s3BucketResource) Schema(ctx context.Context, req resource.SchemaReques
 			"tags": schema.MapAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: descTags,
+				MarkdownDescription: apiDescTags,
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descCreatedAt,
+				MarkdownDescription: apiDescCreatedAt,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"updated_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descUpdatedAt,
+				MarkdownDescription: apiDescUpdatedAt,
 			},
 			"s3_url": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descS3URL,
+				MarkdownDescription: apiDescS3URL,
 			},
 		},
 	}
@@ -171,7 +171,7 @@ func (r *s3BucketResource) Create(ctx context.Context, req resource.CreateReques
 	defer bucketMutex.Unlock()
 
 	var plan s3BucketResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -243,7 +243,7 @@ func (r *s3BucketResource) Create(ctx context.Context, req resource.CreateReques
 //nolint:gocritic // Implements Terraform defined interface
 func (r *s3BucketResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state s3BucketResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -279,12 +279,12 @@ func (r *s3BucketResource) Update(ctx context.Context, req resource.UpdateReques
 	defer bucketMutex.Unlock()
 
 	var state s3BucketResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan s3BucketResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -394,7 +394,7 @@ func (r *s3BucketResource) Delete(ctx context.Context, req resource.DeleteReques
 	defer bucketMutex.Unlock()
 
 	var state s3BucketResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

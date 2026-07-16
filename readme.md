@@ -100,6 +100,8 @@ For more usage examples, including storage disks, startup scripts, and firewall 
 
 To develop the Terraform provider, you'll need a recent version of [golang](https://go.dev/doc/install) installed.
 
+This repository includes a `mise.toml` that pins the Go toolchain along with `golangci-lint`, `terraform`, and `tfplugindocs`. If you use [mise](https://mise.jdx.dev), run `mise install` to provision them; otherwise install a recent version of [golang](https://go.dev/doc/install) yourself.
+
 Add the following to your `~/.terraformrc`
 
 ```
@@ -116,14 +118,18 @@ provider_installation {
 }
 ```
 
-Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples.
+Run `make install` to build a provider and install it into your go-path. Then, you should be able to run `terraform apply` with the provided examples. (Under mise this lands in mise's Go bin, which is where the `$GOPATH/bin/` override above resolves, so the snippet works unchanged.)
 
 Other common commands are: `terraform init` to initialize your working directory, and `terraform plan` to preview changes without applying them. 
+
+Schema attribute descriptions are derived from the `github.com/crusoecloud/client-go` swagger spec (the source of truth). When adding schema fields, generate the text with the `/derive-schema-descriptions` Claude Code skill instead of hand-writing it, then regenerate docs with `make docs`.
 
 ## Versioning
 
 A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub.
 This generates a new tag and triggers our `goreleaser` pipeline which will handle distributing the new Terraform version.
+On a successful release, the pipeline posts an announcement (version, commit, and a link to the GitHub release) to the `#ccx-ci-releases` Slack channel.
+These notifications require the `SLACK_CCX_CI_RELEASES_WEBHOOK_URL` webhook URL to be configured as both a GitHub Actions secret (release announcement) and a GitLab CI/CD variable (pipeline status notifications); if unset, the notification steps log a message and skip without failing the release.
 
 Our `main` branch is primarily used for development. Once features are ready to be deployed, a Crusoe Cloud maintainer will merge the changes from `main` into `release` to deploy a new version.
 
@@ -150,7 +156,7 @@ export MAJOR_VERSION=0
 export MINOR_VERSION=6
 ```
 
-Update this file **only for major or minor version bumps** when merging to `release`. Patch versions are auto-incremented by the release pipeline.
+Update this file **only for major or minor version bumps**, in the same release-prep commit on `main` that adds the changelog entry (before the release MR is opened) — not on the `release` branch. Patch versions are auto-incremented by the release pipeline.
 
 ## Contributing
 
@@ -166,7 +172,7 @@ Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 
 The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
 
-**Every merge to the `release` branch must include a changelog entry.** To add an entry:
+**Every release must include a changelog entry, committed to `main` *before* the release MR is opened** (see the Contributing steps above) — do not add it on the `release` branch or inside the release MR, which would make `release` diverge from `main` and conflict on the next merge. To add an entry:
 
 1. Open `CHANGELOG.md` and add a new version section at the top
 2. Increment the version number from the previous release (e.g., `0.5.45` → `0.5.46`)

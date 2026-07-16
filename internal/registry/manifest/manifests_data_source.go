@@ -81,14 +81,17 @@ func (ds *manifestsDataSource) Schema(ctx context.Context, request datasource.Sc
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"digest": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescDigest,
 						},
 						"size": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescSize,
 						},
 						"tags": schema.ListAttribute{
-							Computed:    true,
-							ElementType: types.StringType,
+							Computed:            true,
+							ElementType:         types.StringType,
+							MarkdownDescription: apiDescTags,
 						},
 					},
 				},
@@ -139,6 +142,12 @@ func (ds *manifestsDataSource) Read(ctx context.Context, request datasource.Read
 			Tags:   tags,
 		})
 	}
+
+	// Sort manifests deterministically (digest is the only stable unique key) so
+	// repeated reads produce a stable ordering.
+	common.SortByKeys(state.Manifests,
+		func(m manifestDataSourceModel) string { return m.Digest.ValueString() },
+	)
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)

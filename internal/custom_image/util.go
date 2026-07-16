@@ -6,6 +6,24 @@ import (
 	"strings"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (Image).
+const (
+	apiDescID          = "ID of the image."
+	apiDescName        = "Name of the image."
+	apiDescDescription = "Description of the image."
+	apiDescLocations   = "Locations where the image is available."
+	apiDescTags        = "Tags associated with the image."
+	apiDescCreatedAt   = "Creation timestamp of the image, in RFC3339 format."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID        = "ID of the project the custom images belong to. " + project.ProviderDescProjectIDFallback
+	providerDescNameFilter       = "Filter custom images by name. This is a case-sensitive exact match."
+	providerDescNamePrefixFilter = "Filter custom images by name prefix. This is case-sensitive and does not require trailing dashes."
 )
 
 // customImagesToTerraformDataModel takes the API response and applies name/name_prefix filters.

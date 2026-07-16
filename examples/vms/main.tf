@@ -66,6 +66,11 @@ resource "crusoe_storage_disk" "data_disk" {
   name     = "${var.name_prefix}data-disk"
   size     = "100GiB"
   location = var.vm.location
+  type     = "persistent-ssd"
+}
+
+output "vm_id" {
+  value = crusoe_compute_instance.my_vm.id
 }
 
 # Create a firewall rule

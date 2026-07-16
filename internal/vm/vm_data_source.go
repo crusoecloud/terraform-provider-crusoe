@@ -71,51 +71,65 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescID,
 			},
 			"name": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: apiDescName,
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
 			},
 			"type": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: apiDescType,
 			},
 			"disks": schema.ListNestedAttribute{
-				Optional: true,
+				Computed:            true,
+				MarkdownDescription: apiDescDisks,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Required: true,
+							Computed:            true,
+							MarkdownDescription: apiDescDiskID,
 						},
 						"attachment_type": schema.StringAttribute{
-							Required: true,
+							Computed:            true,
+							MarkdownDescription: apiDescDiskAttachmentType,
 						},
 						"mode": schema.StringAttribute{
-							Required: true,
+							Computed:            true,
+							MarkdownDescription: apiDescDiskMode,
 						},
 					},
 				},
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: apiDescNetworkInterfaces,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescNIID,
 						},
 						"name": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescNIName,
 						},
 						"network": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescNINetwork,
 						},
 						"subnet": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescNISubnet,
 						},
 						"interface_type": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescNIInterfaceType,
 						},
 						"public_ipv4": schema.ObjectAttribute{
 							Computed: true,
@@ -133,11 +147,13 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 				},
 			},
 			"reservation_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: providerDescReservationID,
 			},
 			"nvlink_domain_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescNvlinkDomainID,
 			},
 		},
 	}

@@ -2,6 +2,7 @@ package disk
 
 import (
 	"context"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -67,45 +68,46 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 			},
 			"disks": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "List of disks in the project.",
+				MarkdownDescription: providerDescDisks,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descID,
+							MarkdownDescription: apiDescID,
 						},
 						"name": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descName,
+							MarkdownDescription: apiDescName,
 						},
 						"location": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descLocation,
+							MarkdownDescription: apiDescLocation,
 						},
 						"type": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descType,
+							MarkdownDescription: apiDescType,
 						},
 						"size": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descSize,
+							MarkdownDescription: apiDescSize,
 						},
 						"serial_number": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descSerialNumber,
+							MarkdownDescription: apiDescSerialNumber,
 						},
 						"block_size": schema.Int64Attribute{
 							Computed:            true,
-							MarkdownDescription: descBlockSize,
+							MarkdownDescription: apiDescBlockSize,
+							DeprecationMessage:  blockSizeDeprecationMessage,
 						},
 						"dns_name": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descDNSName,
+							MarkdownDescription: apiDescDNSName + " " + providerDescSharedVolumeEmpty,
 						},
 						"vips": schema.ListAttribute{
 							Computed:            true,
 							ElementType:         types.StringType,
-							MarkdownDescription: descVips,
+							MarkdownDescription: apiDescVips + " " + providerDescSharedVolumeEmpty,
 						},
 					},
 				},
@@ -141,6 +143,8 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		if vips == nil {
 			vips = []string{}
 		}
+		// Sort VIPs for deterministic ordering; the API does not guarantee a stable order.
+		slices.Sort(vips)
 		state.Disks = append(state.Disks, diskModel{
 			ID:           dataResp.Items[i].Id,
 			Name:         dataResp.Items[i].Name,
@@ -153,6 +157,12 @@ func (ds *disksDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 			Vips:         vips,
 		})
 	}
+
+	// Sort disks deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Disks,
+		func(d diskModel) string { return d.Name },
+		func(d diskModel) string { return d.ID },
+	)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

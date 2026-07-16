@@ -90,6 +90,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		instance_template.NewInstanceTemplatesDataSource,
 		instance_group.NewInstanceGroupsDataSource,
 		load_balancer.NewLoadBalancerDataSource,
+		kubeconfig.NewKubeConfigDataSource,
 		kubernetes_cluster.NewKubernetesClusterDataSource,
 		kubernetes_node_pool.NewKubernetesNodePoolDataSource,
 		custom_image.NewCustomImageDataSource,

@@ -65,14 +65,14 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 		Attributes: map[string]schema.Attribute{
 			"key_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descKeyID,
+				MarkdownDescription: apiDescKeyID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"access_key_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descAccessKeyID,
+				MarkdownDescription: apiDescAccessKeyID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -80,14 +80,14 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			"secret_access_key": schema.StringAttribute{
 				Computed:            true,
 				Sensitive:           true,
-				MarkdownDescription: descSecretAccessKey,
+				MarkdownDescription: apiDescSecretAccessKey,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"alias": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: descAlias,
+				MarkdownDescription: apiDescAlias,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -95,7 +95,7 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			"organization_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descOrganizationID + " If not specified, inferred from the authenticated user.",
+				MarkdownDescription: providerDescOrganizationID + " " + providerDescOrganizationIDInference,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -103,25 +103,25 @@ func (r *s3KeyResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			},
 			"expire_at": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: descExpireAt + " Must be in RFC3339 format (e.g., `2025-12-31T23:59:59Z`).",
+				MarkdownDescription: apiDescExpireAt + " " + providerDescExpireAtExample,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"status": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descStatus,
+				MarkdownDescription: apiDescStatus,
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descCreatedAt,
+				MarkdownDescription: apiDescCreatedAt,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"user_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descUserID,
+				MarkdownDescription: apiDescUserID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -143,7 +143,7 @@ func (r *s3KeyResource) ImportState(ctx context.Context, req resource.ImportStat
 //nolint:gocritic // Implements Terraform defined interface
 func (r *s3KeyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan s3KeyResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -200,22 +200,9 @@ func (r *s3KeyResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	// Find the created key by access_key_id
-	for i := range keys.Items {
-		if keys.Items[i].AccessKeyId == dataResp.AccessKeyId {
-			plan.KeyID = types.StringValue(keys.Items[i].KeyUuid)
-			plan.Status = types.StringValue(keys.Items[i].Status)
-			plan.CreatedAt = types.StringValue(keys.Items[i].CreatedAt)
-			plan.UserID = types.StringValue(keys.Items[i].UserId)
-			if keys.Items[i].Alias != "" {
-				plan.Alias = types.StringValue(keys.Items[i].Alias)
-			}
-			if isValidExpireAt(keys.Items[i].ExpireAt) {
-				plan.ExpireAt = types.StringValue(keys.Items[i].ExpireAt)
-			}
-
-			break
-		}
+	// Populate computed fields from the freshly created key.
+	if key := findKeyByAccessKeyID(keys.Items, dataResp.AccessKeyId); key != nil {
+		s3KeyToResourceModel(key, &plan)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -224,7 +211,7 @@ func (r *s3KeyResource) Create(ctx context.Context, req resource.CreateRequest, 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *s3KeyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state s3KeyResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -251,35 +238,18 @@ func (r *s3KeyResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	// Find the key by access_key_id
-	accessKeyID := state.AccessKeyID.ValueString()
-	var found bool
-	for i := range keys.Items {
-		if keys.Items[i].AccessKeyId == accessKeyID {
-			found = true
-			state.KeyID = types.StringValue(keys.Items[i].KeyUuid)
-			state.Status = types.StringValue(keys.Items[i].Status)
-			state.CreatedAt = types.StringValue(keys.Items[i].CreatedAt)
-			state.UserID = types.StringValue(keys.Items[i].UserId)
-			state.OrganizationID = types.StringValue(orgID)
-			if keys.Items[i].Alias != "" {
-				state.Alias = types.StringValue(keys.Items[i].Alias)
-			}
-			if isValidExpireAt(keys.Items[i].ExpireAt) {
-				state.ExpireAt = types.StringValue(keys.Items[i].ExpireAt)
-			}
-			// Note: SecretAccessKey is preserved from state - it cannot be retrieved from the API
-
-			break
-		}
-	}
-
-	if !found {
+	// Find the key by access_key_id.
+	key := findKeyByAccessKeyID(keys.Items, state.AccessKeyID.ValueString())
+	if key == nil {
 		// Key was deleted out of band
 		resp.State.RemoveResource(ctx)
 
 		return
 	}
+
+	// Note: SecretAccessKey is preserved from state - it cannot be retrieved from the API.
+	s3KeyToResourceModel(key, &state)
+	state.OrganizationID = types.StringValue(orgID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -294,7 +264,7 @@ func (r *s3KeyResource) Update(ctx context.Context, req resource.UpdateRequest, 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *s3KeyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state s3KeyResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

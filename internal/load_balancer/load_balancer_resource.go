@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -101,81 +100,90 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 		Version:             1,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(), // cannot be updated in place
 				},
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescName,
 			},
 			"network_interfaces": schema.ListNestedAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required:            true,
+				MarkdownDescription: apiDescNetworkInterfaces,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"network": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescNetwork,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 						"subnet": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescSubnet,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
 			},
 			"destinations": schema.ListNestedAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Required:            true,
+				MarkdownDescription: apiDescDestinations,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"cidr": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},                                                   // maintain across updates
-							Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/32)?$"}}, // load balancers only support the /32 mask
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescCidr,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},                                                   // maintain across updates
+							Validators:          []validator.String{validators.RegexValidator{RegexPattern: "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/32)?$"}}, // load balancers only support the /32 mask
 						},
 						"resource_id": schema.StringAttribute{
-							Computed:      true,
-							Optional:      true,
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescResourceID,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"protocols": schema.ListAttribute{
-				ElementType:   types.StringType,
-				Required:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				ElementType:         types.StringType,
+				Required:            true,
+				MarkdownDescription: apiDescProtocols,
 			},
 			"algorithm": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.String{stringvalidator.OneOf("random")},         // we currently only support random
+				Required:            true,
+				MarkdownDescription: apiDescAlgorithm,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:          []validator.String{stringvalidator.OneOf("random")},         // we currently only support random
 			},
 			"type": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescType,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"ips": schema.ListNestedAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescIPs,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
@@ -183,15 +191,18 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIPv4ID,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"address": schema.StringAttribute{
-									Computed:      true,
-									PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIPv4Address,
+									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 								},
 								"type": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescPublicIPv4Type,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -200,7 +211,8 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
 								"address": schema.StringAttribute{
-									Computed: true,
+									Computed:            true,
+									MarkdownDescription: apiDescPrivateIPv4Address,
 								},
 							},
 							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
@@ -214,24 +226,29 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Attributes: map[string]schema.Attribute{
 					"timeout": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckTimeout,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"port": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckPort,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"interval": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckInterval,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"success_count": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckSuccessCount,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 					"failure_count": schema.StringAttribute{
-						Computed:      true,
-						PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Computed:            true,
+						MarkdownDescription: apiDescHealthCheckFailureCount,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 					},
 				},
 			},
@@ -240,15 +257,21 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 }
 
 func (r *loadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "load_balancer_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import Load Balancer", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan loadBalancerResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -260,7 +283,7 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 
 	// network interfaces
 	tNetworkInterfaces := make([]loadBalancerNetworkInterfaceModel, 0, len(plan.NetworkInterfaces.Elements()))
-	diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
+	diags := plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -293,10 +316,9 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 	postReq.Destinations = destinations
 
 	// health check
-	var healthCheck swagger.HealthCheckOptions
-	if !plan.HealthCheck.IsNull() && !plan.HealthCheck.IsUnknown() {
-		plan.HealthCheck.As(ctx, healthCheck, basetypes.ObjectAsOptions{})
-		postReq.HealthCheck = &healthCheck
+	postReq.HealthCheck = healthCheckToSwagger(ctx, plan.HealthCheck, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	// protocols
@@ -331,25 +353,16 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	plan.ID = types.StringValue(loadBalancer.Id)
-	ips, _ := loadBalancerIPsToTerraformResourceModel(loadBalancer.Ips)
-	plan.IPs = ips
+	loadBalancerUpdateTerraformState(ctx, loadBalancer, &plan)
 	plan.ProjectID = types.StringValue(projectID)
-	plan.Type = types.StringValue(loadBalancer.Type_)
-	plan.NetworkInterfaces, _ = loadBalancerNetworkInterfacesToTerraformResourceModel(loadBalancer.NetworkInterfaces)
-	plan.HealthCheck, _ = types.ObjectValueFrom(ctx, loadBalancerHealthCheckSchema.AttrTypes, loadBalancerHealthCheckToTerraformResourceModel(loadBalancer.HealthCheck))
-	plan.Destinations, _ = loadBalancerDestinationsToTerraformResourceModel(loadBalancer.Destinations)
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state loadBalancerResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -376,23 +389,18 @@ func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 	state.ProjectID = types.StringValue(projectID)
 	loadBalancerUpdateTerraformState(ctx, &loadBalancer, &state)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state loadBalancerResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan loadBalancerResourceModel
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -403,7 +411,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 
 	if !plan.Destinations.IsNull() && !plan.Destinations.IsUnknown() {
 		tDestinations := make([]loadBalancerNetworkTargetModel, 0, len(plan.Destinations.Elements()))
-		diags = plan.Destinations.ElementsAs(ctx, &tDestinations, true)
+		diags := plan.Destinations.ElementsAs(ctx, &tDestinations, true)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
@@ -418,22 +426,9 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		patchReq.Destinations = destinations
 	}
 
-	healthCheckAttributesMap := plan.HealthCheck.Attributes()
-
-	if !healthCheckAttributesMap["timeout"].IsNull() && !healthCheckAttributesMap["timeout"].IsUnknown() {
-		patchReq.HealthCheck.Timeout = healthCheckAttributesMap["timeout"].String()
-	}
-	if !healthCheckAttributesMap["port"].IsNull() && !healthCheckAttributesMap["port"].IsUnknown() {
-		patchReq.HealthCheck.Port = healthCheckAttributesMap["port"].String()
-	}
-	if !healthCheckAttributesMap["interval"].IsNull() && !healthCheckAttributesMap["interval"].IsUnknown() {
-		patchReq.HealthCheck.Interval = healthCheckAttributesMap["interval"].String()
-	}
-	if !healthCheckAttributesMap["success_count"].IsNull() && !healthCheckAttributesMap["success_count"].IsUnknown() {
-		patchReq.HealthCheck.SuccessCount = healthCheckAttributesMap["success_count"].String()
-	}
-	if !healthCheckAttributesMap["failure_count"].IsNull() && !healthCheckAttributesMap["failure_count"].IsUnknown() {
-		patchReq.HealthCheck.FailureCount = healthCheckAttributesMap["failure_count"].String()
+	patchReq.HealthCheck = healthCheckToSwagger(ctx, plan.HealthCheck, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.PatchLoadBalancer(ctx,
@@ -451,7 +446,7 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
+	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
 		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
 	})
 	if err != nil {
@@ -461,16 +456,15 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
+	loadBalancerUpdateTerraformState(ctx, loadBalancer, &plan)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state loadBalancerResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

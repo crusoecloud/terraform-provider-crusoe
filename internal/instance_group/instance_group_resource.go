@@ -72,13 +72,13 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descID,
+				MarkdownDescription: apiDescID,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descProjectID + " " + descProjectIDInference,
+				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -86,21 +86,21 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descName,
+				MarkdownDescription: apiDescName,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"instance_template_id": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descInstanceTemplateID,
+				MarkdownDescription: apiDescInstanceTemplateID,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"running_instance_count": schema.Int64Attribute{
 				Computed:            true,
-				MarkdownDescription: descRunningInstanceCount,
+				MarkdownDescription: apiDescRunningInstanceCount,
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -108,7 +108,7 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 			"active_instance_ids": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
-				MarkdownDescription: descActiveInstanceIDs,
+				MarkdownDescription: apiDescActiveInstanceIDs,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
@@ -116,31 +116,31 @@ func (r *instanceGroupResource) Schema(ctx context.Context, req resource.SchemaR
 			"inactive_instance_ids": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
-				MarkdownDescription: descInactiveInstanceIDs,
+				MarkdownDescription: apiDescInactiveInstanceIDs,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"state": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descState,
+				MarkdownDescription: apiDescState + " " + providerDescState,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"desired_count": schema.Int64Attribute{
 				Required:            true,
-				MarkdownDescription: descDesiredCount,
+				MarkdownDescription: apiDescDesiredCount,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descCreatedAt,
+				MarkdownDescription: apiDescCreatedAt,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descUpdatedAt,
+				MarkdownDescription: apiDescUpdatedAt,
 			},
 		},
 	}
@@ -161,7 +161,7 @@ func (r *instanceGroupResource) ImportState(ctx context.Context, req resource.Im
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -197,7 +197,7 @@ func (r *instanceGroupResource) Create(ctx context.Context, req resource.CreateR
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -229,12 +229,12 @@ func (r *instanceGroupResource) Read(ctx context.Context, req resource.ReadReque
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -275,7 +275,7 @@ func (r *instanceGroupResource) Update(ctx context.Context, req resource.UpdateR
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceGroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state instanceGroupResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

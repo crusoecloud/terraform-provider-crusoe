@@ -79,13 +79,13 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descID,
+				MarkdownDescription: apiDescID,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descProjectID + " " + descProjectIDInference,
+				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
@@ -93,18 +93,18 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"location": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descLocation,
+				MarkdownDescription: apiDescLocation,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descName,
+				MarkdownDescription: apiDescName,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"type": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descType + " " + descTypeRequired,
+				MarkdownDescription: apiDescType + " " + providerDescTypeRequired,
 				Default:             stringdefault.StaticString(defaultDiskType),
 				Validators:          []validator.String{stringvalidator.OneOf(persistentSSD, sharedVolume)},
 				PlanModifiers: []planmodifier.String{
@@ -114,18 +114,19 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"size": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: descSize,
+				MarkdownDescription: apiDescSize,
 				Validators:          []validator.String{validators.StorageSizeValidator{}},
 			},
 			"serial_number": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descSerialNumber,
+				MarkdownDescription: apiDescSerialNumber,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"block_size": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descBlockSize,
+				MarkdownDescription: apiDescBlockSize,
+				DeprecationMessage:  blockSizeDeprecationMessage,
 				Validators:          []validator.Int64{int64validator.OneOf(alternateBlockSize, defaultBlockSize)},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplaceIfConfigured(),
@@ -134,13 +135,13 @@ func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"dns_name": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: descDNSName,
+				MarkdownDescription: apiDescDNSName + " " + providerDescSharedVolumeEmpty,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"vips": schema.ListAttribute{
 				Computed:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: descVips,
+				MarkdownDescription: apiDescVips + " " + providerDescSharedVolumeEmpty,
 				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 		},
@@ -163,7 +164,7 @@ func (r *diskResource) ImportState(ctx context.Context, req resource.ImportState
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan diskResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -177,17 +178,13 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	blockSize := plan.BlockSize.ValueInt64()
-	if blockSize == 0 && diskType == persistentSSD {
-		blockSize = defaultBlockSize
-	}
-
+	// block_size is deprecated and intentionally omitted from the create request so the
+	// storage backend applies its standard 512-byte block size (CCX-3067).
 	dataResp, httpResp, err := r.client.APIClient.DisksApi.CreateDisk(ctx, swagger.DisksPostRequestV1{
-		Name:      plan.Name.ValueString(),
-		Location:  plan.Location.ValueString(),
-		Type_:     diskType,
-		Size:      plan.Size.ValueString(),
-		BlockSize: blockSize,
+		Name:     plan.Name.ValueString(),
+		Location: plan.Location.ValueString(),
+		Type_:    diskType,
+		Size:     plan.Size.ValueString(),
 	}, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
@@ -210,6 +207,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 	var state diskResourceModel
 	state.ProjectID = types.StringValue(projectID)
 	diskToTerraformResourceModel(disk, &state, plan.Size.ValueString())
+	state.BlockSize = preserveDeprecatedBlockSize(plan.BlockSize, disk.BlockSize)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -217,7 +215,7 @@ func (r *diskResource) Create(ctx context.Context, req resource.CreateRequest, r
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state diskResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -244,18 +242,19 @@ func (r *diskResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	diskToTerraformResourceModel(&disk, &state, state.Size.ValueString())
+	state.BlockSize = preserveDeprecatedBlockSize(state.BlockSize, disk.BlockSize)
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state diskResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
 	var plan diskResourceModel
-	if err := getResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
 
@@ -276,7 +275,7 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	_, _, err = common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
+	disk, _, err := common.AwaitOperationAndResolve[swagger.DiskV1](ctx, dataResp.Operation, plan.ProjectID.ValueString(), r.client.APIClient.DiskOperationsApi.GetStorageDisksOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to resize disk",
 			fmt.Sprintf("There was an error resizing a disk: %s.\n\n"+
@@ -286,13 +285,15 @@ func (r *diskResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	diskToTerraformResourceModel(disk, &plan, plan.Size.ValueString())
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *diskResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state diskResourceModel
-	if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 

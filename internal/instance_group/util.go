@@ -1,51 +1,36 @@
 package instance_group
 
 import (
-	"context"
-	"errors"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
-var errGetResourceModel = errors.New("unable to get resource model")
-
-// Shared schema descriptions for resource and data source
+// apiDesc* — schema descriptions derived from the client-go swagger spec (InstanceGroup).
 const (
-	descID                   = "The unique identifier of the instance group."
-	descName                 = "The name of the instance group."
-	descProjectID            = "The ID of the project this instance group belongs to."
-	descProjectIDInference   = "If not specified, the project ID will be inferred from the Crusoe configuration."
-	descInstanceTemplateID   = "The ID of the instance template used for creating instances in this group."
-	descRunningInstanceCount = "The number of running instances currently in the instance group."
-	descDesiredCount         = "The desired number of VMs for the instance group."
-	descState                = "The current state of the instance group. Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count)."
-	descActiveInstanceIDs    = "A list of IDs of running instances in the instance group."
-	descInactiveInstanceIDs  = "A list of IDs of non-running instances in the instance group."
-	descCreatedAt            = "The timestamp when the instance group was created."
-	descUpdatedAt            = "The timestamp when the instance group was most recently updated."
+	apiDescID                   = "ID of the instance group."
+	apiDescName                 = "Name of the instance group."
+	apiDescInstanceTemplateID   = "ID of the instance template currently associated with the instance group."
+	apiDescRunningInstanceCount = "Number of running instances currently in the instance group."
+	apiDescDesiredCount         = "Desired number of instances for the instance group."
+	apiDescState                = "Current state of the instance group."
+	apiDescActiveInstanceIDs    = "List of IDs of running instances in the instance group."
+	apiDescInactiveInstanceIDs  = "List of IDs of non-running instances in the instance group."
+	apiDescCreatedAt            = "Creation timestamp of the instance group, in RFC3339 format."
+	apiDescUpdatedAt            = "Last update timestamp of the instance group, in RFC3339 format."
 )
 
-// tfDataGetter is implemented by tfsdk.State and tfsdk.Plan
-type tfDataGetter interface {
-	Get(ctx context.Context, target interface{}) diag.Diagnostics
-}
-
-// getResourceModel extracts the resource model from state or plan.
-// Returns errGetResourceModel if there were errors (diagnostics already appended to respDiags).
-func getResourceModel(ctx context.Context, source tfDataGetter, dest *instanceGroupResourceModel, respDiags *diag.Diagnostics) error {
-	diags := source.Get(ctx, dest)
-	respDiags.Append(diags...)
-
-	if respDiags.HasError() {
-		return errGetResourceModel
-	}
-
-	return nil
-}
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	providerDescProjectID      = "ID of the project that owns the instance group. " + project.ProviderDescProjectIDFallback
+	providerDescState          = "Possible values: `HEALTHY` (matches desired count), `UPDATING` (scaling in progress), `UNHEALTHY` (cannot reach desired count)."
+	providerDescInstanceGroups = "List of instance groups in the project."
+)
 
 func instanceGroupToResourceModel(instanceGroup *swagger.InstanceGroup, state *instanceGroupResourceModel, diags *diag.Diagnostics) {
 	state.ID = types.StringValue(instanceGroup.Id)
@@ -58,6 +43,10 @@ func instanceGroupToResourceModel(instanceGroup *swagger.InstanceGroup, state *i
 	state.CreatedAt = types.StringValue(instanceGroup.CreatedAt)
 	state.UpdatedAt = types.StringValue(instanceGroup.UpdatedAt)
 
+	// Sort instance ID lists for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(instanceGroup.ActiveInstances)
+	slices.Sort(instanceGroup.InactiveInstances)
+
 	var tfListDiags diag.Diagnostics
 	state.ActiveInstanceIDs, tfListDiags = common.StringSliceToTFList(instanceGroup.ActiveInstances)
 	diags.Append(tfListDiags...)
@@ -66,6 +55,10 @@ func instanceGroupToResourceModel(instanceGroup *swagger.InstanceGroup, state *i
 }
 
 func instanceGroupToDataSourceModel(item *swagger.InstanceGroup) instanceGroupDataSourceModel {
+	// Sort instance ID lists for deterministic ordering; the API does not guarantee a stable order.
+	slices.Sort(item.ActiveInstances)
+	slices.Sort(item.InactiveInstances)
+
 	return instanceGroupDataSourceModel{
 		ID:                   item.Id,
 		ProjectID:            item.ProjectId,

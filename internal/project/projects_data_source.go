@@ -58,10 +58,12 @@ func (ds *projectsDataSource) Schema(ctx context.Context, request datasource.Sch
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"id": schema.StringAttribute{
-						Computed: true,
+						Computed:            true,
+						MarkdownDescription: apiDescID,
 					},
 					"name": schema.StringAttribute{
-						Computed: true,
+						Computed:            true,
+						MarkdownDescription: apiDescName,
 					},
 				},
 			},
@@ -93,6 +95,12 @@ func (ds *projectsDataSource) Read(ctx context.Context, req datasource.ReadReque
 			Name: dataResp.Items[i].Name,
 		})
 	}
+
+	// Sort projects deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Projects,
+		func(p projectModel) string { return p.Name },
+		func(p projectModel) string { return p.ID },
+	)
 
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

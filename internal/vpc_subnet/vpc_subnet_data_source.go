@@ -60,25 +60,31 @@ func (ds *vpcSubnetsDataSource) Schema(ctx context.Context, request datasource.S
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"id": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescID,
 					},
 					"name": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescName,
 					},
 					"cidr": schema.StringAttribute{
-						Required: true,
+						Required:    true,
+						Description: apiDescCIDR,
 					},
 					"location": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescLocation,
 					},
 					"network": schema.StringAttribute{
-						Computed: true,
+						Computed:    true,
+						Description: apiDescNetwork,
 					},
 				},
 			},
 		},
 		"project_id": schema.StringAttribute{
-			Optional: true,
+			Optional:    true,
+			Description: providerDescProjectID,
 		},
 	}}
 }
@@ -114,6 +120,12 @@ func (ds *vpcSubnetsDataSource) Read(ctx context.Context, req datasource.ReadReq
 			Network:  dataResp.Items[i].VpcNetworkId,
 		})
 	}
+
+	// Sort VPC subnets deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.VPCSubnets,
+		func(s vpcSubnetsModel) string { return s.Name },
+		func(s vpcSubnetsModel) string { return s.ID },
+	)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

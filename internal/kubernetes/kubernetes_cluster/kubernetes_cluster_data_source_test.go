@@ -22,6 +22,31 @@ func TestKubernetesClusterDataSource_Metadata(t *testing.T) {
 	}
 }
 
+// TestKubernetesClusterDataSource_APIFieldsComputed verifies that fields
+// returned by the API are Computed so Terraform persists them to state. They
+// remain Optional as well, since a user may still set them (CCX-2833).
+func TestKubernetesClusterDataSource_APIFieldsComputed(t *testing.T) {
+	ds := NewKubernetesClusterDataSource()
+
+	schemaResp := &datasource.SchemaResponse{}
+	ds.Schema(context.Background(), datasource.SchemaRequest{}, schemaResp)
+
+	for _, fieldName := range []string{
+		"name", "version", "subnet_id", "cluster_cidr", "node_cidr_mask_size",
+		"service_cluster_ip_range", "add_ons", "location",
+	} {
+		attr, found := schemaResp.Schema.Attributes[fieldName]
+		if !found {
+			t.Errorf("attribute %q not found", fieldName)
+
+			continue
+		}
+		if !attr.IsComputed() {
+			t.Errorf("attribute %q should be Computed in the data source", fieldName)
+		}
+	}
+}
+
 func TestKubernetesClusterDataSource_ExtraArgsSchemaAttributes(t *testing.T) {
 	ds := NewKubernetesClusterDataSource()
 

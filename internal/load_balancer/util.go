@@ -6,8 +6,56 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+)
+
+// apiDesc* — schema descriptions derived from the client-go swagger spec (LoadBalancer,
+// plus the nested LoadBalancerNetworkInterface, NetworkTarget, HealthCheckOptions,
+// PublicIpv4Address, and PrivateIpv4Address models).
+const (
+	apiDescID           = "ID of the load balancer."
+	apiDescName         = "Name of the load balancer."
+	apiDescLocation     = "Location of the load balancer."
+	apiDescAlgorithm    = "Load balancing algorithm used to distribute traffic across destinations (for example, `random`)."
+	apiDescType         = "Type of the load balancer (for example, `internal_ipv4`)."
+	apiDescProtocols    = "Network protocols the load balancer handles. Possible values: `tcp`, `udp`."
+	apiDescDestinations = "Backend targets the load balancer forwards traffic to, given as CIDR blocks or resource IDs."
+	apiDescIPs          = "IP addresses assigned to the load balancer."
+
+	// network_interfaces + nested (LoadBalancerNetworkInterface). The json tags are
+	// literally `network`/`subnet`, but the spec describes each as an ID.
+	apiDescNetworkInterfaces = "Network interfaces the load balancer is attached to."
+	apiDescNetwork           = "ID of the VPC network for the interface."
+	apiDescSubnet            = "ID of the subnet for the interface."
+
+	// destinations nested (NetworkTarget).
+	apiDescCidr       = "CIDR block, or an IP address that is converted to a CIDR. Mutually exclusive with resource_id."
+	apiDescResourceID = "ID of a backend resource. Mutually exclusive with cidr."
+
+	// ips nested public_ipv4 (PublicIpv4Address) and private_ipv4 (PrivateIpv4Address)
+	// leaf attributes.
+	apiDescPublicIPv4Address  = "Public IPv4 address."
+	apiDescPublicIPv4ID       = "ID of the public IPv4 address."
+	apiDescPublicIPv4Type     = "Allocation type of the public IPv4 address (for example, `dynamic`)."
+	apiDescPrivateIPv4Address = "Private IPv4 address."
+
+	// health_check nested (HealthCheckOptions).
+	apiDescHealthCheckTimeout      = "Timeout for a health check response, in seconds."
+	apiDescHealthCheckPort         = "Port on which to perform health checks."
+	apiDescHealthCheckInterval     = "Interval between health checks, in seconds."
+	apiDescHealthCheckSuccessCount = "Number of successful checks required to consider a backend healthy."
+	apiDescHealthCheckFailureCount = "Number of allowed failures before considering a backend unhealthy."
+)
+
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+	// The LoadBalancer read model has no project_id property, so the base text is
+	// provider-authored here rather than sourced from the spec.
+	providerDescProjectID     = "ID of the project the load balancer belongs to. " + project.ProviderDescProjectIDFallback
+	providerDescLoadBalancers = "List of load balancers in the project."
 )
 
 var loadBalancerNetworkInterfaceSchema = types.ObjectType{
@@ -153,6 +201,28 @@ func loadBalancerHealthCheckToTerraformResourceModel(healthCheck *swagger.Health
 	}
 
 	return lbHealthCheck
+}
+
+// healthCheckToSwagger decodes the health_check object attribute into a swagger
+// HealthCheckOptions request payload, returning nil when it is null or unknown.
+// The attribute must be decoded into the tfsdk-tagged resource model first — the
+// swagger type only has json tags, so decoding directly into it silently yields an
+// empty struct.
+func healthCheckToSwagger(ctx context.Context, obj types.Object, diags *diag.Diagnostics) *swagger.HealthCheckOptions {
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil
+	}
+
+	var model healthCheckOptionsResourceModel
+	diags.Append(obj.As(ctx, &model, basetypes.ObjectAsOptions{})...)
+
+	return &swagger.HealthCheckOptions{
+		Timeout:      model.Timeout.ValueString(),
+		Port:         model.Port.ValueString(),
+		Interval:     model.Interval.ValueString(),
+		SuccessCount: model.SuccessCount.ValueString(),
+		FailureCount: model.FailureCount.ValueString(),
+	}
 }
 
 func loadBalancerUpdateTerraformState(ctx context.Context, lb *swagger.LoadBalancer, state *loadBalancerResourceModel) {

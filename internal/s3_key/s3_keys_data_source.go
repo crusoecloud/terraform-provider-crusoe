@@ -63,40 +63,40 @@ func (ds *s3KeysDataSource) Schema(ctx context.Context, request datasource.Schem
 			"organization_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: descOrganizationID + " If not specified, inferred from the authenticated user.",
+				MarkdownDescription: providerDescOrganizationID + " " + providerDescOrganizationIDInference,
 			},
 			"keys": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "List of S3 access keys.",
+				MarkdownDescription: providerDescKeys,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"key_id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descKeyID,
+							MarkdownDescription: apiDescKeyID,
 						},
 						"access_key_id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descAccessKeyID,
+							MarkdownDescription: apiDescAccessKeyID,
 						},
 						"alias": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descAlias,
+							MarkdownDescription: apiDescAlias,
 						},
 						"status": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descStatus,
+							MarkdownDescription: apiDescStatus,
 						},
 						"created_at": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descCreatedAt,
+							MarkdownDescription: apiDescCreatedAt,
 						},
 						"expire_at": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descExpireAt,
+							MarkdownDescription: apiDescExpireAt,
 						},
 						"user_id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: descUserID,
+							MarkdownDescription: apiDescUserID,
 						},
 					},
 				},
@@ -146,6 +146,12 @@ func (ds *s3KeysDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	for i := range dataResp.Items {
 		state.Keys = append(state.Keys, s3KeyAPIToDataSourceModel(&dataResp.Items[i]))
 	}
+
+	// Sort keys deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Keys,
+		func(k s3KeyModel) string { return k.CreatedAt },
+		func(k s3KeyModel) string { return k.KeyID },
+	)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

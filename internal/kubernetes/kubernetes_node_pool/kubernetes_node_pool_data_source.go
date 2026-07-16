@@ -27,7 +27,7 @@ func NewKubernetesNodePoolDataSource() datasource.DataSource {
 type kubernetesNodePoolDataSourceModel struct {
 	ID                            types.String `tfsdk:"id"`
 	ProjectID                     types.String `tfsdk:"project_id"`
-	Version                       types.String `tfsdk:"version"`
+	ImageID                       types.String `tfsdk:"image_id"`
 	Type                          types.String `tfsdk:"type"`
 	InstanceCount                 types.Int64  `tfsdk:"instance_count"`
 	ClusterID                     types.String `tfsdk:"cluster_id"`
@@ -56,64 +56,93 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescID,
 			},
 			"project_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
 			},
 			"image_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescImageID,
 			},
 			"type": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescType,
 			},
 			"instance_count": schema.Int64Attribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescInstanceCount,
 			},
 			"cluster_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescClusterID,
 			},
 			"subnet_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescSubnetID,
 			},
 			"node_labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescNodeLabels,
 			},
 			"node_taints": schema.SetNestedAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: apiDescNodeTaints,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescTaintKey,
 						},
 						"value": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescTaintValue,
 						},
 						"effect": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescTaintEffect,
 						},
 					},
 				},
 			},
 			"instance_ids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescInstanceIDs,
 			},
 			"state": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescState,
 			},
 			"name": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescName,
 			},
 			"ephemeral_storage_for_containerd": schema.BoolAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescEphemeralStorageForContainerd,
 			},
 			"nvlink_domain_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescNvlinkDomainID,
 			},
 			"public_ip_type": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: apiDescPublicIPType,
 			},
 		},
 	}
@@ -164,7 +193,7 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 
 	state.ID = types.StringValue(kubernetesNodePool.Id)
 	state.ProjectID = types.StringValue(projectID)
-	state.Version = types.StringValue(kubernetesNodePool.ImageId)
+	state.ImageID = types.StringValue(kubernetesNodePool.ImageId)
 	state.Type = types.StringValue(kubernetesNodePool.Type_)
 	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
 	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
@@ -173,12 +202,12 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 	resp.Diagnostics.Append(diags...)
 	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
 	resp.Diagnostics.Append(diags...)
-	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
+	state.InstanceIDs, diags = common.StringSliceToTFList(sortedInstanceIDs(kubernetesNodePool.InstanceIds))
 	resp.Diagnostics.Append(diags...)
 	state.State = types.StringValue(kubernetesNodePool.State)
 	state.Name = types.StringValue(kubernetesNodePool.Name)
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
-	state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
+	state.NvlinkDomainID = stringOrNull(kubernetesNodePool.NvlinkDomainId)
 	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
 
 	diags = resp.State.Set(ctx, &state)

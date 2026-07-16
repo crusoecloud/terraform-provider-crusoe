@@ -58,17 +58,18 @@ func (ds *registryRepositoriesDataSource) Schema(_ context.Context, _ datasource
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
-				Optional: true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
 			},
 			"repositories": schema.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"name":     schema.StringAttribute{Computed: true},
-						"location": schema.StringAttribute{Computed: true},
-						"mode":     schema.StringAttribute{Computed: true},
-						"state":    schema.StringAttribute{Computed: true},
-						"url":      schema.StringAttribute{Computed: true},
+						"name":     schema.StringAttribute{Computed: true, MarkdownDescription: apiDescName},
+						"location": schema.StringAttribute{Computed: true, MarkdownDescription: apiDescLocation},
+						"mode":     schema.StringAttribute{Computed: true, MarkdownDescription: apiDescMode},
+						"state":    schema.StringAttribute{Computed: true, MarkdownDescription: apiDescState},
+						"url":      schema.StringAttribute{Computed: true, MarkdownDescription: apiDescURL},
 					},
 				},
 			},
@@ -106,6 +107,11 @@ func (ds *registryRepositoriesDataSource) Read(ctx context.Context, request data
 			URL:      types.StringValue(repo.Url),
 		})
 	}
+
+	// Sort repositories deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Repositories,
+		func(r registryRepositoryDataSourceModel) string { return r.Name.ValueString() },
+	)
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)

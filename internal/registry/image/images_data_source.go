@@ -74,16 +74,20 @@ func (ds *imagesDataSource) Schema(ctx context.Context, request datasource.Schem
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"manifest_count": schema.Int64Attribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescManifestCount,
 						},
 						"name": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescName,
 						},
 						"pull_count": schema.Int64Attribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescPullCount,
 						},
 						"url": schema.StringAttribute{
-							Computed: true,
+							Computed:            true,
+							MarkdownDescription: apiDescURL,
 						},
 					},
 				},
@@ -123,6 +127,11 @@ func (ds *imagesDataSource) Read(ctx context.Context, request datasource.ReadReq
 			Url:           types.StringValue(image.Url),
 		})
 	}
+
+	// Sort images deterministically so repeated reads produce a stable ordering.
+	common.SortByKeys(state.Images,
+		func(img imageDataSourceModel) string { return img.Name.ValueString() },
+	)
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)

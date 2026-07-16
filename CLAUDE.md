@@ -10,9 +10,10 @@ This file provides guidance to Claude Code when working with this Terraform prov
 - **Examples & tests** in `examples/<resource>/` with `main.tf` and `tests/*.tftest.hcl`
 - **ID fields**: Always suffix with `ID` (e.g., `ProjectID`, `InstanceTemplateID`)
 - **API errors**: Use `common.UnpackAPIError(err)`, not `err.Error()`
-- **State extraction**: Use `getResourceModel()` helper pattern
+- **State extraction**: Use the shared generic `common.GetResourceModel()` helper
 - **Schema validators**: Add `stringvalidator`/`int64validator` directly in schema
 - **Testing validators**: Go unit tests (not Terraform `expect_failures`) for schema validators
+- **Deterministic lists**: Sort API-ordered collections before setting state (`common.SortByKeys`; key priority `name → updated_at → created_at → id`)
 - **Reference implementation**: `internal/instance_group/` follows all current patterns
 
 ## Table of Contents
@@ -35,6 +36,7 @@ This file provides guidance to Claude Code when working with this Terraform prov
     - [HTTP Response Handling](#http-response-handling)
     - [State Upgrades](#state-upgrades)
     - [Schema Validators](#schema-validators)
+    - [Deterministic List Ordering](#deterministic-list-ordering)
   - [Testing](#testing)
     - [Go Unit Tests](#go-unit-tests)
     - [Terraform Unit Tests](#terraform-unit-tests)
@@ -145,25 +147,34 @@ Template           types.String `tfsdk:"template_id"`
 
 ### State Extraction Helper
 
-Use `getResourceModel()` to extract state/plan with error handling:
+Use the shared generic `common.GetResourceModel()` helper to extract state, plan, or
+config with error handling. It lives in `internal/common/resource_model.go` — do **not**
+add a per-package copy. The model type is inferred from `dest`, so callers never specify
+the type parameter:
 
 ```go
-var errGetResourceModel = errors.New("unable to get resource model")
+// internal/common/resource_model.go (shared, generic — already defined)
+var ErrGetResourceModel = errors.New("unable to get resource model")
 
-func getResourceModel(ctx context.Context, source tfDataGetter, dest *myResourceModel, respDiags *diag.Diagnostics) error {
+// TFDataGetter is implemented by tfsdk.State, tfsdk.Plan, and tfsdk.Config.
+type TFDataGetter interface {
+    Get(ctx context.Context, target interface{}) diag.Diagnostics
+}
+
+func GetResourceModel[T any](ctx context.Context, source TFDataGetter, dest *T, respDiags *diag.Diagnostics) error {
     diags := source.Get(ctx, dest)
     respDiags.Append(diags...)
 
     if respDiags.HasError() {
-        return errGetResourceModel
+        return ErrGetResourceModel
     }
 
     return nil
 }
 
-// Usage:
+// Usage in a resource's CRUD methods:
 var state myResourceModel
-if err := getResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
+if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
     return
 }
 ```
@@ -174,7 +185,16 @@ Always use `common.UnpackAPIError(err)` for API errors (not `err.Error()`).
 
 ### Schema Descriptions
 
-Extract shared descriptions to constants in `util.go` when the same description is used in both resource and data source schemas.
+**Source of truth:** Attribute descriptions come from the `github.com/crusoecloud/client-go` swagger spec (`swagger/v1/swagger.json`) — a Swagger 2.0 document that `client-go` is generated from (CCX-2836). When adding or changing schema fields, derive the description from the spec instead of hand-writing prose: run the `/derive-schema-descriptions` skill, which resolves the spec for the pinned client-go version, maps Terraform attributes to spec properties, and flags anything the spec doesn't describe (e.g. provider-only fields like `project_id`) rather than inventing text. Re-run it after bumping client-go.
+
+Descriptions live in `util.go`, split into two origin-denoting constant blocks that both the resource and data source schemas reference:
+
+- **`apiDesc*`** — derived verbatim from the swagger spec (mechanical style normalization only).
+- **`providerDesc*`** — provider-specific text with no spec basis (Terraform behavior, deprecation notes, `project_id` inference, `common.DevelopmentMessage`, etc.).
+
+Every attribute's description is a named, origin-prefixed constant (no inline strings) so its origin is explicit. When an attribute mixes both, keep the constants separate and compose them in the schema: `apiDescX + " " + providerDescX`.
+
+`project_id` is provider-side: `providerDescProjectID = "<spec text, or the house phrase \"ID of the project the <resource> belongs to.\"> " + project.ProviderDescProjectIDFallback` (the shared inference suffix lives once in `internal/project`). Reference implementation: `internal/disk`.
 
 **Style guidelines** (following patterns from popular Terraform providers):
 
@@ -182,22 +202,27 @@ Extract shared descriptions to constants in `util.go` when the same description 
 - Use "of the [resource]" pattern for clarity
 - Keep descriptions concise - one sentence when possible
 - List possible values inline with backticks: `Possible values: \`value1\`, \`value2\`.`
-- Split default/inference behavior into separate constants that can be appended
+- Put spec-derived text in `apiDesc*` and provider-specific text in `providerDesc*`; compose mixed-origin attributes in the schema
+- If the spec has no description for a mapped attribute, leave it undescribed and flag it — never invent (the `/derive-schema-descriptions` skill does this automatically)
 
 ```go
+// apiDesc* — schema descriptions derived from the client-go swagger spec (DiskV1).
 const (
-    descID                 = "Unique identifier of the disk."
-    descName               = "Name of the disk."
-    descProjectID          = "ID of the project the disk belongs to."
-    descProjectIDInference = "If not specified, the project ID will be inferred from the Crusoe configuration."
-    descType               = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
-    descSize               = "Storage capacity of the disk (e.g., `100GiB`, `1TiB`)."
+    apiDescID      = "ID of the disk."
+    apiDescName    = "Name of the disk."
+    apiDescType    = "Type of the disk. Possible values: `persistent-ssd`, `shared-volume`."
+    apiDescDNSName = "DNS name used to mount the disk. Populated only for `shared-volume` disks."
 )
 
-// Usage in schema - combine base description with inference note
-"project_id": schema.StringAttribute{
-    MarkdownDescription: descProjectID + " " + descProjectIDInference,
-}
+// providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
+const (
+    providerDescProjectID         = "ID of the project the disk belongs to. " + project.ProviderDescProjectIDFallback
+    providerDescSharedVolumeEmpty = "Empty for other disk types."
+)
+
+// Usage in schema — pure spec text references apiDesc*; mixed origin composes both.
+"project_id": schema.StringAttribute{MarkdownDescription: providerDescProjectID},
+"dns_name":   schema.StringAttribute{MarkdownDescription: apiDescDNSName + " " + providerDescSharedVolumeEmpty},
 ```
 
 ### Deprecated Fields
@@ -319,6 +344,27 @@ import (
 },
 ```
 
+### Deterministic List Ordering
+
+Crusoe list API endpoints don't guarantee a stable element order, so order-sensitive Terraform `List` attributes built from `dataResp.Items` re-order between reads and produce spurious diffs on otherwise-unchanged infrastructure (CCX-4394). Sort any collection built from an API response before writing state.
+
+- **List data sources**: sort the result slice with `common.SortByKeys` before `resp.State.Set`. Pass key functions as a tiebreaker chain in priority order `name → updated_at → created_at → id`, supplying only the keys the model exposes (`id` is the always-unique final tiebreaker; use the model's unique field — e.g. `Digest` — when there is no id):
+
+  ```go
+  common.SortByKeys(state.Disks,
+      func(d diskModel) string { return d.Name },
+      func(d diskModel) string { return d.ID },
+  )
+  ```
+
+- **Flat/nested string lists** of opaque IDs with no name/timestamp dimension (e.g. `vips`, `subnets`, `active_instance_ids`): sort lexicographically with `slices.Sort` before assigning.
+
+- **Resource-level `Computed` lists** populated in API order (e.g. `active_instance_ids`, `vips`, `subnets`, node-pool `instance_ids`): sort the slice before `common.StringSliceToTFList`.
+
+- **Do NOT sort** `Optional`+`Computed` lists a user may set in config (e.g. `kubernetes_cluster` `add_ons` / `nodepool_ids`) — sorting the read value can fight the configured order. Likewise leave nested object lists that mirror configured order (e.g. load balancer `network_interfaces`, instance_template `disks`) unless they have a clear stable key.
+
+Sorting is non-breaking (sort-only; no schema/attribute-type/state-shape change, no state migration). Add a unit test asserting a shuffled input yields a stable, key-sorted result.
+
 ## Testing
 
 ### Go Unit Tests
@@ -421,9 +467,9 @@ Watch out for these frequently triggered lint errors:
 
 ## Changelog and Versioning
 
-Update `CHANGELOG.md` and `versions.env` **only when merging to the `release` branch**, not when merging to `main`.
+When preparing a release, commit the `CHANGELOG.md` and `versions.env` updates **to `main` first** (a dedicated release-prep commit), **then** open the `main → release` MR. Do **not** edit these files on the `release` branch or as part of the release MR, and don't squash the release MR — release-only commits make `release` diverge from `main` and cause conflicts on the next `main → release` merge. Ordinary feature merges into `main` should not touch these files; only the release-prep commit does.
 
-See [readme.md](readme.md) (Versioning and Maintaining Changelog sections) for full details on semantic versioning rules, `versions.env` format, changelog categories, and examples.
+See [readme.md](readme.md) (Contributing, Versioning, and Maintaining Changelog sections) for full details on semantic versioning rules, `versions.env` format, changelog categories, and examples.
 
 ## Creating Merge Request Descriptions
 

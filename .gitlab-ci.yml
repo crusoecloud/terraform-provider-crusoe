@@ -33,9 +33,17 @@ notify_release_branch_success:
   rules:
     - if: '$CI_COMMIT_BRANCH == "release" && $CI_PIPELINE_SOURCE == "push"'
   script:
+    - |
+      if [ -z "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" ]; then
+        echo "SLACK_CCX_CI_RELEASES_WEBHOOK_URL not configured; skipping Slack notification." >&2
+        exit 0
+      fi
     - COMMIT_SHORT=$(echo $CI_COMMIT_SHA | cut -c1-8)
     - |
-      curl -X POST "https://hooks.slack.com/services/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" \
+      # JSON-escape: display names are free text, and the curl image has no jq.
+      TRIGGERED_BY=$(printf '%s' "$GITLAB_USER_NAME" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    - |
+      curl -sS --fail-with-body --max-time 10 -X POST "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" \
         -H 'Content-Type: application/json' \
         -d '{
           "text": "*Terraform Provider Release Pipeline Succeeded*",
@@ -60,7 +68,7 @@ notify_release_branch_success:
                 },
                 {
                   "type": "mrkdwn",
-                  "text": "*Triggered by:*\n'"$GITLAB_USER_NAME"'"
+                  "text": "*Triggered by:*\n'"$TRIGGERED_BY"'"
                 },
                 {
                   "type": "mrkdwn",
@@ -93,9 +101,17 @@ notify_release_branch_failure:
   rules:
     - if: '$CI_COMMIT_BRANCH == "release" && $CI_PIPELINE_SOURCE == "push"'
   script:
+    - |
+      if [ -z "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" ]; then
+        echo "SLACK_CCX_CI_RELEASES_WEBHOOK_URL not configured; skipping Slack notification." >&2
+        exit 0
+      fi
     - COMMIT_SHORT=$(echo $CI_COMMIT_SHA | cut -c1-8)
     - |
-      curl -X POST "https://hooks.slack.com/services/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" \
+      # JSON-escape: display names are free text, and the curl image has no jq.
+      TRIGGERED_BY=$(printf '%s' "$GITLAB_USER_NAME" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    - |
+      curl -sS --fail-with-body --max-time 10 -X POST "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" \
         -H 'Content-Type: application/json' \
         -d '{
           "text": "*Terraform Provider Release Pipeline Failed*",
@@ -120,7 +136,7 @@ notify_release_branch_failure:
                 },
                 {
                   "type": "mrkdwn",
-                  "text": "*Triggered by:*\n'"$GITLAB_USER_NAME"'"
+                  "text": "*Triggered by:*\n'"$TRIGGERED_BY"'"
                 },
                 {
                   "type": "mrkdwn",

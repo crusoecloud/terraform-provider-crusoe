@@ -69,3 +69,68 @@ jobs:
           # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+
+      - name: Announce release to Slack
+        continue-on-error: true
+        env:
+          SLACK_CCX_CI_RELEASES_WEBHOOK_URL: ${{ secrets.SLACK_CCX_CI_RELEASES_WEBHOOK_URL }}
+        run: |
+          if [ -z "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" ]; then
+            echo "SLACK_CCX_CI_RELEASES_WEBHOOK_URL not configured; skipping Slack announcement." >&2
+            exit 0
+          fi
+          # --exact-match: fail loudly if no tag points at HEAD rather than announcing a stale tag.
+          TAG=$(git describe --tags --exact-match HEAD)
+          # This pipeline only emits stable vX.Y.Z tags; skip manually created
+          # pre-release tags (e.g. v1.2.3-rc1) just in case.
+          if echo "$TAG" | grep -q '-'; then
+            echo "Pre-release tag $TAG detected; skipping Slack announcement."
+            exit 0
+          fi
+          COMMIT_SHORT=$(git rev-parse --short=8 HEAD)
+          RELEASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          PAYLOAD=$(jq -n \
+            --arg tag "$TAG" \
+            --arg commit "$COMMIT_SHORT" \
+            --arg actor "$GITHUB_ACTOR" \
+            --arg release_url "$RELEASE_URL" \
+            --arg run_url "$RUN_URL" \
+            '{
+              text: "*Terraform Provider Crusoe \($tag) Released Successfully*",
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: "Terraform Provider Crusoe \($tag) Released"
+                  }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*Version:*\n\($tag)" },
+                    { type: "mrkdwn", text: "*Commit:*\n\($commit)" },
+                    { type: "mrkdwn", text: "*Released by:*\n\($actor)" },
+                    { type: "mrkdwn", text: "*Source:*\nGitHub Actions" }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "*Install / Download:*\n• <\($release_url)|GitHub Release>\n• Terraform Registry: `crusoecloud/crusoe`"
+                  }
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "<\($run_url)|View Workflow Run>"
+                  }
+                }
+              ]
+            }')
+          curl -sS --fail-with-body --max-time 10 -X POST "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD"

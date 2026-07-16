@@ -217,9 +217,8 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
-							Optional:      true,
-							Description:   "Infiniband Partition ID",
-							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							Optional:    true,
+							Description: "Infiniband Partition ID",
 						},
 					},
 				},
@@ -246,7 +245,15 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 }
 
 func (r *vmByTemplateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "vm_id")
+	if errMsg != "" {
+		resp.Diagnostics.AddError("Failed to import VM", errMsg)
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface

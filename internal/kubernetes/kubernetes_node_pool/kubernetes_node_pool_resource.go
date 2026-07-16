@@ -106,79 +106,89 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
 			},
 			"version": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescVersion,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
 			},
 			"type": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescType,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"instance_count": schema.Int64Attribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescInstanceCount,
 			},
 			"cluster_id": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescClusterID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"subnet_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescSubnetID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
 			},
 			"ib_partition_id": schema.StringAttribute{
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"requested_node_labels": schema.MapAttribute{
-				ElementType:   types.StringType,
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()}, // maintain across updates
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescRequestedNodeLabels,
+				PlanModifiers:       []planmodifier.Map{mapplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"all_node_labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: apiDescNodeLabels,
 			},
 			"instance_ids": schema.ListAttribute{
-				ElementType: types.StringType,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: apiDescInstanceIDs,
 			},
 			"ssh_key": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescSSHKey,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"state": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				MarkdownDescription: apiDescState,
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"ephemeral_storage_for_containerd": schema.BoolAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescEphemeralStorageForContainerd,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"batch_size": schema.Int64Attribute{
-				Optional: true,
-				MarkdownDescription: common.DevelopmentMessage + " " +
-					"Number of nodes to update at a time during rollout (minimum 1, maximum 10). " +
-					"Mutually exclusive with batch_percentage. " +
-					"If both this and batch_percentage are omitted, existing nodes will not be updated, " +
-					"but new nodes will use the new configuration.",
+				Optional:            true,
+				MarkdownDescription: providerDescBatchSize,
 				Validators: []validator.Int64{
 					int64validator.Between(1, 10),
 				},
@@ -187,12 +197,8 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"batch_percentage": schema.Int64Attribute{
-				Optional: true,
-				MarkdownDescription: common.DevelopmentMessage + " " +
-					"Percentage of nodes to update concurrently during rollout. " +
-					"The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. " +
-					"If both this and batch_size are omitted, existing nodes will not be updated, " +
-					"but new nodes will use the new configuration.",
+				Optional:            true,
+				MarkdownDescription: providerDescBatchPercentage,
 				Validators: []validator.Int64{
 					int64validator.Between(1, 100),
 				},
@@ -201,13 +207,15 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"nvlink_domain_id": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place & maintain across updates
+				Optional:            true,
+				MarkdownDescription: apiDescNvlinkDomainID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place & maintain across updates
 			},
 			"public_ip_type": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  stringdefault.StaticString("dynamic"), // Default to dynamic
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescPublicIPType,
+				Default:             stringdefault.StaticString("dynamic"), // Default to dynamic
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 					common.NewPrivateNodePoolsWarningModifier(),
@@ -216,11 +224,12 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 		},
 		Blocks: map[string]schema.Block{
 			"node_taints": schema.SetNestedBlock{
+				MarkdownDescription: apiDescNodeTaints,
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Taint key. Follows the Kubernetes qualified-name format (optional DNS subdomain prefix, name segment up to 63 chars). Must be non-empty.",
+							MarkdownDescription: apiDescTaintKey,
 							Validators: []validator.String{
 								stringvalidator.LengthAtLeast(1),
 							},
@@ -229,14 +238,14 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 							Optional:            true,
 							Computed:            true,
 							Default:             stringdefault.StaticString(""),
-							MarkdownDescription: "Taint value. Defaults to empty string if omitted. Must be at most 63 characters.",
+							MarkdownDescription: apiDescTaintValue,
 							Validators: []validator.String{
 								stringvalidator.LengthAtMost(63),
 							},
 						},
 						"effect": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Taint effect. Possible values: `NoSchedule`, `PreferNoSchedule`, `NoExecute`.",
+							MarkdownDescription: apiDescTaintEffect,
 							Validators: []validator.String{
 								stringvalidator.OneOf("NoSchedule", "PreferNoSchedule", "NoExecute"),
 							},
@@ -316,50 +325,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	var state kubernetesNodePoolResourceModel
-
-	// Update state from API response
-	state.ID = types.StringValue(kubernetesNodePoolResponse.NodePool.Id)
-	state.ProjectID = types.StringValue(kubernetesNodePoolResponse.NodePool.ProjectId)
-	state.InstanceCount = types.Int64Value(kubernetesNodePoolResponse.NodePool.Count)
-	state.Version = types.StringValue(kubernetesNodePoolResponse.NodePool.ImageId)
-	state.Type = types.StringValue(kubernetesNodePoolResponse.NodePool.Type_)
-	state.ClusterID = types.StringValue(kubernetesNodePoolResponse.NodePool.ClusterId)
-	state.SubnetID = types.StringValue(kubernetesNodePoolResponse.NodePool.SubnetId)
-	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePoolResponse.NodePool.NodeLabels)
-	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePoolResponse.NodePool.NodeTaints)
-	resp.Diagnostics.Append(diags...)
-	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePoolResponse.NodePool.InstanceIds)
-	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(kubernetesNodePoolResponse.NodePool.State)
-	state.Name = types.StringValue(kubernetesNodePoolResponse.NodePool.Name)
-	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePoolResponse.NodePool.EphemeralStorageForContainerd)
-	state.PublicIPType = types.StringValue(kubernetesNodePoolResponse.NodePool.PublicIpType)
-
-	if kubernetesNodePoolResponse.NodePool.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(kubernetesNodePoolResponse.NodePool.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
-
-	// Preserve Terraform-only fields from prior state (not in API)
-	state.IBPartitionID = plan.IBPartitionID
-	state.SSHKey = plan.SSHKey
-	if plan.RequestedNodeLabels.IsUnknown() {
-		state.RequestedNodeLabels = types.MapNull(types.StringType)
-	} else {
-		state.RequestedNodeLabels = plan.RequestedNodeLabels
-	}
-	if plan.BatchSize.IsNull() {
-		state.BatchSize = types.Int64Null()
-	} else {
-		state.BatchSize = plan.BatchSize
-	}
-	if plan.BatchPercentage.IsNull() {
-		state.BatchPercentage = types.Int64Null()
-	} else {
-		state.BatchPercentage = plan.BatchPercentage
-	}
+	nodePoolToResourceModel(ctx, kubernetesNodePoolResponse.NodePool, &plan, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -395,46 +361,7 @@ func (r *kubernetesNodePoolResource) Read(ctx context.Context, req resource.Read
 	}
 
 	var state kubernetesNodePoolResourceModel
-
-	// Update state from API response
-	state.ID = types.StringValue(kubernetesNodePool.Id)
-	state.ProjectID = types.StringValue(kubernetesNodePool.ProjectId)
-	state.Version = types.StringValue(kubernetesNodePool.ImageId)
-	state.Type = types.StringValue(kubernetesNodePool.Type_)
-	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
-	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
-	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
-	state.AllNodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
-	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
-	resp.Diagnostics.Append(diags...)
-	state.InstanceIDs, diags = common.StringSliceToTFList(kubernetesNodePool.InstanceIds)
-	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(kubernetesNodePool.State)
-	state.Name = types.StringValue(kubernetesNodePool.Name)
-	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
-	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
-
-	if kubernetesNodePool.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(kubernetesNodePool.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
-
-	// Preserve Terraform-only fields from prior state (not in API)
-	state.IBPartitionID = stored.IBPartitionID
-	state.RequestedNodeLabels = stored.RequestedNodeLabels
-	state.SSHKey = stored.SSHKey
-	if stored.BatchSize.IsNull() {
-		state.BatchSize = types.Int64Null()
-	} else {
-		state.BatchSize = stored.BatchSize
-	}
-	if stored.BatchPercentage.IsNull() {
-		state.BatchPercentage = types.Int64Null()
-	} else {
-		state.BatchPercentage = stored.BatchPercentage
-	}
+	nodePoolToResourceModel(ctx, &kubernetesNodePool, &stored, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -644,42 +571,7 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	}
 
 	var state kubernetesNodePoolResourceModel
-
-	// Populate state with values from API response
-	state.ID = types.StringValue(updatedNodePool.Id)
-	state.ProjectID = types.StringValue(updatedNodePool.ProjectId)
-	state.InstanceCount = types.Int64Value(updatedNodePool.Count)
-	state.Version = types.StringValue(updatedNodePool.ImageId)
-	state.Type = types.StringValue(updatedNodePool.Type_)
-	state.ClusterID = types.StringValue(updatedNodePool.ClusterId)
-	state.SubnetID = types.StringValue(updatedNodePool.SubnetId)
-	state.AllNodeLabels, diags = common.StringMapToTFMap(updatedNodePool.NodeLabels)
-	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, updatedNodePool.NodeTaints)
-	resp.Diagnostics.Append(diags...)
-	state.InstanceIDs, diags = common.StringSliceToTFList(updatedNodePool.InstanceIds)
-	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(updatedNodePool.State)
-	state.Name = types.StringValue(updatedNodePool.Name)
-	state.EphemeralStorageForContainerd = types.BoolValue(updatedNodePool.EphemeralStorageForContainerd)
-	state.PublicIPType = types.StringValue(updatedNodePool.PublicIpType)
-
-	if updatedNodePool.NvlinkDomainId != "" {
-		state.NvlinkDomainID = types.StringValue(updatedNodePool.NvlinkDomainId)
-	} else {
-		state.NvlinkDomainID = types.StringNull()
-	}
-
-	// Preserve fields not returned by API
-	if plan.RequestedNodeLabels.IsUnknown() {
-		state.RequestedNodeLabels = types.MapNull(types.StringType)
-	} else {
-		state.RequestedNodeLabels = plan.RequestedNodeLabels
-	}
-	state.IBPartitionID = plan.IBPartitionID
-	state.SSHKey = plan.SSHKey
-	state.BatchSize = plan.BatchSize
-	state.BatchPercentage = plan.BatchPercentage
+	nodePoolToResourceModel(ctx, &updatedNodePool, &plan, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)

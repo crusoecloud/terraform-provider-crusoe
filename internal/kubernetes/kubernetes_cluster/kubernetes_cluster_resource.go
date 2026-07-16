@@ -92,20 +92,24 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				Computed:            true,
+				MarkdownDescription: apiDescID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"project_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
+				Computed:            true,
+				Optional:            true,
+				MarkdownDescription: providerDescProjectID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
 			},
 			"name": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescName,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"version": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				MarkdownDescription: apiDescVersion,
 				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
 					"Kubernetes Version Change Not Supported",
 					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
@@ -117,74 +121,88 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				)},
 			},
 			"subnet_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescSubnetID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place
 			},
 			"cluster_cidr": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescClusterCidr,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"node_cidr_mask_size": schema.Int64Attribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown(), int64planmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:    []validator.Int64{int64validator.AtMost(math.MaxInt32)},
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescNodeCidrMaskSize,
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown(), int64planmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators:          []validator.Int64{int64validator.AtMost(math.MaxInt32)},
 			},
 			"service_cluster_ip_range": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescServiceClusterIPRange,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"add_ons": schema.ListAttribute{
-				Computed:      true,
-				Optional:      true,
-				ElementType:   types.StringType,
-				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Default:       listdefault.StaticValue(emptyStringList),
+				Computed:            true,
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescAddOns,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Default:             listdefault.StaticValue(emptyStringList),
 			},
 			"location": schema.StringAttribute{
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Required:            true,
+				MarkdownDescription: apiDescLocation,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"dns_name": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{},
+				Computed:            true,
+				MarkdownDescription: apiDescDNSName,
+				PlanModifiers:       []planmodifier.String{},
 			},
 			"nodepool_ids": schema.ListAttribute{
-				ElementType:   types.StringType,
-				Computed:      true,
-				PlanModifiers: []planmodifier.List{},
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: apiDescNodePoolIDs,
+				PlanModifiers:       []planmodifier.List{},
 			},
 			"oidc_issuer_url": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCIssuerURL,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_client_id": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCClientID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_username_claim": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCUsernameClaim,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_username_prefix": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCUsernamePrefix,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_groups_claim": schema.StringAttribute{
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCGroupsClaim,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"oidc_ca_cert": schema.StringAttribute{
-				Optional:      true,
-				Description:   "CA certificate used to verify the OIDC server (optional).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Optional:            true,
+				MarkdownDescription: apiDescOIDCCACert,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"private": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescPrivate,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 					common.NewPrivateControlPlaneWarningModifier(),
@@ -192,19 +210,19 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Default: booldefault.StaticBool(false), // Default to false
 			},
 			"apiserver_extra_args": schema.MapAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-apiserver as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescApiserverExtraArgs + " " + providerDescExtraArgsNote,
 			},
 			"scheduler_extra_args": schema.MapAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-scheduler as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescSchedulerExtraArgs + " " + providerDescExtraArgsNote,
 			},
 			"controller_manager_extra_args": schema.MapAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "Extra arguments to pass to the kube-controller-manager as key-value pairs. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: apiDescControllerManagerExtraArgs + " " + providerDescExtraArgsNote,
 			},
 		},
 	}
@@ -272,34 +290,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	var state kubernetesClusterResourceModel
-
-	state.ID = types.StringValue(kubernetesCluster.Id)
-	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
-	state.Name = types.StringValue(kubernetesCluster.Name)
-	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
-	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
-	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
-	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
-	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
-	resp.Diagnostics.Append(diags...)
-	state.Location = types.StringValue(kubernetesCluster.Location)
-	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
-	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
-	resp.Diagnostics.Append(diags...)
-	state.OIDCIssuerURL = plan.OIDCIssuerURL
-	state.OIDCClientID = plan.OIDCClientID
-	state.OIDCUsernameClaim = plan.OIDCUsernameClaim
-	state.OIDCUsernamePrefix = plan.OIDCUsernamePrefix
-	state.OIDCGroupsClaim = plan.OIDCGroupsClaim
-	state.OIDCCACert = plan.OIDCCACert
-	state.Private = types.BoolValue(kubernetesCluster.Private)
-	state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
-	resp.Diagnostics.Append(diags...)
+	clusterToResourceModel(kubernetesCluster, &plan, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -333,45 +324,12 @@ func (r *kubernetesClusterResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	var state kubernetesClusterResourceModel
-
-	diags = resp.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-
+	clusterToResourceModel(&kubernetesCluster, &stored, &stored, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	state.ID = types.StringValue(kubernetesCluster.Id)
-	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
-	state.Name = types.StringValue(kubernetesCluster.Name)
-	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
-	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
-	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
-	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
-	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
-	resp.Diagnostics.Append(diags...)
-	state.Location = types.StringValue(kubernetesCluster.Location)
-	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
-	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
-	resp.Diagnostics.Append(diags...)
-	state.OIDCIssuerURL = stored.OIDCIssuerURL
-	state.OIDCClientID = stored.OIDCClientID
-	state.OIDCUsernameClaim = stored.OIDCUsernameClaim
-	state.OIDCUsernamePrefix = stored.OIDCUsernamePrefix
-	state.OIDCGroupsClaim = stored.OIDCGroupsClaim
-	state.OIDCCACert = stored.OIDCCACert
-	state.Private = types.BoolValue(kubernetesCluster.Private)
-
-	state.ApiserverExtraArgs, diags = resolveExtraArg(stored.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = resolveExtraArg(stored.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
-	resp.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = resolveExtraArg(stored.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
-	resp.Diagnostics.Append(diags...)
-
-	diags = resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &stored)
 	resp.Diagnostics.Append(diags...)
 }
 
@@ -467,30 +425,7 @@ func (r *kubernetesClusterResource) Update(
 		return
 	}
 
-	state.ID = types.StringValue(kubernetesCluster.Id)
-	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
-	state.Name = types.StringValue(kubernetesCluster.Name)
-	state.Version = types.StringValue(kubernetesCluster.Version)
-	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
-	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
-	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)
-	state.ServiceClusterIpRange = types.StringValue(kubernetesCluster.ServiceClusterIpRange)
-	state.AddOns, diags = common.StringSliceToTFList(kubernetesCluster.AddOns)
-	response.Diagnostics.Append(diags...)
-	state.Location = types.StringValue(kubernetesCluster.Location)
-	state.DNSName = types.StringValue(kubernetesCluster.DnsName)
-	state.NodePoolIds, diags = common.StringSliceToTFList(kubernetesCluster.NodePools)
-	response.Diagnostics.Append(diags...)
-	state.Private = types.BoolValue(kubernetesCluster.Private)
-
-	// For null plan fields, preserve null in state so the field stays unmanaged.
-	// For non-null plan fields, use the server response to reflect actual state.
-	state.ApiserverExtraArgs, diags = resolveExtraArg(plan.ApiserverExtraArgs, kubernetesCluster.ApiserverExtraArgs)
-	response.Diagnostics.Append(diags...)
-	state.SchedulerExtraArgs, diags = resolveExtraArg(plan.SchedulerExtraArgs, kubernetesCluster.SchedulerExtraArgs)
-	response.Diagnostics.Append(diags...)
-	state.ControllerManagerExtraArgs, diags = resolveExtraArg(plan.ControllerManagerExtraArgs, kubernetesCluster.ControllerManagerExtraArgs)
-	response.Diagnostics.Append(diags...)
+	clusterToResourceModel(&kubernetesCluster, &plan, &state, &response.Diagnostics)
 
 	diags = response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
