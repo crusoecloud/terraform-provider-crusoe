@@ -157,9 +157,9 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		Action:           plan.Action.ValueString(),
 		Protocols:        stringToSlice(plan.Protocols.ValueString(), ","),
 		Direction:        plan.Direction.ValueString(),
-		Sources:          []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Source.ValueString())},
+		Sources:          toFirewallRuleObjects(stringToSlice(plan.Source.ValueString(), ",")),
 		SourcePorts:      stringToSlice(sourcePortsStr, ","),
-		Destinations:     []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Destination.ValueString())},
+		Destinations:     toFirewallRuleObjects(stringToSlice(plan.Destination.ValueString(), ",")),
 		DestinationPorts: stringToSlice(destPortsStr, ","),
 	}, projectID)
 	if httpResp != nil {
@@ -235,13 +235,13 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 		patchReq.Protocols = stringToSlice(plan.Protocols.ValueString(), ",")
 	}
 	if !plan.Destination.IsNull() && !plan.Destination.IsUnknown() {
-		patchReq.Destinations = []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Destination.ValueString())}
+		patchReq.Destinations = toFirewallRuleObjects(stringToSlice(plan.Destination.ValueString(), ","))
 	}
 	if !plan.DestinationPorts.IsNull() && !plan.DestinationPorts.IsUnknown() {
 		patchReq.DestinationPorts = stringToSlice(plan.DestinationPorts.ValueString(), ",")
 	}
 	if !plan.Source.IsNull() && !plan.Source.IsUnknown() {
-		patchReq.Sources = []swagger.FirewallRuleObject{toFirewallRuleObject(plan.Source.ValueString())}
+		patchReq.Sources = toFirewallRuleObjects(stringToSlice(plan.Source.ValueString(), ","))
 	}
 	if !plan.SourcePorts.IsNull() && !plan.SourcePorts.IsUnknown() {
 		patchReq.SourcePorts = stringToSlice(plan.SourcePorts.ValueString(), ",")

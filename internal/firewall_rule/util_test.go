@@ -112,6 +112,52 @@ func Test_preserveListFormat(t *testing.T) {
 	}
 }
 
+func Test_toFirewallRuleObjects(t *testing.T) {
+	type args struct {
+		ipsOrCIDRs []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []swagger.FirewallRuleObject
+	}{
+		{
+			name: "empty list",
+			args: args{},
+			want: []swagger.FirewallRuleObject{},
+		},
+		{
+			name: "single CIDR",
+			args: args{ipsOrCIDRs: []string{"127.0.0.0/16"}},
+			want: []swagger.FirewallRuleObject{{Cidr: "127.0.0.0/16"}},
+		},
+		{
+			name: "multiple CIDRs",
+			args: args{ipsOrCIDRs: []string{"127.0.0.0/16", "127.0.0.1/24"}},
+			want: []swagger.FirewallRuleObject{{Cidr: "127.0.0.0/16"}, {Cidr: "127.0.0.1/24"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toFirewallRuleObjects(tt.args.ipsOrCIDRs); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("toFirewallRuleObjects() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_toFirewallRuleObjects_splitsCommaSeparatedList guards the create/update
+// path: a comma-separated source or destination must reach the API as one object
+// per CIDR, not a single object holding the whole string.
+func Test_toFirewallRuleObjects_splitsCommaSeparatedList(t *testing.T) {
+	got := toFirewallRuleObjects(stringToSlice("1.1.1.1/32, 2.2.2.2/32", ","))
+	want := []swagger.FirewallRuleObject{{Cidr: "1.1.1.1/32"}, {Cidr: "2.2.2.2/32"}}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("toFirewallRuleObjects(stringToSlice()) = %v, want %v", got, want)
+	}
+}
+
 // Test_firewallRuleToTerraformResourceModel_preservesConfiguredFormat is the
 // regression guard for CCX-4493: a user-configured "*" must survive the
 // transform even though the API expands it to "1-65535".
