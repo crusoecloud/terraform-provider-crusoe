@@ -43,6 +43,50 @@ func Test_cidrListToString(t *testing.T) {
 	}
 }
 
+// Test_toFirewallRuleObjects covers CCX-5403: comma-separated source/destination
+// strings must map to one FirewallRuleObject per CIDR, not a single object
+// holding the raw comma-separated string.
+func Test_toFirewallRuleObjects(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []swagger.FirewallRuleObject
+	}{
+		{
+			name: "empty list",
+			in:   []string{},
+			want: []swagger.FirewallRuleObject{},
+		},
+		{
+			name: "single CIDR",
+			in:   []string{"127.0.0.0/16"},
+			want: []swagger.FirewallRuleObject{{Cidr: "127.0.0.0/16"}},
+		},
+		{
+			name: "multiple CIDRs",
+			in:   []string{"1.1.1.1/32", "2.2.2.2/32"},
+			want: []swagger.FirewallRuleObject{{Cidr: "1.1.1.1/32"}, {Cidr: "2.2.2.2/32"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toFirewallRuleObjects(tt.in); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("toFirewallRuleObjects(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_toFirewallRuleObjects_splitsCommaSeparatedList exercises the full
+// write-path composition used in Create/Update.
+func Test_toFirewallRuleObjects_splitsCommaSeparatedList(t *testing.T) {
+	got := toFirewallRuleObjects(stringToSlice("1.1.1.1/32, 2.2.2.2/32", ","))
+	want := []swagger.FirewallRuleObject{{Cidr: "1.1.1.1/32"}, {Cidr: "2.2.2.2/32"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func Test_stringToSlice(t *testing.T) {
 	type args struct {
 		s         string

@@ -102,9 +102,14 @@ func preserveListFormat(configured string, apiElems []string, expandWildcard boo
 	return strings.Join(apiElems, ",")
 }
 
-// toFirewallRuleObject wraps an IP or CIDR string into a FirewallRuleObject.
-func toFirewallRuleObject(ipOrCIDR string) swagger.FirewallRuleObject {
-	return swagger.FirewallRuleObject{Cidr: ipOrCIDR}
+// toFirewallRuleObjects wraps IP or CIDR strings into FirewallRuleObjects.
+func toFirewallRuleObjects(ipsOrCIDRs []string) []swagger.FirewallRuleObject {
+	out := make([]swagger.FirewallRuleObject, 0, len(ipsOrCIDRs))
+	for _, ipOrCIDR := range ipsOrCIDRs {
+		out = append(out, swagger.FirewallRuleObject{Cidr: ipOrCIDR})
+	}
+
+	return out
 }
 
 // stringToSlice splits a delimited string list into a slice of strings.
