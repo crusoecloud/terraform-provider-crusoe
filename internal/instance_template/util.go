@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
@@ -106,10 +107,15 @@ func disksToSet(ctx context.Context, apiDisks []swagger.DiskTemplate, current ty
 		return empty
 	}
 
+	formats := configuredSizeFormats(ctx, current)
+
 	disks := make([]diskToCreateResourceModel, 0, len(apiDisks))
 	for i := range apiDisks {
+		// Preserve the user's size format (e.g., TiB, GiB) to avoid Terraform
+		// treating it as a change when the API normalizes to GiB.
+		size := common.PreserveSizeFormat(formats.take(apiDisks[i].Size), apiDisks[i].Size)
 		disks = append(disks, diskToCreateResourceModel{
-			Size: types.StringValue(apiDisks[i].Size),
+			Size: types.StringValue(size),
 			Type: types.StringValue(apiDisks[i].Type_),
 		})
 	}
@@ -118,4 +124,51 @@ func disksToSet(ctx context.Context, apiDisks []swagger.DiskTemplate, current ty
 	diags.Append(d...)
 
 	return set
+}
+
+type sizeFormats []string
+
+// take returns the configured size matching apiSize's capacity and consumes it, or "" if none.
+func (f sizeFormats) take(apiSize string) string {
+	want, ok := common.StorageSizeInGiB(apiSize)
+	if !ok {
+		return ""
+	}
+
+	for i, configured := range f {
+		if configured == "" {
+			continue
+		}
+		if got, ok := common.StorageSizeInGiB(configured); ok && got == want {
+			f[i] = ""
+
+			return configured
+		}
+	}
+
+	return ""
+}
+
+// configuredSizeFormats extracts the user's disk sizes (plan in Create, prior state in Read)
+func configuredSizeFormats(ctx context.Context, current types.Set) sizeFormats {
+	if current.IsNull() || current.IsUnknown() {
+		return nil
+	}
+
+	configured := make([]diskToCreateResourceModel, 0, len(current.Elements()))
+	if d := current.ElementsAs(ctx, &configured, true); d.HasError() {
+		return nil
+	}
+
+	formats := make(sizeFormats, 0, len(configured))
+	for i := range configured {
+		if configured[i].Size.IsNull() || configured[i].Size.IsUnknown() {
+			formats = append(formats, "")
+
+			continue
+		}
+		formats = append(formats, configured[i].Size.ValueString())
+	}
+
+	return formats
 }

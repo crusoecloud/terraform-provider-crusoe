@@ -3,8 +3,6 @@ package disk
 import (
 	"context"
 	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -13,8 +11,6 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
-
-const gibInTib = 1024
 
 // apiDesc* — schema descriptions derived from the client-go swagger spec (DiskV1).
 const (
@@ -61,7 +57,7 @@ func diskToTerraformResourceModel(disk *swagger.DiskV1, state *diskResourceModel
 	state.Name = types.StringValue(disk.Name)
 	state.Location = types.StringValue(disk.Location)
 	state.Type = types.StringValue(disk.Type_)
-	state.Size = types.StringValue(preserveSizeFormat(sizeFormat, disk.Size))
+	state.Size = types.StringValue(common.PreserveSizeFormat(sizeFormat, disk.Size))
 	state.SerialNumber = types.StringValue(disk.SerialNumber)
 	// block_size is deprecated and intentionally not sourced from the API here; callers
 	// preserve the planned/prior value via preserveDeprecatedBlockSize so the deprecated
@@ -104,39 +100,4 @@ func stringsToAttrValues(s []string) []attr.Value {
 	}
 
 	return out
-}
-
-// preserveSizeFormat converts apiSize to match the user's preferred unit (TiB vs GiB)
-// when the values are semantically equivalent. Returns apiSize unchanged if userFormat
-// is empty or conversion isn't possible.
-func preserveSizeFormat(userFormat, apiSize string) string {
-	if userFormat == "" {
-		return apiSize
-	}
-
-	userUnit := strings.ToLower(userFormat[len(userFormat)-3:])
-	apiUnit := strings.ToLower(apiSize[len(apiSize)-3:])
-
-	// Already same unit
-	if userUnit == apiUnit {
-		return apiSize
-	}
-
-	// User wants TiB, API returned GiB → convert if evenly divisible
-	if userUnit == "tib" && apiUnit == "gib" {
-		if gib, err := strconv.Atoi(apiSize[:len(apiSize)-3]); err == nil &&
-			gib >= gibInTib && gib%gibInTib == 0 {
-
-			return strconv.Itoa(gib/gibInTib) + "TiB"
-		}
-	}
-
-	// User wants GiB, API returned TiB → convert
-	if userUnit == "gib" && apiUnit == "tib" {
-		if tib, err := strconv.Atoi(apiSize[:len(apiSize)-3]); err == nil {
-			return strconv.Itoa(tib*gibInTib) + "GiB"
-		}
-	}
-
-	return apiSize
 }

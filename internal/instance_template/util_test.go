@@ -101,6 +101,75 @@ func Test_instanceTemplateToResourceModel_createReadIdentical(t *testing.T) {
 	}
 }
 
+func disk(size, diskType string) diskToCreateResourceModel {
+	return diskToCreateResourceModel{Size: types.StringValue(size), Type: types.StringValue(diskType)}
+}
+
+// Sizes render in the user's unit, not the API's GiB.
+func Test_disksToSet_preservesConfiguredUnit(t *testing.T) {
+	set := func(disks ...diskToCreateResourceModel) types.Set {
+		s, d := types.SetValueFrom(context.Background(), diskToCreateSchema, disks)
+		if d.HasError() {
+			t.Fatalf("building disk set: %v", d)
+		}
+
+		return s
+	}
+
+	tests := []struct {
+		name     string
+		apiDisks []swagger.DiskTemplate
+		current  types.Set
+		want     []diskToCreateResourceModel
+	}{
+		{
+			name:     "TiB configured, API returns GiB",
+			apiDisks: []swagger.DiskTemplate{{Size: "20480GiB", Type_: persistentSSD}},
+			current:  set(disk("20TiB", persistentSSD)),
+			want:     []diskToCreateResourceModel{disk("20TiB", persistentSSD)},
+		},
+		{
+			name: "matched by capacity, not response order",
+			apiDisks: []swagger.DiskTemplate{
+				{Size: "1024GiB", Type_: persistentSSD},
+				{Size: "100GiB", Type_: persistentSSD},
+			},
+			current: set(disk("100GiB", persistentSSD), disk("1TiB", persistentSSD)),
+			want:    []diskToCreateResourceModel{disk("1TiB", persistentSSD), disk("100GiB", persistentSSD)},
+		},
+		{
+			name:     "no matching capacity keeps the API value",
+			apiDisks: []swagger.DiskTemplate{{Size: "2048GiB", Type_: persistentSSD}},
+			current:  set(disk("1TiB", persistentSSD)),
+			want:     []diskToCreateResourceModel{disk("2048GiB", persistentSSD)},
+		},
+		{
+			name:     "nothing configured keeps the API value",
+			apiDisks: []swagger.DiskTemplate{{Size: "1024GiB", Type_: persistentSSD}},
+			current:  types.SetNull(diskToCreateSchema),
+			want:     []diskToCreateResourceModel{disk("1024GiB", persistentSSD)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var diags diag.Diagnostics
+			got := disksToSet(context.Background(), tt.apiDisks, tt.current, &diags)
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+
+			var gotDisks []diskToCreateResourceModel
+			if d := got.ElementsAs(context.Background(), &gotDisks, false); d.HasError() {
+				t.Fatalf("reading disks: %v", d)
+			}
+			if !reflect.DeepEqual(gotDisks, tt.want) {
+				t.Errorf("disks = %+v, want %+v", gotDisks, tt.want)
+			}
+		})
+	}
+}
+
 // Test_instanceTemplateToResourceModel_disksNullVsEmpty verifies that, when the
 // template has no disks, the transform preserves the caller's null-vs-empty
 // intent instead of collapsing both to the same representation.
