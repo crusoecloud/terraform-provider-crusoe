@@ -1,3 +1,10 @@
+## 1.1.1
+
+BUG FIXES:
+
+- Fixed `crusoe_instance_template` failing when disk `size` is in TiB; the configured unit is now preserved.
+- Fixed `crusoe_vpc_firewall_rule` rejecting comma-separated CIDR lists in `source` and `destination`.
+
 ## 1.1.0
 
 NEW FEATURES:
