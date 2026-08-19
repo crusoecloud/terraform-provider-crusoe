@@ -14,8 +14,8 @@ import (
 // sampleAPITemplate returns an API instance template with the disk type populated
 // and placement_policy plus the nullable fields empty, to exercise the transform's
 // normalizations.
-func sampleAPITemplate() *swagger.InstanceTemplate {
-	return &swagger.InstanceTemplate{
+func sampleAPITemplate() *swagger.CustomerInstanceTemplate {
+	return &swagger.CustomerInstanceTemplate{
 		Id:                  "template-1",
 		ProjectId:           "proj-1",
 		Name:                "my-template",
@@ -25,7 +25,7 @@ func sampleAPITemplate() *swagger.InstanceTemplate {
 		SshPublicKey:        "ssh-ed25519 AAAA user@host",
 		SubnetId:            "subnet-1",
 		PublicIpAddressType: "dynamic",
-		Disks:               []swagger.DiskTemplate{{Size: "100GiB", Type_: "persistent-ssd"}},
+		Disks:               []swagger.CustomerDiskTemplate{{Size: "100GiB", Type_: "persistent-ssd"}},
 		// Empty values that must be normalized:
 		PlacementPolicy: "",
 		IbPartitionId:   "",
@@ -118,19 +118,19 @@ func Test_disksToSet_preservesConfiguredUnit(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		apiDisks []swagger.DiskTemplate
+		apiDisks []swagger.CustomerDiskTemplate
 		current  types.Set
 		want     []diskToCreateResourceModel
 	}{
 		{
 			name:     "TiB configured, API returns GiB",
-			apiDisks: []swagger.DiskTemplate{{Size: "20480GiB", Type_: persistentSSD}},
+			apiDisks: []swagger.CustomerDiskTemplate{{Size: "20480GiB", Type_: persistentSSD}},
 			current:  set(disk("20TiB", persistentSSD)),
 			want:     []diskToCreateResourceModel{disk("20TiB", persistentSSD)},
 		},
 		{
 			name: "matched by capacity, not response order",
-			apiDisks: []swagger.DiskTemplate{
+			apiDisks: []swagger.CustomerDiskTemplate{
 				{Size: "1024GiB", Type_: persistentSSD},
 				{Size: "100GiB", Type_: persistentSSD},
 			},
@@ -139,13 +139,13 @@ func Test_disksToSet_preservesConfiguredUnit(t *testing.T) {
 		},
 		{
 			name:     "no matching capacity keeps the API value",
-			apiDisks: []swagger.DiskTemplate{{Size: "2048GiB", Type_: persistentSSD}},
+			apiDisks: []swagger.CustomerDiskTemplate{{Size: "2048GiB", Type_: persistentSSD}},
 			current:  set(disk("1TiB", persistentSSD)),
 			want:     []diskToCreateResourceModel{disk("2048GiB", persistentSSD)},
 		},
 		{
 			name:     "nothing configured keeps the API value",
-			apiDisks: []swagger.DiskTemplate{{Size: "1024GiB", Type_: persistentSSD}},
+			apiDisks: []swagger.CustomerDiskTemplate{{Size: "1024GiB", Type_: persistentSSD}},
 			current:  types.SetNull(diskToCreateSchema),
 			want:     []diskToCreateResourceModel{disk("1024GiB", persistentSSD)},
 		},

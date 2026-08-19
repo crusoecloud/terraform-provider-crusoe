@@ -76,11 +76,11 @@ func TestInstanceTemplatesDataSource_NestedFieldsComputed(t *testing.T) {
 // regression where disks were aggregated across all templates and assigned to
 // every template. Each template must carry only its own disks.
 func TestInstanceTemplatesToModel_DisksScopedPerTemplate(t *testing.T) {
-	items := []swagger.InstanceTemplate{
+	items := []swagger.CustomerInstanceTemplate{
 		{
 			Id:   "tmpl-with-disks",
 			Name: "has-disks",
-			Disks: []swagger.DiskTemplate{
+			Disks: []swagger.CustomerDiskTemplate{
 				{Size: "1GiB", Type_: "persistent-ssd"},
 				{Size: "5GiB", Type_: "persistent-ssd"},
 			},
@@ -115,7 +115,7 @@ func TestInstanceTemplatesToModel_DisksScopedPerTemplate(t *testing.T) {
 // returned in a stable order (by name, then id) regardless of API response order,
 // preventing spurious diffs when the API re-orders its results (CCX-4394).
 func TestInstanceTemplatesToModel_DeterministicOrder(t *testing.T) {
-	items := []swagger.InstanceTemplate{
+	items := []swagger.CustomerInstanceTemplate{
 		{Id: "3", Name: "charlie"},
 		{Id: "1", Name: "alpha"},
 		{Id: "2", Name: "bravo"},

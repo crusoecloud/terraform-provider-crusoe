@@ -231,7 +231,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	var disksToCreate []swagger.DiskTemplate
+	var disksToCreate []swagger.CustomerDiskTemplate
 	if !plan.DisksToCreate.IsNull() && !plan.DisksToCreate.IsUnknown() {
 		tDisks := make([]diskToCreateResourceModel, 0, len(plan.DisksToCreate.Elements()))
 		diags = plan.DisksToCreate.ElementsAs(ctx, &tDisks, true)
@@ -240,16 +240,16 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 			return
 		}
 
-		disksToCreate = make([]swagger.DiskTemplate, 0, len(tDisks))
+		disksToCreate = make([]swagger.CustomerDiskTemplate, 0, len(tDisks))
 		for _, disk := range tDisks {
-			disksToCreate = append(disksToCreate, swagger.DiskTemplate{
+			disksToCreate = append(disksToCreate, swagger.CustomerDiskTemplate{
 				Size:  disk.Size.ValueString(),
 				Type_: disk.Type.ValueString(),
 			})
 		}
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1{
+	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatesServiceCreateInstanceTemplateBody{
 		TemplateName:        plan.Name.ValueString(),
 		Type_:               plan.Type.ValueString(),
 		Location:            plan.Location.ValueString(),
@@ -304,7 +304,7 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	instanceTemplate, httpResp, err := r.client.APIClient.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	instanceTemplate, httpResp, err := r.client.APIClient.InstanceTemplatesApi.GetInstanceTemplate(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
@@ -346,7 +346,8 @@ func (r *instanceTemplateResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	httpResp, err := r.client.APIClient.InstanceTemplatesApi.DeleteInstanceTemplate(ctx, state.ID.ValueString(), state.ProjectID.ValueString())
+	_, httpResp, err := r.client.APIClient.InstanceTemplatesApi.DeleteInstanceTemplate(ctx,
+		state.ProjectID.ValueString(), state.ID.ValueString())
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}

@@ -191,7 +191,7 @@ func (ds *instanceTemplatesDataSource) Read(ctx context.Context, req datasource.
 
 // instanceTemplatesToModel maps API instance templates to the Terraform model.
 // Disks are built per template so each template carries only its own disks.
-func instanceTemplatesToModel(items []swagger.InstanceTemplate) []instanceTemplatesModel {
+func instanceTemplatesToModel(items []swagger.CustomerInstanceTemplate) []instanceTemplatesModel {
 	templates := make([]instanceTemplatesModel, 0, len(items))
 	for i := range items {
 		disks := make([]diskModel, 0, len(items[i].Disks))

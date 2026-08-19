@@ -53,7 +53,7 @@ const (
 //
 // The deprecated, plan-owned reservation_id is left untouched: Create handles its
 // own deprecation logic and Read preserves the prior-state value.
-func instanceTemplateToResourceModel(ctx context.Context, template *swagger.InstanceTemplate,
+func instanceTemplateToResourceModel(ctx context.Context, template *swagger.CustomerInstanceTemplate,
 	model *instanceTemplateResourceModel, diags *diag.Diagnostics,
 ) {
 	model.ID = types.StringValue(template.Id)
@@ -93,7 +93,7 @@ func stringOrNull(s string) types.String {
 // disksToSet builds the disks Set from the API response. When the template has
 // no disks it preserves the caller's null-vs-empty intent (current is the plan
 // value in Create and the prior-state value in Read).
-func disksToSet(ctx context.Context, apiDisks []swagger.DiskTemplate, current types.Set,
+func disksToSet(ctx context.Context, apiDisks []swagger.CustomerDiskTemplate, current types.Set,
 	diags *diag.Diagnostics,
 ) types.Set {
 	if len(apiDisks) == 0 {

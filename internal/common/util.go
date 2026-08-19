@@ -211,6 +211,15 @@ func opResultToError(res interface{}) (expectedErr, unexpectedErr error) {
 	return fmt.Errorf("%s", resultError.Message), nil
 }
 
+// apiErrorBody mirrors the API's error response, which the generated client no
+// longer exposes as a named type.
+type apiErrorBody struct {
+	Code    string `json:"code,omitempty"`
+	ErrorId string `json:"error_id,omitempty"`
+	Message string `json:"message,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+}
+
 // UnpackAPIError takes a swagger API error and safely attempts to extract any additional information
 // present in the response. The original error is returned unchanged if it cannot be unpacked.
 func UnpackAPIError(original error) error {
@@ -219,7 +228,7 @@ func UnpackAPIError(original error) error {
 		return original
 	}
 
-	var model swagger.ErrorBody
+	var model apiErrorBody
 	err := json.Unmarshal(apiErr.Body(), &model)
 	if err != nil {
 		return original
