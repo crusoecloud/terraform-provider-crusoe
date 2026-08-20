@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -46,6 +47,7 @@ type instanceTemplateResourceModel struct {
 	IBPartition         types.String `tfsdk:"ib_partition"`
 	PublicIpAddressType types.String `tfsdk:"public_ip_address_type"`
 	DisksToCreate       types.Set    `tfsdk:"disks"`
+	SharedVolumes       types.Set    `tfsdk:"shared_volume_attachments"`
 	ReservationID       types.String `tfsdk:"reservation_id"`
 	PlacementPolicy     types.String `tfsdk:"placement_policy"`
 	NvlinkDomainID      types.String `tfsdk:"nvlink_domain_id"`
@@ -184,6 +186,12 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 					},
 				},
 			},
+			"shared_volume_attachments": schema.SetAttribute{
+				Optional:      true,
+				ElementType:   types.StringType,
+				Description:   apiDescSharedVolumeAttachments,
+				PlanModifiers: []planmodifier.Set{setplanmodifier.RequiresReplace()}, // cannot be updated in place
+			},
 			"reservation_id": schema.StringAttribute{
 				Optional:      true,
 				Computed:      true,
@@ -249,20 +257,30 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		}
 	}
 
+	var sharedVolumes []string
+	if !plan.SharedVolumes.IsNull() && !plan.SharedVolumes.IsUnknown() {
+		diags = plan.SharedVolumes.ElementsAs(ctx, &sharedVolumes, true)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
 	dataResp, httpResp, err := r.client.APIClient.InstanceTemplatesApi.CreateInstanceTemplate(ctx, swagger.InstanceTemplatePostRequestV1{
-		TemplateName:        plan.Name.ValueString(),
-		Type_:               plan.Type.ValueString(),
-		Location:            plan.Location.ValueString(),
-		ImageName:           plan.Image.ValueString(),
-		SshPublicKey:        plan.SSHKey.ValueString(),
-		StartupScript:       plan.StartupScript.ValueString(),
-		ShutdownScript:      plan.ShutdownScript.ValueString(),
-		SubnetId:            plan.Subnet.ValueString(),
-		IbPartitionId:       plan.IBPartition.ValueString(),
-		Disks:               disksToCreate,
-		PublicIpAddressType: plan.PublicIpAddressType.ValueString(),
-		PlacementPolicy:     plan.PlacementPolicy.ValueString(),
-		NvlinkDomainId:      plan.NvlinkDomainID.ValueString(),
+		TemplateName:            plan.Name.ValueString(),
+		Type_:                   plan.Type.ValueString(),
+		Location:                plan.Location.ValueString(),
+		ImageName:               plan.Image.ValueString(),
+		SshPublicKey:            plan.SSHKey.ValueString(),
+		StartupScript:           plan.StartupScript.ValueString(),
+		ShutdownScript:          plan.ShutdownScript.ValueString(),
+		SubnetId:                plan.Subnet.ValueString(),
+		IbPartitionId:           plan.IBPartition.ValueString(),
+		Disks:                   disksToCreate,
+		SharedVolumeAttachments: sharedVolumes,
+		PublicIpAddressType:     plan.PublicIpAddressType.ValueString(),
+		PlacementPolicy:         plan.PlacementPolicy.ValueString(),
+		NvlinkDomainId:          plan.NvlinkDomainID.ValueString(),
 	}, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()

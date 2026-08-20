@@ -26,21 +26,22 @@ type diskModel struct {
 }
 
 type instanceTemplatesModel struct {
-	ID                  string      `tfsdk:"id"`
-	Name                string      `tfsdk:"name"`
-	ProjectID           string      `tfsdk:"project_id"`
-	Type                string      `tfsdk:"type"`
-	SSHKey              string      `tfsdk:"ssh_key"`
-	Location            string      `tfsdk:"location"`
-	ImageName           string      `tfsdk:"image"`
-	StartupScript       string      `tfsdk:"startup_script"`
-	ShutdownScript      string      `tfsdk:"shutdown_script"`
-	PublicIPAddressType string      `tfsdk:"public_ip_address_type"`
-	SubnetId            string      `tfsdk:"subnet"`
-	IBPartition         string      `tfsdk:"ib_partition"`
-	Disks               []diskModel `tfsdk:"disks"`
-	PlacementPolicy     string      `tfsdk:"placement_policy"`
-	NvlinkDomainID      string      `tfsdk:"nvlink_domain_id"`
+	ID                      string      `tfsdk:"id"`
+	Name                    string      `tfsdk:"name"`
+	ProjectID               string      `tfsdk:"project_id"`
+	Type                    string      `tfsdk:"type"`
+	SSHKey                  string      `tfsdk:"ssh_key"`
+	Location                string      `tfsdk:"location"`
+	ImageName               string      `tfsdk:"image"`
+	StartupScript           string      `tfsdk:"startup_script"`
+	ShutdownScript          string      `tfsdk:"shutdown_script"`
+	PublicIPAddressType     string      `tfsdk:"public_ip_address_type"`
+	SubnetId                string      `tfsdk:"subnet"`
+	IBPartition             string      `tfsdk:"ib_partition"`
+	Disks                   []diskModel `tfsdk:"disks"`
+	SharedVolumeAttachments []string    `tfsdk:"shared_volume_attachments"`
+	PlacementPolicy         string      `tfsdk:"placement_policy"`
+	NvlinkDomainID          string      `tfsdk:"nvlink_domain_id"`
 }
 
 func NewInstanceTemplatesDataSource() datasource.DataSource {
@@ -145,6 +146,11 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 							},
 						},
 					},
+					"shared_volume_attachments": schema.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+						Description: apiDescSharedVolumeAttachments,
+					},
 					"placement_policy": schema.StringAttribute{
 						Optional:    true,
 						Computed:    true,
@@ -203,20 +209,21 @@ func instanceTemplatesToModel(items []swagger.InstanceTemplate) []instanceTempla
 		}
 
 		templates = append(templates, instanceTemplatesModel{
-			ID:              items[i].Id,
-			Name:            items[i].Name,
-			Type:            items[i].Type_,
-			SSHKey:          items[i].SshPublicKey,
-			Location:        items[i].Location,
-			ImageName:       items[i].ImageName,
-			StartupScript:   items[i].StartupScript,
-			ShutdownScript:  items[i].ShutdownScript,
-			SubnetId:        items[i].SubnetId,
-			IBPartition:     items[i].IbPartitionId,
-			ProjectID:       items[i].ProjectId,
-			Disks:           disks,
-			PlacementPolicy: items[i].PlacementPolicy,
-			NvlinkDomainID:  items[i].NvlinkDomainId,
+			ID:                      items[i].Id,
+			Name:                    items[i].Name,
+			Type:                    items[i].Type_,
+			SSHKey:                  items[i].SshPublicKey,
+			Location:                items[i].Location,
+			ImageName:               items[i].ImageName,
+			StartupScript:           items[i].StartupScript,
+			ShutdownScript:          items[i].ShutdownScript,
+			SubnetId:                items[i].SubnetId,
+			IBPartition:             items[i].IbPartitionId,
+			ProjectID:               items[i].ProjectId,
+			Disks:                   disks,
+			SharedVolumeAttachments: items[i].SharedVolumeAttachments,
+			PlacementPolicy:         items[i].PlacementPolicy,
+			NvlinkDomainID:          items[i].NvlinkDomainId,
 		})
 	}
 

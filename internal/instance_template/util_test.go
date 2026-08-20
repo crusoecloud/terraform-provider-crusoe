@@ -202,3 +202,21 @@ func Test_instanceTemplateToResourceModel_disksNullVsEmpty(t *testing.T) {
 		}
 	})
 }
+
+func Test_stringsToSet(t *testing.T) {
+	t.Run("maps values", func(t *testing.T) {
+		var diags diag.Diagnostics
+		set := stringsToSet(context.Background(), []string{"disk-1"}, types.SetNull(types.StringType), &diags)
+		if n := len(set.Elements()); n != 1 {
+			t.Errorf("got %d elements, want 1", n)
+		}
+	})
+
+	t.Run("empty stays null when unset", func(t *testing.T) {
+		var diags diag.Diagnostics
+		set := stringsToSet(context.Background(), nil, types.SetNull(types.StringType), &diags)
+		if !set.IsNull() {
+			t.Errorf("got %v, want null", set)
+		}
+	})
+}

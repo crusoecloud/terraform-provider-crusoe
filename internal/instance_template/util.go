@@ -30,6 +30,8 @@ const (
 	// Nested DiskTemplate attributes.
 	apiDescDiskSize = "Size of the disk, including a unit suffix."
 	apiDescDiskType = "Type of disk to create. Possible values: `persistent-ssd`, `shared-volume`."
+	//nolint:lll // description reads better on one line
+	apiDescSharedVolumeAttachments = "IDs of existing shared disks to attach to every VM created from this instance template. Attached read-write."
 )
 
 // providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
@@ -78,6 +80,22 @@ func instanceTemplateToResourceModel(ctx context.Context, template *swagger.Inst
 	}
 
 	model.DisksToCreate = disksToSet(ctx, template.Disks, model.DisksToCreate, diags)
+	model.SharedVolumes = stringsToSet(ctx, template.SharedVolumeAttachments, model.SharedVolumes, diags)
+}
+
+// stringsToSet builds a string Set from the API response, preserving the caller's
+// null-vs-empty intent when the list is empty.
+func stringsToSet(ctx context.Context, values []string, current types.Set,
+	diags *diag.Diagnostics,
+) types.Set {
+	if len(values) == 0 && current.IsNull() {
+		return types.SetNull(types.StringType)
+	}
+
+	set, d := types.SetValueFrom(ctx, types.StringType, values)
+	diags.Append(d...)
+
+	return set
 }
 
 // stringOrNull maps an empty API string to a null value, matching how the

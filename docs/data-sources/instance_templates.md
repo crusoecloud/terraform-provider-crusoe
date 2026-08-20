@@ -45,6 +45,7 @@ Read-Only:
 - `ib_partition` (String)
 - `id` (String) ID of the instance template.
 - `name` (String) Name of the instance template. (This is not the name of the VMs created from this instance template.)
+- `shared_volume_attachments` (List of String) IDs of existing shared disks to attach to every VM created from this instance template. Attached read-write.
 - `shutdown_script` (String) Shutdown script to use for all VMs created from this instance template.
 - `ssh_key` (String) SSH public key to use for all VMs created from this instance template.
 - `startup_script` (String) Startup script to use for all VMs created from this instance template.
