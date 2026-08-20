@@ -28,9 +28,8 @@ const (
 	apiDescNvlinkDomainID      = "NVLink domain assigned to all VMs created from this instance template."
 
 	// Nested DiskTemplate attributes.
-	apiDescDiskSize = "Size of the disk, including a unit suffix."
-	apiDescDiskType = "Type of disk to create. Possible values: `persistent-ssd`, `shared-volume`."
-	//nolint:lll // description reads better on one line
+	apiDescDiskSize                = "Size of the disk, including a unit suffix."
+	apiDescDiskType                = "Type of disk to create. Possible values: `persistent-ssd`, `shared-volume`."
 	apiDescSharedVolumeAttachments = "IDs of existing shared disks to attach to every VM created from this instance template. Attached read-write."
 )
 
