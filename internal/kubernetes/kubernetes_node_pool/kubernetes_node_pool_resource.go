@@ -317,11 +317,11 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	if kubernetesNodePoolResponse.Details != nil && kubernetesNodePoolResponse.Details.Error_ != "" {
+	if kubernetesNodePoolResponse.Details != nil && kubernetesNodePoolResponse.Details.Error != "" {
 		// TODO: Return created count once NumVmsCreated is populated
 		resp.Diagnostics.AddWarning("Unable to create desired number of VMs",
 			fmt.Sprintf("Warning -- Unable to create desired number of VMs due to the following error: %s",
-				kubernetesNodePoolResponse.Details.Error_))
+				kubernetesNodePoolResponse.Details.Error))
 	}
 
 	var state kubernetesNodePoolResourceModel
@@ -512,11 +512,11 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	if kubernetesNodePoolResponse.Details != nil && kubernetesNodePoolResponse.Details.Error_ != "" {
+	if kubernetesNodePoolResponse.Details != nil && kubernetesNodePoolResponse.Details.Error != "" {
 		// TODO: Return created count once NumVmsCreated is populated
 		resp.Diagnostics.AddWarning("Unable to provision all instances",
 			fmt.Sprintf("Warning -- Unable to create desired number of VMs due to the following error: %s",
-				kubernetesNodePoolResponse.Details.Error_))
+				kubernetesNodePoolResponse.Details.Error))
 	}
 
 	// Detect if changes require node rollout
