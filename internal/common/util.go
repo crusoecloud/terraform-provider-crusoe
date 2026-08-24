@@ -213,6 +213,7 @@ func opResultToError(res interface{}) (expectedErr, unexpectedErr error) {
 
 // apiErrorBody mirrors the API's error response, which the generated client no
 // longer exposes as a named type.
+// TODO: CCX-5707 - drop once the SDK exposes ErrorBody again.
 type apiErrorBody struct {
 	Code    string `json:"code,omitempty"`
 	ErrorID string `json:"error_id,omitempty"`

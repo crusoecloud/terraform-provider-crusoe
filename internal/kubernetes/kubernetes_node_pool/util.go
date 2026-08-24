@@ -87,6 +87,7 @@ func ParseOpResultStrict[T any](opResult interface{}) (*T, error) {
 
 // nodePoolOpResult and operationDetails mirror the async operation result shapes,
 // which the generated client no longer exposes as named types.
+// TODO: CCX-5707 - drop once the SDK exposes these types again.
 type operationDetails struct {
 	Error         string `json:"error,omitempty"`
 	NumVmsCreated int32  `json:"num_vms_created,omitempty"`
