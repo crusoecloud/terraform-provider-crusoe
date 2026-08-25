@@ -65,6 +65,7 @@ resource "crusoe_instance_template" "example" {
 - `project_id` (String) ID of the project this instance template belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 - `public_ip_address_type` (String) Public IP address type to use for all VMs created from this instance template. Must either be `static` or `dynamic`.
 - `reservation_id` (String) (Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string.
+- `shared_volume_attachments` (Set of String) IDs of existing shared disks to attach to every VM created from this instance template. Attached read-write.
 - `shutdown_script` (String) Shutdown script to use for all VMs created from this instance template.
 - `startup_script` (String) Startup script to use for all VMs created from this instance template.
 
