@@ -85,11 +85,11 @@ func ParseOpResultStrict[T any](opResult interface{}) (*T, error) {
 	return &result, nil
 }
 
-// nodePoolOpResult and operationDetails mirror the async operation result shapes,
-// which the generated client no longer exposes as named types.
-// TODO: CCX-5707 - drop once the SDK exposes these types again.
+// nodePoolOpResult and operationDetails mirror swagger.KubernetesNodePoolResponse and
+// swagger.OperationDetails, which the generated client no longer exposes.
+// TODO: CCX-5707 - drop and revert to the swagger types once the SDK exposes them again.
 type operationDetails struct {
-	Error         string `json:"error,omitempty"`
+	Error_        string `json:"error,omitempty"`
 	NumVmsCreated int32  `json:"num_vms_created,omitempty"`
 }
 
@@ -140,7 +140,7 @@ func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operati
 		return &nodePoolOpResult{
 			NodePool: nodePool,
 			Details: &operationDetails{
-				Error:         "",
+				Error_:        "",
 				NumVmsCreated: int32(nodePool.Count),
 			},
 		}, err

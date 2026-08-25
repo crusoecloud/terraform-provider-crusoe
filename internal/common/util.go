@@ -211,12 +211,11 @@ func opResultToError(res interface{}) (expectedErr, unexpectedErr error) {
 	return fmt.Errorf("%s", resultError.Message), nil
 }
 
-// apiErrorBody mirrors the API's error response, which the generated client no
-// longer exposes as a named type.
-// TODO: CCX-5707 - drop once the SDK exposes ErrorBody again.
-type apiErrorBody struct {
+// errorBody mirrors swagger.ErrorBody, which the generated client no longer exposes.
+// TODO: CCX-5707 - drop and revert to swagger.ErrorBody once the SDK exposes it again.
+type errorBody struct {
 	Code    string `json:"code,omitempty"`
-	ErrorID string `json:"error_id,omitempty"`
+	ErrorId string `json:"error_id,omitempty"`
 	Message string `json:"message,omitempty"`
 	Reason  string `json:"reason,omitempty"`
 }
@@ -229,7 +228,7 @@ func UnpackAPIError(original error) error {
 		return original
 	}
 
-	var model apiErrorBody
+	var model errorBody
 	err := json.Unmarshal(apiErr.Body(), &model)
 	if err != nil {
 		return original
@@ -243,8 +242,8 @@ func UnpackAPIError(original error) error {
 		errorMsg = components[1]
 	}
 
-	if model.Code == internalErrorCode && model.ErrorID != "" {
-		errorMsg = fmt.Sprintf("%s. Error ID: %s.", errorMsg, model.ErrorID)
+	if model.Code == internalErrorCode && model.ErrorId != "" {
+		errorMsg = fmt.Sprintf("%s. Error ID: %s.", errorMsg, model.ErrorId)
 	}
 
 	//nolint:goerr113 // error is dynamic
