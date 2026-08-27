@@ -1,3 +1,9 @@
+## 1.2.0
+
+ENHANCEMENTS:
+
+- Added `shared_volume_attachments` to the `crusoe_instance_template` resource and `crusoe_instance_templates` data source, for attaching existing shared disks read-write to every VM created from the template.
+
 ## 1.1.1
 
 BUG FIXES:
