@@ -1,5 +1,5 @@
 //nolint:gocritic // Implements Terraform defined interface
-package ib_partition
+package transport_partition
 
 import (
 	"context"
@@ -18,22 +18,22 @@ import (
 
 const notFoundMessage = "404 Not Found"
 
-type ibPartitionResource struct {
+type transportPartitionResource struct {
 	client *common.CrusoeClient
 }
 
-type ibPartitionResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	ProjectID   types.String `tfsdk:"project_id"`
-	Name        types.String `tfsdk:"name"`
-	IBNetworkID types.String `tfsdk:"ib_network_id"`
+type transportPartitionResourceModel struct {
+	ID                 types.String `tfsdk:"id"`
+	ProjectID          types.String `tfsdk:"project_id"`
+	Name               types.String `tfsdk:"name"`
+	TransportNetworkID types.String `tfsdk:"transport_network_id"`
 }
 
-func NewIBPartitionResource() resource.Resource {
-	return &ibPartitionResource{}
+func NewTransportPartitionResource() resource.Resource {
+	return &transportPartitionResource{}
 }
 
-func (r *ibPartitionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *transportPartitionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -48,14 +48,12 @@ func (r *ibPartitionResource) Configure(ctx context.Context, req resource.Config
 	r.client = client
 }
 
-func (r *ibPartitionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_ib_partition"
+func (r *transportPartitionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_transport_partition"
 }
 
-func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *transportPartitionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version:            1,
-		DeprecationMessage: providerDescDeprecated,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -67,9 +65,9 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 				Description:   apiDescName,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
-			"ib_network_id": schema.StringAttribute{
+			"transport_network_id": schema.StringAttribute{
 				Required:      true,
-				Description:   apiDescIBNetworkID,
+				Description:   apiDescTransportNetworkID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"project_id": schema.StringAttribute{
@@ -86,10 +84,10 @@ func (r *ibPartitionResource) Schema(ctx context.Context, req resource.SchemaReq
 	}
 }
 
-func (r *ibPartitionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "ib_partition_id")
+func (r *transportPartitionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "transport_partition_id")
 	if errMsg != "" {
-		resp.Diagnostics.AddError("Failed to import IB Partition", errMsg)
+		resp.Diagnostics.AddError("Failed to import transport partition", errMsg)
 
 		return
 	}
@@ -98,8 +96,8 @@ func (r *ibPartitionResource) ImportState(ctx context.Context, req resource.Impo
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
 }
 
-func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ibPartitionResourceModel
+func (r *transportPartitionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan transportPartitionResourceModel
 	if err := common.GetResourceModel(ctx, req.Plan, &plan, &resp.Diagnostics); err != nil {
 		return
 	}
@@ -108,31 +106,31 @@ func (r *ibPartitionResource) Create(ctx context.Context, req resource.CreateReq
 
 	dataResp, httpResp, err := r.client.APIClient.IBPartitionsApi.CreateIBPartition(ctx, swagger.IbPartitionsPostRequestV1{
 		Name:        plan.Name.ValueString(),
-		IbNetworkId: plan.IBNetworkID.ValueString(),
+		IbNetworkId: plan.TransportNetworkID.ValueString(),
 	}, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create partition",
-			fmt.Sprintf("There was an error creating an Infiniband partition: %s", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error creating a transport partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 
-	ibPartitionToTerraformResourceModel(&dataResp, &plan)
+	transportPartitionToTerraformResourceModel(&dataResp, &plan)
 	plan.ProjectID = types.StringValue(projectID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
-func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state ibPartitionResourceModel
+func (r *transportPartitionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state transportPartitionResourceModel
 	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
 
-	// We only have this parsing for transitioning from v1alpha4 to V1 because old tf state files will not
+	// We only have this parsing for transitioning from v1alpha4 to v1 because old tf state files will not
 	// have project ID stored. So we will try to get a fallback project to pass to the API.
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
@@ -148,28 +146,28 @@ func (r *ibPartitionResource) Read(ctx context.Context, req resource.ReadRequest
 			return
 		}
 
-		resp.Diagnostics.AddError("Failed to get IB partition",
-			fmt.Sprintf("Fetching Crusoe Infiniband partition failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
+		resp.Diagnostics.AddError("Failed to get transport partition",
+			fmt.Sprintf("Fetching Crusoe transport partition failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
 
 		return
 	}
 
 	state.ProjectID = types.StringValue(projectID)
-	ibPartitionToTerraformResourceModel(&partition, &state)
+	transportPartitionToTerraformResourceModel(&partition, &state)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *ibPartitionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *transportPartitionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// This should be unreachable, since all properties are marked as needing replacement on update.
 	resp.Diagnostics.AddWarning("In-place updates not supported",
-		"Updating IB partitions in place is not currently supported. If you're seeing this message, please"+
+		"Updating transport partitions in place is not currently supported. If you're seeing this message, please"+
 			" reach out to support@crusoecloud.com and let us know. In the meantime, you should be able to update your"+
 			" partition by deleting it and then creating a new one.")
 }
 
-func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state ibPartitionResourceModel
+func (r *transportPartitionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state transportPartitionResourceModel
 	if err := common.GetResourceModel(ctx, req.State, &state, &resp.Diagnostics); err != nil {
 		return
 	}
@@ -180,7 +178,7 @@ func (r *ibPartitionResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete partition",
-			fmt.Sprintf("There was an error deleting an Infiniband partition: %s", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error deleting a transport partition: %s", common.UnpackAPIError(err)))
 
 		return
 	}

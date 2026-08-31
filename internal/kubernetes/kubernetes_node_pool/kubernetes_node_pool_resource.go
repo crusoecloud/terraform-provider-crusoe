@@ -45,6 +45,7 @@ type kubernetesNodePoolResourceModel struct {
 	ClusterID                     types.String `tfsdk:"cluster_id"`
 	SubnetID                      types.String `tfsdk:"subnet_id"`
 	IBPartitionID                 types.String `tfsdk:"ib_partition_id"`
+	TransportPartitionID          types.String `tfsdk:"transport_partition_id"`
 	RequestedNodeLabels           types.Map    `tfsdk:"requested_node_labels"`
 	AllNodeLabels                 types.Map    `tfsdk:"all_node_labels"`
 	NodeTaints                    types.Set    `tfsdk:"node_taints"`
@@ -146,6 +147,12 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
 			},
 			"ib_partition_id": schema.StringAttribute{
+				Optional:           true,
+				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				DeprecationMessage: "ib_partition_id is deprecated, use transport_partition_id instead",
+				Description:        "ib_partition_id is deprecated, use transport_partition_id instead",
+			},
+			"transport_partition_id": schema.StringAttribute{
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
@@ -290,6 +297,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		ClusterId:                     plan.ClusterID.ValueString(),
 		Count:                         plan.InstanceCount.ValueInt64(),
 		IbPartitionId:                 plan.IBPartitionID.ValueString(),
+		TransportPartitionId:          plan.TransportPartitionID.ValueString(),
 		Name:                          plan.Name.ValueString(),
 		NodeLabels:                    nodeLabels,
 		NodeTaints:                    nodeTaints,

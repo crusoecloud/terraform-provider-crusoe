@@ -216,7 +216,7 @@ BUG FIXES:
 
 - Fixes an issue with setting the `custom_image` field for VM resources
 
-## 0.5.32
+## 0.5.32 (July 15, 2025)
 
 ENHANCEMENTS:
 
@@ -226,7 +226,7 @@ BUG FIXES:
 
 - N/A
 
-## 0.5.31
+## 0.5.31 (July 9, 2025)
 
 ENHANCEMENTS:
 
@@ -236,11 +236,11 @@ BUG FIXES:
 
 - Fixes an issue with setting the `nat_gateway_enabled` field for VPC subnet resources
 
-## 0.5.30
+## 0.5.30 (June 4, 2025)
 
 ENHANCEMENTS:
 
-- Add support for best effort nodepool creation
+- Add support for best effort node pool creation
 - Add support for VPC Subnet NAT Gateways
 
 BUG FIXES:
@@ -257,14 +257,14 @@ ENHANCEMENTS:
 BUG FIXES:
 
 - Fixes an issue where state data for disks was being lost during import
-- Fixed an issue where the `ib_partition_id` field would be set to null when updating a nodepool
+- Fixed an issue where the `ib_partition_id` field would be set to null when updating a node pool
 
 ## 0.5.28 (April 18, 2025)
 
 ENHANCEMENTS:
 
 - Adds support for kubeconfig resources
-- Adds ability to update kubernetes nodepool size in place
+- Adds ability to update kubernetes node pool size in place
 - Supports importing kubernetes cluster state
 
 BUG FIXES:

@@ -271,8 +271,9 @@ func validateNodeTaintDuplicates(taints []swagger.KubernetesNodeTaint) error {
 // particular the instance_ids sort (CCX-4394) and the nvlink_domain_id
 // empty-to-null normalization now live in exactly one place.
 //
-// The Terraform-only fields the API does not return (ib_partition_id, ssh_key,
-// requested_node_labels, batch_size, batch_percentage) are taken from ref: the
+// The Terraform-only fields the API does not return (ib_partition_id,
+// transport_partition_id, ssh_key, requested_node_labels, batch_size,
+// batch_percentage) are taken from ref: the
 // plan in Create/Update, the prior state in Read.
 func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNodePool,
 	ref, model *kubernetesNodePoolResourceModel, diags *diag.Diagnostics,
@@ -304,6 +305,7 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 
 	// Terraform-only fields (not returned by the API) come from the reference model.
 	model.IBPartitionID = ref.IBPartitionID
+	model.TransportPartitionID = ref.TransportPartitionID
 	model.SSHKey = ref.SSHKey
 	model.BatchSize = ref.BatchSize
 	model.BatchPercentage = ref.BatchPercentage

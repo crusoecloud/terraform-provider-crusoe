@@ -217,8 +217,15 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
-							Optional:    true,
-							Description: "Infiniband Partition ID",
+							Optional:           true,
+							Description:        "Infiniband Partition ID - ib_partition_id is deprecated, use transport_partition_id instead",
+							PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							DeprecationMessage: "ib_partition_id is deprecated, use transport_partition_id instead",
+						},
+						"transport_partition_id": schema.StringAttribute{
+							Optional:      true,
+							Description:   "Transport Partition ID",
+							PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
@@ -370,7 +377,10 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 
 	hostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(instance.HostChannelAdapters))
 	for _, hca := range instance.HostChannelAdapters {
-		hostChannelAdapters = append(hostChannelAdapters, vmHostChannelAdapterResourceModel{IBPartitionID: hca.IbPartitionId})
+		hostChannelAdapters = append(hostChannelAdapters, vmHostChannelAdapterResourceModel{
+			IBPartitionID:        hca.IbPartitionId,
+			TransportPartitionID: hca.TransportPartitionId,
+		})
 	}
 	hostChannelAdaptersList, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hostChannelAdapters)
 	plan.HostChannelAdapters = hostChannelAdaptersList
@@ -546,7 +556,8 @@ func (r *vmByTemplateResource) Update(ctx context.Context, req resource.UpdateRe
 			for _, hca := range tHostChannelAdapters {
 				hostChannelAdapters = []swagger.PartialHostChannelAdapter{
 					{
-						IbPartitionId: hca.IBPartitionID,
+						IbPartitionId:        hca.IBPartitionID,
+						TransportPartitionId: hca.TransportPartitionID,
 					},
 				}
 			}

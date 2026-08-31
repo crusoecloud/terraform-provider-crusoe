@@ -77,7 +77,8 @@ type vmDiskResourceModel struct {
 }
 
 type vmHostChannelAdapterResourceModel struct {
-	IBPartitionID string `tfsdk:"ib_partition_id"`
+	IBPartitionID        string `tfsdk:"ib_partition_id"`
+	TransportPartitionID string `tfsdk:"transport_partition_id"`
 }
 
 func NewVMResource() resource.Resource {
@@ -310,13 +311,24 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				},
 			},
 			"host_channel_adapters": schema.ListNestedAttribute{
+				Computed:            true,
 				Optional:            true,
 				MarkdownDescription: apiDescHostChannelAdapters,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
+							Computed:            true,
 							Optional:            true,
-							MarkdownDescription: providerDescIBPartitionID,
+							MarkdownDescription: providerDescIBPartitionID + " " + providerDescIBPartitionIDDeprecated,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							DeprecationMessage:  providerDescIBPartitionIDDeprecated,
+						},
+						"transport_partition_id": schema.StringAttribute{
+							Computed:            true,
+							Optional:            true,
+							MarkdownDescription: apiDescTransportPartitionID,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
@@ -409,7 +421,8 @@ func (r *vmResource) Create(ctx context.Context, req resource.CreateRequest, res
 		for _, hca := range tHostChannelAdapters {
 			hostChannelAdapters = []swagger.PartialHostChannelAdapter{
 				{
-					IbPartitionId: hca.IBPartitionID,
+					IbPartitionId:        hca.IBPartitionID,
+					TransportPartitionId: hca.TransportPartitionID,
 				},
 			}
 		}
@@ -620,7 +633,8 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			for _, hca := range tHostChannelAdapters {
 				hostChannelAdapters = []swagger.PartialHostChannelAdapter{
 					{
-						IbPartitionId: hca.IBPartitionID,
+						IbPartitionId:        hca.IBPartitionID,
+						TransportPartitionId: hca.TransportPartitionID,
 					},
 				}
 			}

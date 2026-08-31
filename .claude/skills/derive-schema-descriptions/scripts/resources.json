@@ -18,6 +18,8 @@
     "registry/token": {"read_model": "LimitedUsageApiKeyInfo", "extra": ["CcrTokenResponse"]},
     "s3_bucket": {"read_model": "S3Bucket", "extra": ["CreateS3BucketRequest"]},
     "s3_key": {"read_model": "S3Key", "extra": ["CreateS3KeyResponse"]},
+    "transport_network": {"read_model": "IBNetwork", "extra": ["IBNetworkCapacity"]},
+    "transport_partition": {"read_model": "IBPartition"},
     "vm": {"read_model": "InstanceV1", "extra": ["DiskAttachment", "NetworkInterface", "PublicIpv4Address", "PrivateIpv4Address", "InstancesPostRequestV1"]},
     "vpc_network": {"read_model": "VpcNetwork"},
     "vpc_subnet": {"read_model": "VpcSubnet", "extra": ["NatGateway", "VpcSubnetPostRequest"]}

@@ -38,6 +38,7 @@ type instanceTemplatesModel struct {
 	PublicIPAddressType     string      `tfsdk:"public_ip_address_type"`
 	SubnetId                string      `tfsdk:"subnet"`
 	IBPartition             string      `tfsdk:"ib_partition"`
+	TransportPartitionID    string      `tfsdk:"transport_partition_id"`
 	Disks                   []diskModel `tfsdk:"disks"`
 	SharedVolumeAttachments []string    `tfsdk:"shared_volume_attachments"`
 	PlacementPolicy         string      `tfsdk:"placement_policy"`
@@ -123,7 +124,13 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 						Description: apiDescSubnet,
 					},
 					"ib_partition": schema.StringAttribute{
-						Computed: true,
+						Computed:           true,
+						DeprecationMessage: providerDescIBPartitionDeprecated,
+						Description:        providerDescIBPartitionDeprecated,
+					},
+					"transport_partition_id": schema.StringAttribute{
+						Computed:    true,
+						Description: apiDescTransportPartitionID,
 					},
 					"public_ip_address_type": schema.StringAttribute{
 						Optional:    true,
@@ -219,6 +226,7 @@ func instanceTemplatesToModel(items []swagger.InstanceTemplate) []instanceTempla
 			ShutdownScript:          items[i].ShutdownScript,
 			SubnetId:                items[i].SubnetId,
 			IBPartition:             items[i].IbPartitionId,
+			TransportPartitionID:    items[i].TransportPartitionId,
 			ProjectID:               items[i].ProjectId,
 			Disks:                   disks,
 			SharedVolumeAttachments: items[i].SharedVolumeAttachments,

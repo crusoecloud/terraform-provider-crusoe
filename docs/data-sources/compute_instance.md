@@ -35,6 +35,7 @@ data "crusoe_compute_instance" "example" {
 ### Read-Only
 
 - `disks` (Attributes List) Disks attached to the VM. (see [below for nested schema](#nestedatt--disks))
+- `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `network_interfaces` (Attributes List) Network interfaces attached to the VM. (see [below for nested schema](#nestedatt--network_interfaces))
 - `type` (String) Product name of the VM type.
 
@@ -46,6 +47,19 @@ Read-Only:
 - `attachment_type` (String) Role the disk plays for the VM. Possible values: `os`, `data`.
 - `id` (String) ID of the disk to attach.
 - `mode` (String) Access mode to attach the disk with. Possible values: `read-only`, `read-write`.
+
+
+<a id="nestedatt--host_channel_adapters"></a>
+### Nested Schema for `host_channel_adapters`
+
+Read-Only:
+
+- `guid` (String)
+- `ib_network_id` (String, Deprecated) ib_network_id is deprecated, use transport_network_id instead
+- `ib_partition_id` (String, Deprecated) ib_partition_id is deprecated, use transport_partition_id instead
+- `transport_network_id` (String)
+- `transport_partition_id` (String)
+- `type` (String)
 
 
 <a id="nestedatt--network_interfaces"></a>

@@ -508,6 +508,15 @@ func FormatDeprecationWithReplacement(deprecatedInVersion, newFieldName string) 
 	return FormatDeprecation(deprecatedInVersion) + fmt.Sprintf(" Use %s instead.", newFieldName)
 }
 
+// FormatResourceDeprecationWithReplacement builds a schema-level deprecation
+// message for a whole resource or data source. FormatDeprecation says "This
+// field", which reads wrong when the deprecated thing is the resource itself.
+func FormatResourceDeprecationWithReplacement(deprecatedInVersion, replacementName string) string {
+	return fmt.Sprintf("This is deprecated as of provider version %s "+
+		"and will be removed in the next major version. Use %s instead.",
+		deprecatedInVersion, replacementName)
+}
+
 // ValidateHTTPStatus checks if the HTTP response status code matches any of the accepted codes.
 // Returns true if valid, false if invalid (and adds error to diagnostics).
 func ValidateHTTPStatus(diagnostics *diag.Diagnostics, httpResp *http.Response, operation string, acceptedCodes ...int) bool {

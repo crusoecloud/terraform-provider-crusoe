@@ -35,6 +35,8 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/registry/token"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/s3_bucket"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/s3_key"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/transport_network"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/transport_partition"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vm"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_network"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/vpc_subnet"
@@ -84,6 +86,7 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		vm.NewVMDataSource,
 		disk.NewDisksDataSource,
 		ib_network.NewIBNetworkDataSource,
+		transport_network.NewTransportNetworkDataSource,
 		project.NewProjectsDataSource,
 		vpc_network.NewVPCNetworksDataSource,
 		vpc_subnet.NewVPCSubnetsDataSource,
@@ -111,6 +114,7 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		disk.NewDiskResource,
 		firewall_rule.NewFirewallRuleResource,
 		ib_partition.NewIBPartitionResource,
+		transport_partition.NewTransportPartitionResource,
 		project.NewProjectResource,
 		vpc_network.NewVPCNetworkResource,
 		vpc_subnet.NewVPCSubnetResource,

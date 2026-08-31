@@ -13,19 +13,20 @@ import (
 
 // apiDesc* — schema descriptions derived from the client-go swagger spec (InstanceTemplate).
 const (
-	apiDescID                  = "ID of the instance template."
-	apiDescName                = "Name of the instance template. (This is not the name of the VMs created from this instance template.)"
-	apiDescType                = "Product name of the VM type we want to create from this instance template."
-	apiDescSSHKey              = "SSH public key to use for all VMs created from this instance template."
-	apiDescLocation            = "Location to use for all VMs created from this instance template. May be empty if we do not want to bind this template to a location."
-	apiDescImage               = "OS Image to use for all VMs created from this instance template."
-	apiDescStartupScript       = "Startup script to use for all VMs created from this instance template."
-	apiDescShutdownScript      = "Shutdown script to use for all VMs created from this instance template."
-	apiDescSubnet              = "SubnetID to use for all VMs created from this instance template. Only used if template has a location."
-	apiDescPublicIPAddressType = "Public IP address type to use for all VMs created from this instance template. Must either be `static` or `dynamic`."
-	apiDescPlacementPolicy     = "Placement policy controlling how VMs created from this instance template are distributed across hosts. Possible values: `spread`, `unspecified`."
-	apiDescDisks               = "Disks attached to all VMs created from this instance template."
-	apiDescNvlinkDomainID      = "NVLink domain assigned to all VMs created from this instance template."
+	apiDescID                   = "ID of the instance template."
+	apiDescName                 = "Name of the instance template. (This is not the name of the VMs created from this instance template.)"
+	apiDescType                 = "Product name of the VM type we want to create from this instance template."
+	apiDescSSHKey               = "SSH public key to use for all VMs created from this instance template."
+	apiDescLocation             = "Location to use for all VMs created from this instance template. May be empty if we do not want to bind this template to a location."
+	apiDescImage                = "OS Image to use for all VMs created from this instance template."
+	apiDescStartupScript        = "Startup script to use for all VMs created from this instance template."
+	apiDescShutdownScript       = "Shutdown script to use for all VMs created from this instance template."
+	apiDescSubnet               = "SubnetID to use for all VMs created from this instance template. Only used if template has a location."
+	apiDescTransportPartitionID = "IB or RoCE partition to use for all VMs created from this instance template. Only used for transport-enabled VM types. Empty if template has no location."
+	apiDescPublicIPAddressType  = "Public IP address type to use for all VMs created from this instance template. Must either be `static` or `dynamic`."
+	apiDescPlacementPolicy      = "Placement policy controlling how VMs created from this instance template are distributed across hosts. Possible values: `spread`, `unspecified`."
+	apiDescDisks                = "Disks attached to all VMs created from this instance template."
+	apiDescNvlinkDomainID       = "NVLink domain assigned to all VMs created from this instance template."
 
 	// Nested DiskTemplate attributes.
 	apiDescDiskSize                = "Size of the disk, including a unit suffix."
@@ -36,6 +37,11 @@ const (
 // providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
 const (
 	providerDescProjectID = "ID of the project this instance template belongs to. " + project.ProviderDescProjectIDFallback
+
+	// providerDescIBPartitionDeprecated marks ib_partition as replaced by
+	// transport_partition_id. The spec does not describe ib_partition, so this
+	// text is provider-side only.
+	providerDescIBPartitionDeprecated = "ib_partition is deprecated, use transport_partition_id instead"
 
 	// providerDescReservationID is provider-side deprecation/behavior text for the
 	// resource-only, plan-owned reservation_id attribute. It is intentionally not
@@ -49,8 +55,8 @@ const (
 //
 // Every API-backed field comes from the response: disks are read from the response
 // rather than rebuilt from the create request, the nullable fields (ib_partition,
-// startup_script, shutdown_script, nvlink_domain_id) are null-normalized, and an
-// empty placement_policy falls back to "unspecified".
+// transport_partition_id, startup_script, shutdown_script, nvlink_domain_id) are
+// null-normalized, and an empty placement_policy falls back to "unspecified".
 //
 // The deprecated, plan-owned reservation_id is left untouched: Create handles its
 // own deprecation logic and Read preserves the prior-state value.
@@ -68,6 +74,7 @@ func instanceTemplateToResourceModel(ctx context.Context, template *swagger.Inst
 	model.PublicIpAddressType = types.StringValue(template.PublicIpAddressType)
 
 	model.IBPartition = stringOrNull(template.IbPartitionId)
+	model.TransportPartitionID = stringOrNull(template.TransportPartitionId)
 	model.StartupScript = stringOrNull(template.StartupScript)
 	model.ShutdownScript = stringOrNull(template.ShutdownScript)
 	model.NvlinkDomainID = stringOrNull(template.NvlinkDomainId)

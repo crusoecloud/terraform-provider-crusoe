@@ -34,23 +34,24 @@ type instanceTemplateResource struct {
 }
 
 type instanceTemplateResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	ProjectID           types.String `tfsdk:"project_id"`
-	Name                types.String `tfsdk:"name"`
-	Type                types.String `tfsdk:"type"`
-	SSHKey              types.String `tfsdk:"ssh_key"`
-	Location            types.String `tfsdk:"location"`
-	Image               types.String `tfsdk:"image"`
-	StartupScript       types.String `tfsdk:"startup_script"`
-	ShutdownScript      types.String `tfsdk:"shutdown_script"`
-	Subnet              types.String `tfsdk:"subnet"`
-	IBPartition         types.String `tfsdk:"ib_partition"`
-	PublicIpAddressType types.String `tfsdk:"public_ip_address_type"`
-	DisksToCreate       types.Set    `tfsdk:"disks"`
-	SharedVolumes       types.Set    `tfsdk:"shared_volume_attachments"`
-	ReservationID       types.String `tfsdk:"reservation_id"`
-	PlacementPolicy     types.String `tfsdk:"placement_policy"`
-	NvlinkDomainID      types.String `tfsdk:"nvlink_domain_id"`
+	ID                   types.String `tfsdk:"id"`
+	ProjectID            types.String `tfsdk:"project_id"`
+	Name                 types.String `tfsdk:"name"`
+	Type                 types.String `tfsdk:"type"`
+	SSHKey               types.String `tfsdk:"ssh_key"`
+	Location             types.String `tfsdk:"location"`
+	Image                types.String `tfsdk:"image"`
+	StartupScript        types.String `tfsdk:"startup_script"`
+	ShutdownScript       types.String `tfsdk:"shutdown_script"`
+	Subnet               types.String `tfsdk:"subnet"`
+	IBPartition          types.String `tfsdk:"ib_partition"`
+	TransportPartitionID types.String `tfsdk:"transport_partition_id"`
+	PublicIpAddressType  types.String `tfsdk:"public_ip_address_type"`
+	DisksToCreate        types.Set    `tfsdk:"disks"`
+	SharedVolumes        types.Set    `tfsdk:"shared_volume_attachments"`
+	ReservationID        types.String `tfsdk:"reservation_id"`
+	PlacementPolicy      types.String `tfsdk:"placement_policy"`
+	NvlinkDomainID       types.String `tfsdk:"nvlink_domain_id"`
 }
 
 type diskToCreateResourceModel struct {
@@ -153,7 +154,14 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"ib_partition": schema.StringAttribute{
+				Optional:           true,
+				PlanModifiers:      []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				DeprecationMessage: providerDescIBPartitionDeprecated,
+				Description:        providerDescIBPartitionDeprecated,
+			},
+			"transport_partition_id": schema.StringAttribute{
 				Optional:      true,
+				Description:   apiDescTransportPartitionID,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
 			"public_ip_address_type": schema.StringAttribute{
@@ -276,6 +284,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		ShutdownScript:          plan.ShutdownScript.ValueString(),
 		SubnetId:                plan.Subnet.ValueString(),
 		IbPartitionId:           plan.IBPartition.ValueString(),
+		TransportPartitionId:    plan.TransportPartitionID.ValueString(),
 		Disks:                   disksToCreate,
 		SharedVolumeAttachments: sharedVolumes,
 		PublicIpAddressType:     plan.PublicIpAddressType.ValueString(),

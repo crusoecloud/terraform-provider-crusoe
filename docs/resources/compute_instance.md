@@ -101,7 +101,8 @@ Required:
 
 Optional:
 
-- `ib_partition_id` (String) Infiniband Partition ID.
+- `ib_partition_id` (String, Deprecated) Infiniband Partition ID. ib_partition_id is deprecated, use transport_partition_id instead
+- `transport_partition_id` (String) ID of the transport partition the host channel adapter is attached to.
 
 
 <a id="nestedatt--network_interfaces"></a>

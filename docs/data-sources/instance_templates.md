@@ -42,7 +42,7 @@ Optional:
 Read-Only:
 
 - `disks` (Attributes List) Disks attached to all VMs created from this instance template. (see [below for nested schema](#nestedatt--instance_templates--disks))
-- `ib_partition` (String)
+- `ib_partition` (String, Deprecated) ib_partition is deprecated, use transport_partition_id instead
 - `id` (String) ID of the instance template.
 - `name` (String) Name of the instance template. (This is not the name of the VMs created from this instance template.)
 - `shared_volume_attachments` (List of String) IDs of existing shared disks to attach to every VM created from this instance template. Attached read-write.
@@ -50,6 +50,7 @@ Read-Only:
 - `ssh_key` (String) SSH public key to use for all VMs created from this instance template.
 - `startup_script` (String) Startup script to use for all VMs created from this instance template.
 - `subnet` (String) SubnetID to use for all VMs created from this instance template. Only used if template has a location.
+- `transport_partition_id` (String) IB or RoCE partition to use for all VMs created from this instance template. Only used for transport-enabled VM types. Empty if template has no location.
 - `type` (String) Product name of the VM type we want to create from this instance template.
 
 <a id="nestedatt--instance_templates--disks"></a>

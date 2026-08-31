@@ -56,7 +56,8 @@ const (
 	apiDescPrivateIpv4Address = "Private IPv4 address."
 
 	// host_channel_adapters (InstanceV1.host_channel_adapters)
-	apiDescHostChannelAdapters = "Host channel adapters attached to the VM."
+	apiDescHostChannelAdapters  = "Host channel adapters attached to the VM."
+	apiDescTransportPartitionID = "ID of the transport partition the host channel adapter is attached to."
 
 	apiDescNvlinkDomainID = "ID of the NVLink domain the VM belongs to, if any."
 
@@ -76,6 +77,9 @@ const (
 	// the spec text; the field is deprecated and its behavior is provider-specific.
 	providerDescReservationID = "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string."
 	providerDescIBPartitionID = "Infiniband Partition ID."
+	// ib_partition_id is superseded by transport_partition_id. The spec does not
+	// describe ib_partition_id, so this replacement notice is provider-side only.
+	providerDescIBPartitionIDDeprecated = "ib_partition_id is deprecated, use transport_partition_id instead"
 )
 
 // instanceTypeFamily returns the product-family prefix of an instance type,
@@ -123,7 +127,8 @@ var vmDiskAttachmentSchema = types.ObjectType{
 
 var vmHostChannelAdapterSchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"ib_partition_id": types.StringType,
+		"ib_partition_id":        types.StringType,
+		"transport_partition_id": types.StringType,
 	},
 }
 
@@ -256,12 +261,33 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 func vmHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter) (hcaList types.List) {
 	hcas := make([]vmHostChannelAdapterResourceModel, 0, 1)
 	if len(hostChannelAdapters) >= 1 {
-		hcas = append(hcas, vmHostChannelAdapterResourceModel{IBPartitionID: hostChannelAdapters[0].IbPartitionId})
+		hcas = append(hcas, vmHostChannelAdapterResourceModel{
+			IBPartitionID:        hostChannelAdapters[0].IbPartitionId,
+			TransportPartitionID: hostChannelAdapters[0].TransportPartitionId,
+		})
 	}
 
 	values, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hcas)
 
 	return values
+}
+
+// vmHostChannelAdaptersToTerraformDataModel creates a slice of Terraform-compatible host channel adapters
+// instances from Crusoe API host channel adapters interfaces.
+func vmHostChannelAdaptersToTerraformDataModel(hostChannelAdapters []swagger.HostChannelAdapter) (hcaList []vmHostChannelAdapterDataModel) {
+	hcas := make([]vmHostChannelAdapterDataModel, 0, 1)
+	if len(hostChannelAdapters) >= 1 {
+		hcas = append(hcas, vmHostChannelAdapterDataModel{
+			Type:                 hostChannelAdapters[0].Type_,
+			Guid:                 hostChannelAdapters[0].Guid,
+			IbNetworkID:          hostChannelAdapters[0].IbNetworkId,
+			IbPartitionID:        hostChannelAdapters[0].IbPartitionId,
+			TransportNetworkID:   hostChannelAdapters[0].TransportNetworkId,
+			TransportPartitionID: hostChannelAdapters[0].TransportPartitionId,
+		})
+	}
+
+	return hcas
 }
 
 func findInstance(ctx context.Context, client *swagger.APIClient, instanceID string) (*swagger.InstanceV1, error) {

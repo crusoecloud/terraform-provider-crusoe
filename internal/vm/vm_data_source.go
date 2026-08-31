@@ -19,14 +19,15 @@ type vmDataSource struct {
 }
 
 type vmDataSourceFilter struct {
-	ID                *string                       `tfsdk:"id"`
-	ProjectID         types.String                  `tfsdk:"project_id"`
-	ReservationID     *string                       `tfsdk:"reservation_id"`
-	Name              *string                       `tfsdk:"name"`
-	Type              *string                       `tfsdk:"type"`
-	Disks             []vmDiskResourceModel         `tfsdk:"disks"`
-	NetworkInterfaces []vmNetworkInterfaceDataModel `tfsdk:"network_interfaces"`
-	NvlinkDomainID    *string                       `tfsdk:"nvlink_domain_id"`
+	ID                  *string                         `tfsdk:"id"`
+	ProjectID           types.String                    `tfsdk:"project_id"`
+	ReservationID       *string                         `tfsdk:"reservation_id"`
+	Name                *string                         `tfsdk:"name"`
+	Type                *string                         `tfsdk:"type"`
+	Disks               []vmDiskResourceModel           `tfsdk:"disks"`
+	NetworkInterfaces   []vmNetworkInterfaceDataModel   `tfsdk:"network_interfaces"`
+	NvlinkDomainID      *string                         `tfsdk:"nvlink_domain_id"`
+	HostChannelAdapters []vmHostChannelAdapterDataModel `tfsdk:"host_channel_adapters"`
 }
 
 type vmNetworkInterfaceDataModel struct {
@@ -41,6 +42,15 @@ type vmNetworkInterfaceDataModel struct {
 
 type vmIPv4 struct {
 	Address string `tfsdk:"address"`
+}
+
+type vmHostChannelAdapterDataModel struct {
+	Type                 string `tfsdk:"type"`
+	Guid                 string `tfsdk:"guid"`
+	IbNetworkID          string `tfsdk:"ib_network_id"`
+	IbPartitionID        string `tfsdk:"ib_partition_id"`
+	TransportNetworkID   string `tfsdk:"transport_network_id"`
+	TransportPartitionID string `tfsdk:"transport_partition_id"`
 }
 
 func NewVMDataSource() datasource.DataSource {
@@ -146,6 +156,35 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 					},
 				},
 			},
+			"host_channel_adapters": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"type": schema.StringAttribute{
+							Computed: true,
+						},
+						"guid": schema.StringAttribute{
+							Computed: true,
+						},
+						"ib_network_id": schema.StringAttribute{
+							Computed:           true,
+							DeprecationMessage: "ib_network_id is deprecated, use transport_network_id instead",
+							Description:        "ib_network_id is deprecated, use transport_network_id instead",
+						},
+						"ib_partition_id": schema.StringAttribute{
+							Computed:           true,
+							DeprecationMessage: "ib_partition_id is deprecated, use transport_partition_id instead",
+							Description:        "ib_partition_id is deprecated, use transport_partition_id instead",
+						},
+						"transport_network_id": schema.StringAttribute{
+							Computed: true,
+						},
+						"transport_partition_id": schema.StringAttribute{
+							Computed: true,
+						},
+					},
+				},
+			},
 			"reservation_id": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: providerDescReservationID,
@@ -204,6 +243,9 @@ func (ds *vmDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 
 		networkInterfaces, _ := vmNetworkInterfacesToTerraformDataModel(vm.NetworkInterfaces)
 		state.NetworkInterfaces = networkInterfaces
+
+		hostChannelAdapters := vmHostChannelAdaptersToTerraformDataModel(vm.HostChannelAdapters)
+		state.HostChannelAdapters = hostChannelAdapters
 
 		diags = resp.State.Set(ctx, state)
 		resp.Diagnostics.Append(diags...)

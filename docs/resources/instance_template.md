@@ -57,7 +57,7 @@ resource "crusoe_instance_template" "example" {
 ### Optional
 
 - `disks` (Attributes Set) Disks attached to all VMs created from this instance template. (see [below for nested schema](#nestedatt--disks))
-- `ib_partition` (String)
+- `ib_partition` (String, Deprecated) ib_partition is deprecated, use transport_partition_id instead
 - `image` (String) OS Image to use for all VMs created from this instance template.
 - `location` (String) Location to use for all VMs created from this instance template. May be empty if we do not want to bind this template to a location.
 - `nvlink_domain_id` (String) NVLink domain assigned to all VMs created from this instance template.
@@ -68,6 +68,7 @@ resource "crusoe_instance_template" "example" {
 - `shared_volume_attachments` (Set of String) IDs of existing shared disks to attach to every VM created from this instance template. Attached read-write.
 - `shutdown_script` (String) Shutdown script to use for all VMs created from this instance template.
 - `startup_script` (String) Startup script to use for all VMs created from this instance template.
+- `transport_partition_id` (String) IB or RoCE partition to use for all VMs created from this instance template. Only used for transport-enabled VM types. Empty if template has no location.
 
 ### Read-Only
 

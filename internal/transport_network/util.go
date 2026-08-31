@@ -1,11 +1,15 @@
-package ib_network
+package transport_network
 
 import (
-	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
-// apiDesc* — schema descriptions derived from the client-go swagger spec (IbNetwork; nested IbNetworkCapacity).
+// apiDesc* — schema descriptions derived from the client-go swagger spec.
+//
+// The spec has no TransportNetwork definition: this data source reads the
+// IBNetwork model (nested IBNetworkCapacity), so the text below is that model's
+// text verbatim. It therefore still says "InfiniBand network", which is what the
+// API returns for both IB and RoCE fabrics.
 const (
 	apiDescID                = "ID of the InfiniBand network."
 	apiDescName              = "Name of the InfiniBand network."
@@ -17,9 +21,7 @@ const (
 
 // providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
 const (
-	providerDescProjectID = "ID of the project the InfiniBand network belongs to. " + project.ProviderDescProjectIDFallback
-)
+	providerDescProjectID = "ID of the project the transport network belongs to. " + project.ProviderDescProjectIDFallback
 
-// providerDescDeprecated marks the whole data source as replaced by
-// crusoe_transport_networks, which covers both InfiniBand and RoCE fabrics.
-var providerDescDeprecated = common.FormatResourceDeprecationWithReplacement("v1.2.0", "the `crusoe_transport_networks` data source")
+	providerDescTransportNetworks = "Transport networks available to the project."
+)

@@ -22,6 +22,10 @@ const (
 	providerDescProjectID = "ID of the project the InfiniBand partition belongs to. " + project.ProviderDescProjectIDFallback
 )
 
+// providerDescDeprecated marks the whole resource as replaced by
+// crusoe_transport_partition, which covers both InfiniBand and RoCE fabrics.
+var providerDescDeprecated = common.FormatResourceDeprecationWithReplacement("v1.2.0", "the `crusoe_transport_partition` resource")
+
 func findIbPartition(ctx context.Context, client *swagger.APIClient, ibPartitionID string) (*swagger.IbPartition, string, error) {
 	args := common.FindResourceArgs[swagger.IbPartition]{
 		ResourceID:  ibPartitionID,

@@ -58,39 +58,42 @@ func (ds *ibNetworksDataSource) Metadata(ctx context.Context, request datasource
 }
 
 func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
-		"project_id": schema.StringAttribute{
-			Optional:    true,
-			Description: providerDescProjectID,
-		},
-		"ib_networks": schema.ListNestedAttribute{
-			Computed: true,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: map[string]schema.Attribute{
-					"id": schema.StringAttribute{
-						Computed:    true,
-						Description: apiDescID,
-					},
-					"name": schema.StringAttribute{
-						Computed:    true,
-						Description: apiDescName,
-					},
-					"location": schema.StringAttribute{
-						Computed:    true,
-						Description: apiDescLocation,
-					},
-					"capacities": schema.ListNestedAttribute{
-						Computed:    true,
-						Description: apiDescCapacities,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"quantity": schema.Int64Attribute{
-									Computed:    true,
-									Description: apiDescCapacityQuantity,
-								},
-								"slice_type": schema.StringAttribute{
-									Computed:    true,
-									Description: apiDescCapacitySliceType,
+	response.Schema = schema.Schema{
+		DeprecationMessage: providerDescDeprecated,
+		Attributes: map[string]schema.Attribute{
+			"project_id": schema.StringAttribute{
+				Optional:    true,
+				Description: providerDescProjectID,
+			},
+			"ib_networks": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Computed:    true,
+							Description: apiDescID,
+						},
+						"name": schema.StringAttribute{
+							Computed:    true,
+							Description: apiDescName,
+						},
+						"location": schema.StringAttribute{
+							Computed:    true,
+							Description: apiDescLocation,
+						},
+						"capacities": schema.ListNestedAttribute{
+							Computed:    true,
+							Description: apiDescCapacities,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"quantity": schema.Int64Attribute{
+										Computed:    true,
+										Description: apiDescCapacityQuantity,
+									},
+									"slice_type": schema.StringAttribute{
+										Computed:    true,
+										Description: apiDescCapacitySliceType,
+									},
 								},
 							},
 						},
@@ -98,7 +101,7 @@ func (ds *ibNetworksDataSource) Schema(ctx context.Context, request datasource.S
 				},
 			},
 		},
-	}}
+	}
 }
 
 func (ds *ibNetworksDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

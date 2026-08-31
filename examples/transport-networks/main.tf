@@ -1,5 +1,3 @@
-# This example is deprecated, use transport-networks instead
-
 terraform {
   required_providers {
     crusoe = {
@@ -10,7 +8,7 @@ terraform {
 
 variable "name_prefix" {
   type    = string
-  default = "tf-example-ib-"
+  default = "tf-example-transport-networks-"
 }
 
 variable "ib_vm" {
@@ -30,31 +28,31 @@ variable "ib_vm" {
 
 variable "vm_count" {
   type    = number
-  default = 1
+  default = 2
 }
 
 # List available IB networks
-data "crusoe_ib_networks" "my_ib_networks" {}
-output "ib_networks" {
-  value = data.crusoe_ib_networks.my_ib_networks.ib_networks
+data "crusoe_transport_networks" "my_transport_networks" {}
+output "transport_networks" {
+  value = data.crusoe_transport_networks.my_transport_networks.transport_networks
 }
 
 locals {
   my_ssh_key = file("~/.ssh/id_ed25519.pub")
-  # Find an IB network in the same location and with available capacity
-  available_ib_networks = [
-    for network in data.crusoe_ib_networks.my_ib_networks.ib_networks :
+  # Find a transport network in the same location and with available capacity
+  available_transport_networks = [
+    for network in data.crusoe_transport_networks.my_transport_networks.transport_networks :
     network if network.location == var.ib_vm.location && anytrue([
       for capacity in network.capacities :
       capacity.quantity >= var.ib_vm.slices * var.vm_count && capacity.slice_type == var.ib_vm.type
     ])
   ]
-  available_ib_network_id = length(local.available_ib_networks) > 0 ? local.available_ib_networks[0].id : null
+  available_transport_network_id = length(local.available_transport_networks) > 0 ? local.available_transport_networks[0].id : null
 }
 
-# Output ib_network_id for testing
-output "selected_ib_network_id" {
-  value = local.available_ib_network_id
+# Output available_transport_network_id for testing
+output "selected_transport_network_id" {
+  value = local.available_transport_network_id
 }
 
 # Create a VPC network
@@ -71,13 +69,13 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   network  = crusoe_vpc_network.my_vpc_network.id
 }
 
-# Create an IB partition to deploy VMs in
-resource "crusoe_ib_partition" "my_partition" {
-  name          = "${var.name_prefix}partition"
-  ib_network_id = local.available_ib_network_id
+# Create a transport partition to deploy VMs in
+resource "crusoe_transport_partition" "my_partition" {
+  name                 = "${var.name_prefix}partition"
+  transport_network_id = local.available_transport_network_id
 }
 
-# Create multiple VMs, all in the same Infiniband partition
+# Create multiple VMs, all in the same transport partition
 resource "crusoe_compute_instance" "my_vms" {
   count    = var.vm_count
   name     = "${var.name_prefix}vm-${count.index}"
@@ -98,7 +96,7 @@ resource "crusoe_compute_instance" "my_vms" {
   }]
   host_channel_adapters = [
     {
-      ib_partition_id = crusoe_ib_partition.my_partition.id
+      transport_partition_id = crusoe_transport_partition.my_partition.id
     }
   ]
   ssh_key = local.my_ssh_key
