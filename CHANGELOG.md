@@ -1,3 +1,22 @@
+## 1.3.0
+
+NEW FEATURES:
+
+- Added `crusoe_transport_partition` resource and `crusoe_transport_networks` data source, which cover both InfiniBand and RoCE fabrics and replace the InfiniBand-only `crusoe_ib_partition` resource and `crusoe_ib_networks` data source.
+
+ENHANCEMENTS:
+
+- Added `transport_partition_id` alongside the deprecated InfiniBand partition attributes on `crusoe_compute_instance` (`host_channel_adapters`), `crusoe_compute_instance_by_template` (`host_channel_adapters`), `crusoe_instance_template`, and `crusoe_kubernetes_node_pool`. The `crusoe_compute_instance` data source also exposes `transport_network_id` and `transport_partition_id`.
+- Added `sources` and `destinations` list attributes to the `crusoe_vpc_firewall_rule` resource, replacing the single-string `source` and `destination`. Each element sets either a `cidr` or a `resource_id`, so networks, subnets, and VMs can be referenced by ID instead of by CIDR.
+
+DEPRECATIONS:
+
+- The `crusoe_ib_partition` resource and `crusoe_ib_networks` data source are deprecated in favor of `crusoe_transport_partition` and `crusoe_transport_networks`.
+- `ib_partition_id` (on `crusoe_compute_instance`, `crusoe_compute_instance_by_template`, and `crusoe_kubernetes_node_pool`) and `ib_partition` (on `crusoe_instance_template`) are deprecated in favor of `transport_partition_id`. On the `crusoe_compute_instance` data source, `ib_network_id` and `ib_partition_id` are deprecated in favor of `transport_network_id` and `transport_partition_id`.
+- `crusoe_vpc_firewall_rule`: `source` and `destination` are deprecated in favor of `sources` and `destinations`. Existing configurations keep working — exactly one of `source`/`sources` and one of `destination`/`destinations` must be set — and existing state is migrated automatically without a plan diff.
+
+All deprecated attributes remain functional and will be removed in the next major version.
+
 ## 1.2.0
 
 ENHANCEMENTS:

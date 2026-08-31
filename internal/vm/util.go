@@ -77,9 +77,14 @@ const (
 	// the spec text; the field is deprecated and its behavior is provider-specific.
 	providerDescReservationID = "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string."
 	providerDescIBPartitionID = "Infiniband Partition ID."
-	// ib_partition_id is superseded by transport_partition_id. The spec does not
-	// describe ib_partition_id, so this replacement notice is provider-side only.
-	providerDescIBPartitionIDDeprecated = "ib_partition_id is deprecated, use transport_partition_id instead"
+)
+
+// ib_network_id and ib_partition_id are superseded by transport_network_id and
+// transport_partition_id. The spec does not describe the ib_* fields, so these
+// replacement notices are provider-side only.
+var (
+	providerDescIBNetworkIDDeprecated   = common.FormatDeprecationWithReplacement("v1.3.0", "transport_network_id")
+	providerDescIBPartitionIDDeprecated = common.FormatDeprecationWithReplacement("v1.3.0", "transport_partition_id")
 )
 
 // instanceTypeFamily returns the product-family prefix of an instance type,

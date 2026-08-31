@@ -38,16 +38,16 @@ const (
 const (
 	providerDescProjectID = "ID of the project this instance template belongs to. " + project.ProviderDescProjectIDFallback
 
-	// providerDescIBPartitionDeprecated marks ib_partition as replaced by
-	// transport_partition_id. The spec does not describe ib_partition, so this
-	// text is provider-side only.
-	providerDescIBPartitionDeprecated = "ib_partition is deprecated, use transport_partition_id instead"
-
 	// providerDescReservationID is provider-side deprecation/behavior text for the
 	// resource-only, plan-owned reservation_id attribute. It is intentionally not
 	// sourced from the spec.
 	providerDescReservationID = "(Deprecated) ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string."
 )
+
+// providerDescIBPartitionDeprecated marks ib_partition as replaced by
+// transport_partition_id. The spec does not describe ib_partition, so this
+// text is provider-side only.
+var providerDescIBPartitionDeprecated = common.FormatDeprecationWithReplacement("v1.3.0", "transport_partition_id")
 
 // instanceTemplateToResourceModel maps an API instance template onto model, with
 // the API object as the source of truth. Create and Read both call it so their

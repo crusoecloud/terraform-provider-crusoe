@@ -149,8 +149,8 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"ib_partition_id": schema.StringAttribute{
 				Optional:           true,
 				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				DeprecationMessage: "ib_partition_id is deprecated, use transport_partition_id instead",
-				Description:        "ib_partition_id is deprecated, use transport_partition_id instead",
+				DeprecationMessage: providerDescIBPartitionIDDeprecated,
+				Description:        providerDescIBPartitionIDDeprecated,
 			},
 			"transport_partition_id": schema.StringAttribute{
 				Optional:      true,

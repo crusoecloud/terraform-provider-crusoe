@@ -55,8 +55,8 @@ Read-Only:
 Read-Only:
 
 - `guid` (String)
-- `ib_network_id` (String, Deprecated) ib_network_id is deprecated, use transport_network_id instead
-- `ib_partition_id` (String, Deprecated) ib_partition_id is deprecated, use transport_partition_id instead
+- `ib_network_id` (String, Deprecated) This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_network_id instead.
+- `ib_partition_id` (String, Deprecated) This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
 - `transport_network_id` (String)
 - `transport_partition_id` (String)
 - `type` (String)

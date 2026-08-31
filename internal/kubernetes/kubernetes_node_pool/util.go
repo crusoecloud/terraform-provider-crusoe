@@ -67,6 +67,11 @@ const (
 		"but new nodes will use the new configuration."
 )
 
+// providerDescIBPartitionIDDeprecated marks ib_partition_id as replaced by
+// transport_partition_id. The spec does not describe ib_partition_id, so this
+// text is provider-side only.
+var providerDescIBPartitionIDDeprecated = common.FormatDeprecationWithReplacement("v1.3.0", "transport_partition_id")
+
 func ParseOpResultStrict[T any](opResult interface{}) (*T, error) {
 	b, err := json.Marshal(opResult)
 	if err != nil {

@@ -22,4 +22,4 @@ const (
 
 // providerDescDeprecated marks the whole data source as replaced by
 // crusoe_transport_networks, which covers both InfiniBand and RoCE fabrics.
-var providerDescDeprecated = common.FormatResourceDeprecationWithReplacement("v1.2.0", "the `crusoe_transport_networks` data source")
+var providerDescDeprecated = common.FormatResourceDeprecationWithReplacement("v1.3.0", "the `crusoe_transport_networks` data source")
