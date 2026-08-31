@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -23,17 +25,30 @@ type firewallRuleResource struct {
 }
 
 type firewallRuleResourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	ProjectID        types.String `tfsdk:"project_id"`
-	Name             types.String `tfsdk:"name"`
-	Network          types.String `tfsdk:"network"`
-	Action           types.String `tfsdk:"action"`
-	Direction        types.String `tfsdk:"direction"`
-	Protocols        types.String `tfsdk:"protocols"`
-	Source           types.String `tfsdk:"source"`
-	SourcePorts      types.String `tfsdk:"source_ports"`
+	ID        types.String `tfsdk:"id"`
+	ProjectID types.String `tfsdk:"project_id"`
+	Name      types.String `tfsdk:"name"`
+	Network   types.String `tfsdk:"network"`
+	Action    types.String `tfsdk:"action"`
+	Direction types.String `tfsdk:"direction"`
+	Protocols types.String `tfsdk:"protocols"`
+	// Sources is the replacement for the deprecated Source field. Exactly one of
+	// the two must be set.
+	Source      types.String `tfsdk:"source"`
+	Sources     types.List   `tfsdk:"sources"`
+	SourcePorts types.String `tfsdk:"source_ports"`
+	// Destinations is the replacement for the deprecated Destination field. Exactly
+	// one of the two must be set.
 	Destination      types.String `tfsdk:"destination"`
+	Destinations     types.List   `tfsdk:"destinations"`
 	DestinationPorts types.String `tfsdk:"destination_ports"`
+}
+
+// firewallRuleObjectModel is a single sources/destinations element, mirroring the
+// API's FirewallRuleObject: exactly one of the two members is set.
+type firewallRuleObjectModel struct {
+	CIDR       types.String `tfsdk:"cidr"`
+	ResourceID types.String `tfsdk:"resource_id"`
 }
 
 func NewFirewallRuleResource() resource.Resource {
@@ -104,9 +119,23 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				// TODO: add validator
 			},
 			"source": schema.StringAttribute{
-				Required:    true,
-				Description: apiDescSource,
-				// TODO: add validator
+				Optional:            true,
+				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.2.0", "sources"),
+				MarkdownDescription: providerDescSource,
+				Validators: []validator.String{
+					// Exactly one of the deprecated field or its replacement must be set.
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("source"),
+						path.MatchRoot("sources"),
+					),
+				},
+			},
+			"sources": schema.ListNestedAttribute{
+				Optional: true,
+				MarkdownDescription: apiDescSources + " " + providerDescRuleObjectConstraint + " " +
+					providerDescSourceConstraint,
+				Validators:   []validator.List{listvalidator.SizeAtLeast(1)},
+				NestedObject: ruleObjectNestedAttribute(),
 			},
 			"source_ports": schema.StringAttribute{
 				Required:    true,
@@ -114,9 +143,23 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				// TODO: add validator
 			},
 			"destination": schema.StringAttribute{
-				Required:    true,
-				Description: apiDescDestination,
-				// TODO: add validator
+				Optional:            true,
+				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.2.0", "destinations"),
+				MarkdownDescription: providerDescDestination,
+				Validators: []validator.String{
+					// Exactly one of the deprecated field or its replacement must be set.
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("destination"),
+						path.MatchRoot("destinations"),
+					),
+				},
+			},
+			"destinations": schema.ListNestedAttribute{
+				Optional: true,
+				MarkdownDescription: apiDescDestinations + " " + providerDescRuleObjectConstraint + " " +
+					providerDescDestinationConstraint,
+				Validators:   []validator.List{listvalidator.SizeAtLeast(1)},
+				NestedObject: ruleObjectNestedAttribute(),
 			},
 			"destination_ports": schema.StringAttribute{
 				Required:    true,
@@ -151,15 +194,21 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	sourcePortsStr := strings.ReplaceAll(plan.SourcePorts.ValueString(), "*", "1-65535")
 	destPortsStr := strings.ReplaceAll(plan.DestinationPorts.ValueString(), "*", "1-65535")
 
+	sources := ruleObjectsFromModel(ctx, plan.Sources, plan.Source, &resp.Diagnostics)
+	destinations := ruleObjectsFromModel(ctx, plan.Destinations, plan.Destination, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.CreateVPCFirewallRule(ctx, swagger.VpcFirewallRulesPostRequestV1{
 		VpcNetworkId:     plan.Network.ValueString(),
 		Name:             plan.Name.ValueString(),
 		Action:           plan.Action.ValueString(),
 		Protocols:        stringToSlice(plan.Protocols.ValueString(), ","),
 		Direction:        plan.Direction.ValueString(),
-		Sources:          toFirewallRuleObjects(stringToSlice(plan.Source.ValueString(), ",")),
+		Sources:          sources,
 		SourcePorts:      stringToSlice(sourcePortsStr, ","),
-		Destinations:     toFirewallRuleObjects(stringToSlice(plan.Destination.ValueString(), ",")),
+		Destinations:     destinations,
 		DestinationPorts: stringToSlice(destPortsStr, ","),
 	}, projectID)
 	if httpResp != nil {
@@ -182,7 +231,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	firewallRuleToTerraformResourceModel(firewallRule, &plan)
+	firewallRuleToTerraformResourceModel(ctx, firewallRule, &plan)
 	plan.ProjectID = types.StringValue(projectID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -211,7 +260,7 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	state.ProjectID = types.StringValue(projectID)
-	firewallRuleToTerraformResourceModel(&rule, &state)
+	firewallRuleToTerraformResourceModel(ctx, &rule, &state)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -234,17 +283,20 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	if !plan.Protocols.IsNull() && !plan.Protocols.IsUnknown() {
 		patchReq.Protocols = stringToSlice(plan.Protocols.ValueString(), ",")
 	}
-	if !plan.Destination.IsNull() && !plan.Destination.IsUnknown() {
-		patchReq.Destinations = toFirewallRuleObjects(stringToSlice(plan.Destination.ValueString(), ","))
+	if isSet(plan.Destination) || isSetList(plan.Destinations) {
+		patchReq.Destinations = ruleObjectsFromModel(ctx, plan.Destinations, plan.Destination, &resp.Diagnostics)
 	}
 	if !plan.DestinationPorts.IsNull() && !plan.DestinationPorts.IsUnknown() {
 		patchReq.DestinationPorts = stringToSlice(plan.DestinationPorts.ValueString(), ",")
 	}
-	if !plan.Source.IsNull() && !plan.Source.IsUnknown() {
-		patchReq.Sources = toFirewallRuleObjects(stringToSlice(plan.Source.ValueString(), ","))
+	if isSet(plan.Source) || isSetList(plan.Sources) {
+		patchReq.Sources = ruleObjectsFromModel(ctx, plan.Sources, plan.Source, &resp.Diagnostics)
 	}
 	if !plan.SourcePorts.IsNull() && !plan.SourcePorts.IsUnknown() {
 		patchReq.SourcePorts = stringToSlice(plan.SourcePorts.ValueString(), ",")
+	}
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	dataResp, httpResp, err := r.client.APIClient.VPCFirewallRulesApi.PatchVPCFirewallRule(ctx,
@@ -270,7 +322,7 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	firewallRuleToTerraformResourceModel(firewallRule, &plan)
+	firewallRuleToTerraformResourceModel(ctx, firewallRule, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

@@ -11,8 +11,15 @@ import (
 
 // firewallRuleResourceModelV0 is the minimal set of attributes that we will need from a prior state to
 // rebuild a firewall rule's state because these fields are not returned by the API.
+//
+// A v0 configuration can only use the combined source/destination fields, since the
+// sources/destinations lists that replaced them did not exist yet. Carrying the two
+// values over keeps the upgraded state on the same fields the configuration uses, so
+// the first plan after the upgrade does not report a move to the new lists.
 type firewallRuleResourceModelV0 struct {
-	ID types.String `tfsdk:"id"`
+	ID          types.String `tfsdk:"id"`
+	Source      types.String `tfsdk:"source"`
+	Destination types.String `tfsdk:"destination"`
 }
 
 func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
@@ -22,6 +29,12 @@ func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.
 				Attributes: map[string]schema.Attribute{
 					"id": schema.StringAttribute{
 						Computed: true,
+					},
+					"source": schema.StringAttribute{
+						Optional: true,
+					},
+					"destination": schema.StringAttribute{
+						Optional: true,
 					},
 				},
 			},
@@ -52,9 +65,12 @@ func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.
 					return
 				}
 
-				var state firewallRuleResourceModel
-				state.ProjectID = types.StringValue(projectID)
-				firewallRuleToTerraformResourceModel(firewallRule, &state)
+				state := firewallRuleResourceModel{
+					ProjectID:   types.StringValue(projectID),
+					Source:      priorStateData.Source,
+					Destination: priorStateData.Destination,
+				}
+				firewallRuleToTerraformResourceModel(ctx, firewallRule, &state)
 				resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 				if resp.Diagnostics.HasError() {
 					resp.Diagnostics.AddError("Failed to migrate firewall rule to current version",

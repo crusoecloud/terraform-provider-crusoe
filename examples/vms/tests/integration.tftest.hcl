@@ -27,8 +27,8 @@ run "check_vm_and_disk_exists" {
   }
 
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.destination == crusoe_compute_instance.my_vm.network_interfaces[0].private_ipv4.address
-    error_message = "Expected firewall rule destination to match the VMs's destination IP address."
+    condition     = crusoe_vpc_firewall_rule.open_fw_rule.destinations[0].resource_id == crusoe_compute_instance.my_vm.id
+    error_message = "Expected firewall rule destination to match the VM's resource ID."
   }
 
   assert {

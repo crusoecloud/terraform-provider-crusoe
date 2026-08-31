@@ -1,43 +1,197 @@
 package firewall_rule
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
-func Test_cidrListToString(t *testing.T) {
-	type args struct {
-		ruleObjects []swagger.FirewallRuleObject
+// cidrObject and resourceIDObject build a single sources/destinations element of
+// each of the two mutually-exclusive shapes.
+func cidrObject(cidr string) firewallRuleObjectModel {
+	return firewallRuleObjectModel{CIDR: types.StringValue(cidr), ResourceID: types.StringNull()}
+}
+
+func resourceIDObject(resourceID string) firewallRuleObjectModel {
+	return firewallRuleObjectModel{CIDR: types.StringNull(), ResourceID: types.StringValue(resourceID)}
+}
+
+func ruleObjectList(t *testing.T, objects ...firewallRuleObjectModel) types.List {
+	t.Helper()
+
+	list, diags := types.ListValueFrom(context.Background(), firewallRuleObjectType, objects)
+	if diags.HasError() {
+		t.Fatalf("failed to build rule object list: %v", diags)
 	}
+
+	return list
+}
+
+func Test_ruleObjectsFromModel(t *testing.T) {
 	tests := []struct {
-		name string
-		args args
-		want string
+		name       string
+		list       []firewallRuleObjectModel
+		deprecated types.String
+		want       []swagger.FirewallRuleObject
 	}{
 		{
-			name: "empty list",
-			args: args{},
-			want: "",
+			name: "mixed cidr and resource id elements",
+			list: []firewallRuleObjectModel{cidrObject("10.0.0.0/16"), resourceIDObject("vpc-123")},
+			want: []swagger.FirewallRuleObject{{Cidr: "10.0.0.0/16"}, {ResourceId: "vpc-123"}},
 		},
 		{
-			name: "single CIDR",
-			args: args{ruleObjects: []swagger.FirewallRuleObject{{Cidr: "127.0.0.0/16"}}},
-			want: "127.0.0.0/16",
+			name:       "list wins over deprecated field",
+			list:       []firewallRuleObjectModel{cidrObject("10.0.0.0/16")},
+			deprecated: types.StringValue("0.0.0.0/0"),
+			want:       []swagger.FirewallRuleObject{{Cidr: "10.0.0.0/16"}},
 		},
 		{
-			name: "multiple CIDRs",
-			args: args{ruleObjects: []swagger.FirewallRuleObject{{Cidr: "127.0.0.0/16"}, {Cidr: "127.0.0.1/24"}}},
-			want: "127.0.0.0/16,127.0.0.1/24",
+			name:       "falls back to deprecated field",
+			deprecated: types.StringValue("0.0.0.0/0"),
+			want:       []swagger.FirewallRuleObject{{Cidr: "0.0.0.0/0"}},
+		},
+		{
+			name:       "deprecated field splits comma-separated cidrs",
+			deprecated: types.StringValue("10.0.0.0/16,10.1.0.0/16"),
+			want:       []swagger.FirewallRuleObject{{Cidr: "10.0.0.0/16"}, {Cidr: "10.1.0.0/16"}},
+		},
+		{
+			name: "nothing set",
+			want: []swagger.FirewallRuleObject{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := cidrListToString(tt.args.ruleObjects); got != tt.want {
-				t.Errorf("cidrListToString() = %v, want %v", got, tt.want)
+			list := types.ListNull(firewallRuleObjectType)
+			if tt.list != nil {
+				list = ruleObjectList(t, tt.list...)
+			}
+			deprecated := tt.deprecated
+			if deprecated.IsNull() {
+				deprecated = types.StringNull()
+			}
+
+			var diags diag.Diagnostics
+			got := ruleObjectsFromModel(context.Background(), list, deprecated, &diags)
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ruleObjectsFromModel() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_applyRuleObjectsToState(t *testing.T) {
+	tests := []struct {
+		name       string
+		list       []firewallRuleObjectModel
+		deprecated types.String
+		objects    []swagger.FirewallRuleObject
+		wantList   []firewallRuleObjectModel
+		wantDeprec types.String
+	}{
+		{
+			name:       "deprecated field updated from api",
+			deprecated: types.StringValue("0.0.0.0/0"),
+			objects:    []swagger.FirewallRuleObject{{Cidr: "0.0.0.0/0"}},
+			wantDeprec: types.StringValue("0.0.0.0/0"),
+		},
+		{
+			name:       "deprecated field reflects api change",
+			deprecated: types.StringValue("10.0.0.0/16"),
+			objects:    []swagger.FirewallRuleObject{{Cidr: "0.0.0.0/0"}},
+			wantDeprec: types.StringValue("0.0.0.0/0"),
+		},
+		{
+			name:     "configured cidrs preserved when api agrees",
+			list:     []firewallRuleObjectModel{cidrObject("10.0.0.0/16"), cidrObject("10.1.0.0/16")},
+			objects:  []swagger.FirewallRuleObject{{Cidr: "10.1.0.0/16"}, {Cidr: "10.0.0.0/16"}}, // reordered
+			wantList: []firewallRuleObjectModel{cidrObject("10.0.0.0/16"), cidrObject("10.1.0.0/16")},
+		},
+		{
+			name:     "bare ip preserved against api /32 conversion",
+			list:     []firewallRuleObjectModel{cidrObject("10.1.2.3")},
+			objects:  []swagger.FirewallRuleObject{{Cidr: "10.1.2.3/32"}},
+			wantList: []firewallRuleObjectModel{cidrObject("10.1.2.3")},
+		},
+		{
+			name:     "configured cidrs replaced on genuine change",
+			list:     []firewallRuleObjectModel{cidrObject("10.0.0.0/16")},
+			objects:  []swagger.FirewallRuleObject{{Cidr: "0.0.0.0/0"}},
+			wantList: []firewallRuleObjectModel{cidrObject("0.0.0.0/0")},
+		},
+		{
+			name:     "resource id round-trips unchanged",
+			list:     []firewallRuleObjectModel{resourceIDObject("vpc-123")},
+			objects:  []swagger.FirewallRuleObject{{ResourceId: "vpc-123"}},
+			wantList: []firewallRuleObjectModel{resourceIDObject("vpc-123")},
+		},
+		{
+			name:     "mixed cidr and resource id entries preserved when api agrees",
+			list:     []firewallRuleObjectModel{cidrObject("10.4.0.0/16"), resourceIDObject("subnet-1")},
+			objects:  []swagger.FirewallRuleObject{{ResourceId: "subnet-1"}, {Cidr: "10.4.0.0/16"}}, // reordered
+			wantList: []firewallRuleObjectModel{cidrObject("10.4.0.0/16"), resourceIDObject("subnet-1")},
+		},
+		{
+			// The API returns a resource_id unchanged, so a CIDR coming back in its place
+			// is a real out-of-band edit rather than the reference being resolved.
+			name:     "resource id replaced when the api reports a different target",
+			list:     []firewallRuleObjectModel{resourceIDObject("vpc-123")},
+			objects:  []swagger.FirewallRuleObject{{Cidr: "10.0.0.0/16"}},
+			wantList: []firewallRuleObjectModel{cidrObject("10.0.0.0/16")},
+		},
+		{
+			name:     "import populates list from api",
+			objects:  []swagger.FirewallRuleObject{{ResourceId: "vpc-123"}, {Cidr: "10.0.0.0/16"}},
+			wantList: []firewallRuleObjectModel{resourceIDObject("vpc-123"), cidrObject("10.0.0.0/16")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			list := types.ListNull(firewallRuleObjectType)
+			if tt.list != nil {
+				list = ruleObjectList(t, tt.list...)
+			}
+			deprecated := tt.deprecated
+
+			applyRuleObjectsToState(context.Background(), tt.objects, &list, &deprecated)
+
+			wantList := types.ListNull(firewallRuleObjectType)
+			if tt.wantList != nil {
+				wantList = ruleObjectList(t, tt.wantList...)
+			}
+			if !list.Equal(wantList) {
+				t.Errorf("list = %v, want %v", list, wantList)
+			}
+			if !deprecated.Equal(tt.wantDeprec) {
+				t.Errorf("deprecated = %v, want %v", deprecated, tt.wantDeprec)
+			}
+		})
+	}
+}
+
+func Test_canonicalCIDR(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"", ""},
+		{"10.0.0.0/16", "10.0.0.0/16"},
+		{"10.1.2.3", "10.1.2.3/32"},
+		{" 10.1.2.3 ", "10.1.2.3/32"},
+		{"2001:db8::1", "2001:db8::1/128"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := canonicalCIDR(tt.in); got != tt.want {
+				t.Errorf("canonicalCIDR(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
 	}
@@ -180,7 +334,7 @@ func Test_firewallRuleToTerraformResourceModel_preservesConfiguredFormat(t *test
 		DestinationPorts: []string{wildcardPortRange},
 	}
 
-	firewallRuleToTerraformResourceModel(rule, state)
+	firewallRuleToTerraformResourceModel(context.Background(), rule, state)
 
 	if got := state.SourcePorts.ValueString(); got != "*" {
 		t.Errorf("source_ports = %q, want %q (preserved)", got, "*")
@@ -191,17 +345,60 @@ func Test_firewallRuleToTerraformResourceModel_preservesConfiguredFormat(t *test
 	if got := state.ID.ValueString(); got != "fw-1" {
 		t.Errorf("id = %q, want %q (from API)", got, "fw-1")
 	}
+	// The deprecated fields are in use, so their replacements must stay null rather
+	// than being populated from the API response.
+	if !state.Sources.IsNull() {
+		t.Errorf("sources = %v, want null while `source` is configured", state.Sources)
+	}
+	if !state.Destinations.IsNull() {
+		t.Errorf("destinations = %v, want null while `destination` is configured", state.Destinations)
+	}
+}
+
+// Test_firewallRuleToTerraformResourceModel_sources covers the same transform for
+// the sources/destinations lists that replaced the combined fields.
+func Test_firewallRuleToTerraformResourceModel_sources(t *testing.T) {
+	state := &firewallRuleResourceModel{
+		Sources:      ruleObjectList(t, cidrObject("0.0.0.0/0")),
+		Destinations: ruleObjectList(t, resourceIDObject("vm-1")),
+	}
+	rule := &swagger.VpcFirewallRule{
+		Sources: []swagger.FirewallRuleObject{{Cidr: "0.0.0.0/0"}},
+		// The API returns a VM reference unchanged rather than resolving it.
+		Destinations: []swagger.FirewallRuleObject{{ResourceId: "vm-1"}},
+	}
+
+	firewallRuleToTerraformResourceModel(context.Background(), rule, state)
+
+	if want := ruleObjectList(t, cidrObject("0.0.0.0/0")); !state.Sources.Equal(want) {
+		t.Errorf("sources = %v, want %v", state.Sources, want)
+	}
+	if want := ruleObjectList(t, resourceIDObject("vm-1")); !state.Destinations.Equal(want) {
+		t.Errorf("destinations = %v, want %v (resource reference round-trips)", state.Destinations, want)
+	}
+	if !state.Source.IsNull() || !state.Destination.IsNull() {
+		t.Error("deprecated source/destination should stay null when the lists are configured")
+	}
 }
 
 // Test_firewallRuleToTerraformResourceModel_reflectsAPIChange confirms a genuine
 // out-of-band change is still surfaced (preserve only applies when equal).
 func Test_firewallRuleToTerraformResourceModel_reflectsAPIChange(t *testing.T) {
-	state := &firewallRuleResourceModel{SourcePorts: types.StringValue("80")}
-	rule := &swagger.VpcFirewallRule{SourcePorts: []string{"443"}}
+	state := &firewallRuleResourceModel{
+		SourcePorts: types.StringValue("80"),
+		Sources:     ruleObjectList(t, cidrObject("10.0.0.0/16")),
+	}
+	rule := &swagger.VpcFirewallRule{
+		SourcePorts: []string{"443"},
+		Sources:     []swagger.FirewallRuleObject{{Cidr: "0.0.0.0/0"}},
+	}
 
-	firewallRuleToTerraformResourceModel(rule, state)
+	firewallRuleToTerraformResourceModel(context.Background(), rule, state)
 
 	if got := state.SourcePorts.ValueString(); got != "443" {
 		t.Errorf("source_ports = %q, want %q (from API)", got, "443")
+	}
+	if want := ruleObjectList(t, cidrObject("0.0.0.0/0")); !state.Sources.Equal(want) {
+		t.Errorf("sources = %v, want %v (from API)", state.Sources, want)
 	}
 }

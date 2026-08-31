@@ -41,9 +41,9 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   action            = "allow"
   direction         = "ingress"
   protocols         = "tcp"
-  source            = "0.0.0.0/0"
+  sources           = [{ cidr = "0.0.0.0/0" }]
   source_ports      = "1-65535"
-  destination       = crusoe_vpc_network.my_vpc_network.cidr
+  destinations      = [{ resource_id = crusoe_vpc_network.my_vpc_network.id }]
   destination_ports = "1-65535"
 
   # It is currently not possible for terraform to create subnets and firewall rules concurrently.

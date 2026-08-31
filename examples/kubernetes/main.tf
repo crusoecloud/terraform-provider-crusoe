@@ -89,9 +89,9 @@ resource "crusoe_vpc_firewall_rule" "my_egress_rule" {
   action            = "allow"
   direction         = "egress"
   protocols         = "tcp,udp"
-  source            = crusoe_vpc_subnet.my_vpc_subnet.cidr
+  sources           = [{ cidr = crusoe_vpc_subnet.my_vpc_subnet.cidr }]
   source_ports      = "1-65535"
-  destination       = "0.0.0.0/0"
+  destinations      = [{ cidr = "0.0.0.0/0" }]
   destination_ports = "1-65535"
   network           = crusoe_vpc_network.my_vpc_network.id
 }

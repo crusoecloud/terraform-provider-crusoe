@@ -76,8 +76,8 @@ run "validate_firewall_rule" {
   }
 
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.source == "0.0.0.0/0"
-    error_message = "Expected firewall source name to be '0.0.0.0/0', but got '${crusoe_vpc_firewall_rule.open_fw_rule.source}'."
+    condition     = crusoe_vpc_firewall_rule.open_fw_rule.sources[0].cidr == "0.0.0.0/0"
+    error_message = "Expected firewall source CIDR to be '0.0.0.0/0', but got '${crusoe_vpc_firewall_rule.open_fw_rule.sources[0].cidr}'."
   }
 
   assert {

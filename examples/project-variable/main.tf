@@ -89,8 +89,8 @@ resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
   action            = "allow"
   direction         = "ingress"
   protocols         = "tcp"
-  source            = "0.0.0.0/0"
+  sources           = [{ cidr = "0.0.0.0/0" }]
   source_ports      = "1-65535"
-  destination       = crusoe_compute_instance.my_vm.network_interfaces[0].private_ipv4.address
+  destinations      = [{ resource_id = crusoe_compute_instance.my_vm.id }]
   destination_ports = "3000"
 }
