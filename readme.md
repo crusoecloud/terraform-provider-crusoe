@@ -108,7 +108,7 @@ Add the following to your `~/.terraformrc`
 provider_installation {
 
   dev_overrides {
-    "registry.terraform.io/crusoecloud/crusoe" = "$GOPATH/bin/"
+    "registry.terraform.io/providers/crusoecloud/crusoe" = "$GOPATH/bin/"
   }
 
   # For all other providers, install them directly from their origin provider
