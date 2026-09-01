@@ -101,7 +101,7 @@ Required:
 
 Optional:
 
-- `ib_partition_id` (String, Deprecated) Infiniband Partition ID. ib_partition_id is deprecated, use transport_partition_id instead
+- `ib_partition_id` (String, Deprecated) Infiniband Partition ID. This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
 - `transport_partition_id` (String) ID of the transport partition the host channel adapter is attached to.
 
 

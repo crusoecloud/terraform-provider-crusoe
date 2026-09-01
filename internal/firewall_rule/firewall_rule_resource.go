@@ -120,7 +120,7 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"source": schema.StringAttribute{
 				Optional:            true,
-				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.2.0", "sources"),
+				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.3.0", "sources"),
 				MarkdownDescription: providerDescSource,
 				Validators: []validator.String{
 					// Exactly one of the deprecated field or its replacement must be set.
@@ -144,7 +144,7 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"destination": schema.StringAttribute{
 				Optional:            true,
-				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.2.0", "destinations"),
+				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.3.0", "destinations"),
 				MarkdownDescription: providerDescDestination,
 				Validators: []validator.String{
 					// Exactly one of the deprecated field or its replacement must be set.

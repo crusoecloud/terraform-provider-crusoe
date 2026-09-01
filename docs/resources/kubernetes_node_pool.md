@@ -57,7 +57,7 @@ resource "crusoe_kubernetes_node_pool" "example" {
 - `batch_percentage` (Number) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. Percentage of nodes to update concurrently during rollout. The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. If both this and batch_size are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
 - `batch_size` (Number) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. Number of nodes to update at a time during rollout (minimum 1, maximum 10). Mutually exclusive with batch_percentage. If both this and batch_percentage are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
 - `ephemeral_storage_for_containerd` (Boolean) Whether the first local ephemeral NVMe disk is used for containerd storage.
-- `ib_partition_id` (String, Deprecated) ib_partition_id is deprecated, use transport_partition_id instead
+- `ib_partition_id` (String, Deprecated) This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
 - `node_taints` (Block Set) Taints applied to nodes in the node pool. (see [below for nested schema](#nestedblock--node_taints))
 - `nvlink_domain_id` (String) NVLink domain ID assigned to the node pool.
 - `project_id` (String) ID of the project that owns the node pool. If not specified, the project ID will be inferred from the Crusoe configuration.

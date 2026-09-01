@@ -57,7 +57,7 @@ resource "crusoe_instance_template" "example" {
 ### Optional
 
 - `disks` (Attributes Set) Disks attached to all VMs created from this instance template. (see [below for nested schema](#nestedatt--disks))
-- `ib_partition` (String, Deprecated) ib_partition is deprecated, use transport_partition_id instead
+- `ib_partition` (String, Deprecated) This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
 - `image` (String) OS Image to use for all VMs created from this instance template.
 - `location` (String) Location to use for all VMs created from this instance template. May be empty if we do not want to bind this template to a location.
 - `nvlink_domain_id` (String) NVLink domain assigned to all VMs created from this instance template.

@@ -218,9 +218,9 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
 							Optional:           true,
-							Description:        "Infiniband Partition ID - ib_partition_id is deprecated, use transport_partition_id instead",
+							Description:        providerDescIBPartitionID + " " + providerDescIBPartitionIDDeprecated,
 							PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-							DeprecationMessage: "ib_partition_id is deprecated, use transport_partition_id instead",
+							DeprecationMessage: providerDescIBPartitionIDDeprecated,
 						},
 						"transport_partition_id": schema.StringAttribute{
 							Optional:      true,

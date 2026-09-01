@@ -168,13 +168,13 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 						},
 						"ib_network_id": schema.StringAttribute{
 							Computed:           true,
-							DeprecationMessage: "ib_network_id is deprecated, use transport_network_id instead",
-							Description:        "ib_network_id is deprecated, use transport_network_id instead",
+							DeprecationMessage: providerDescIBNetworkIDDeprecated,
+							Description:        providerDescIBNetworkIDDeprecated,
 						},
 						"ib_partition_id": schema.StringAttribute{
 							Computed:           true,
-							DeprecationMessage: "ib_partition_id is deprecated, use transport_partition_id instead",
-							Description:        "ib_partition_id is deprecated, use transport_partition_id instead",
+							DeprecationMessage: providerDescIBPartitionIDDeprecated,
+							Description:        providerDescIBPartitionIDDeprecated,
 						},
 						"transport_network_id": schema.StringAttribute{
 							Computed: true,
