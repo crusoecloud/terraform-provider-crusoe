@@ -95,10 +95,12 @@ func (ds *disksDataSource) Schema(ctx context.Context, request datasource.Schema
 							Computed:            true,
 							MarkdownDescription: apiDescSerialNumber,
 						},
+						// Description rather than DeprecationMessage; see the note on
+						// FormatDeprecation. The disk resource keeps its DeprecationMessage,
+						// because there block_size is an attribute the practitioner writes.
 						"block_size": schema.Int64Attribute{
 							Computed:            true,
-							MarkdownDescription: apiDescBlockSize,
-							DeprecationMessage:  blockSizeDeprecationMessage,
+							MarkdownDescription: apiDescBlockSize + " " + blockSizeDeprecationMessage,
 						},
 						"dns_name": schema.StringAttribute{
 							Computed:            true,

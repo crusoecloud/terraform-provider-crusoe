@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -51,10 +53,11 @@ func Test_nodePoolToResourceModel(t *testing.T) {
 		NvlinkDomainId: "", // absent → must normalize to null
 	}
 	ref := &kubernetesNodePoolResourceModel{
-		IBPartitionID:   types.StringValue("ibp-1"),
-		SSHKey:          types.StringValue("ssh-key"),
-		BatchSize:       types.Int64Value(2),
-		BatchPercentage: types.Int64Null(),
+		IBPartitionID:        types.StringValue("ibp-1"),
+		TransportPartitionID: types.StringValue("tp-1"),
+		SSHKey:               types.StringValue("ssh-key"),
+		BatchSize:            types.Int64Value(2),
+		BatchPercentage:      types.Int64Null(),
 	}
 
 	var diags diag.Diagnostics
@@ -77,8 +80,91 @@ func Test_nodePoolToResourceModel(t *testing.T) {
 	if want := []string{"i-a", "i-b", "i-c"}; !reflect.DeepEqual(ids, want) {
 		t.Errorf("instance_ids = %v, want %v (sorted)", ids, want)
 	}
+	// Both halves of the partition alias pair are Terraform-only: the API does not return
+	// them, so each must survive from the reference model unchanged.
 	if got := model.IBPartitionID.ValueString(); got != "ibp-1" {
 		t.Errorf("ib_partition_id = %q, want it preserved from ref", got)
+	}
+	if got := model.TransportPartitionID.ValueString(); got != "tp-1" {
+		t.Errorf("transport_partition_id = %q, want it preserved from ref", got)
+	}
+}
+
+// Test_nodePoolToResourceModel_aliasPairFromRef checks each combination of the partition
+// alias pair through the reference model. The transform must not invent a value for the
+// half the configuration leaves unset, in either direction.
+func Test_nodePoolToResourceModel_aliasPairFromRef(t *testing.T) {
+	tests := []struct {
+		name                  string
+		refIB, refTransport   types.String
+		wantIB, wantTransport types.String
+	}{
+		{
+			name:  "configuration uses the deprecated name",
+			refIB: types.StringValue("ibp-1"), refTransport: types.StringNull(),
+			wantIB: types.StringValue("ibp-1"), wantTransport: types.StringNull(),
+		},
+		{
+			name:  "configuration uses the replacement name",
+			refIB: types.StringNull(), refTransport: types.StringValue("tp-1"),
+			wantIB: types.StringNull(), wantTransport: types.StringValue("tp-1"),
+		},
+		{
+			name:  "configuration sets neither",
+			refIB: types.StringNull(), refTransport: types.StringNull(),
+			wantIB: types.StringNull(), wantTransport: types.StringNull(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ref := &kubernetesNodePoolResourceModel{
+				IBPartitionID:        tt.refIB,
+				TransportPartitionID: tt.refTransport,
+			}
+
+			var diags diag.Diagnostics
+			var model kubernetesNodePoolResourceModel
+			nodePoolToResourceModel(context.Background(),
+				&swagger.KubernetesNodePool{Id: "np-1"}, ref, &model, &diags)
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+
+			if !model.IBPartitionID.Equal(tt.wantIB) {
+				t.Errorf("ib_partition_id = %v, want %v", model.IBPartitionID, tt.wantIB)
+			}
+			if !model.TransportPartitionID.Equal(tt.wantTransport) {
+				t.Errorf("transport_partition_id = %v, want %v", model.TransportPartitionID, tt.wantTransport)
+			}
+		})
+	}
+}
+
+// Test_nodePoolSchemaAliasPair checks the two schema-level facts the docs and the plan
+// behavior depend on: transport_partition_id carries a description (an undescribed
+// attribute renders bare in the generated docs), and neither half still carries the
+// UseStateForUnknown modifier, which never applied to an Optional-only attribute.
+func Test_nodePoolSchemaAliasPair(t *testing.T) {
+	schemaResp := &resource.SchemaResponse{}
+	NewKubernetesNodePoolResource().Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+	if schemaResp.Diagnostics.HasError() {
+		t.Fatalf("failed to build schema: %v", schemaResp.Diagnostics)
+	}
+
+	for _, name := range []string{attrIBPartitionID, attrTransportPartitionID} {
+		attr, ok := schemaResp.Schema.Attributes[name].(schema.StringAttribute)
+		if !ok {
+			t.Fatalf("%s is not a StringAttribute", name)
+		}
+
+		if attr.Description == "" {
+			t.Errorf("%s has no description, which renders bare in the generated docs", name)
+		}
+		if len(attr.PlanModifiers) != 1 {
+			t.Errorf("%s has %d plan modifiers, want exactly the alias pair modifier",
+				name, len(attr.PlanModifiers))
+		}
 	}
 }
 

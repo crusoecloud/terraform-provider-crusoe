@@ -498,6 +498,22 @@ func StringMapToTFMap(m map[string]string) (types.Map, diag.Diagnostics) {
 	return types.MapValue(types.StringType, tfMap)
 }
 
+// FormatDeprecation builds the deprecation notice for a field.
+//
+// Put this text in an attribute's DeprecationMessage only when the practitioner can act on
+// it, which means an attribute they write: Required, Optional, or Optional+Computed. For a
+// Computed-only attribute, pass it as the Description instead. Two reasons:
+//
+//  1. Terraform propagates an attribute deprecation to every reference to a containing
+//     object, so a warning fires for someone who passes a whole data source item or
+//     resource to an output and never touches the deprecated attribute. There is no way to
+//     silence it short of projecting individual fields.
+//  2. The text asks the reader to remove the field from their configuration, which a
+//     read-only attribute was never in.
+//
+// A whole resource or data source is a different case, and its schema-level
+// DeprecationMessage is correct: choosing to use it is the actionable thing. See
+// FormatResourceDeprecationWithReplacement.
 func FormatDeprecation(deprecatedInVersion string) string {
 	return fmt.Sprintf("This field is deprecated as of provider version %s "+
 		"and will be removed in the next major version. "+

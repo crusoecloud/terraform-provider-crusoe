@@ -263,18 +263,57 @@ func vmNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.Net
 
 // vmHostChannelAdaptersToTerraformResourceModel creates a slice of Terraform-compatible host channel adapters
 // instances from Crusoe API host channel adapters interfaces.
-func vmHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter) (hcaList types.List) {
+//
+// ib_partition_id and transport_partition_id name the same partition. ref supplies the
+// values the configuration owns, the plan in Create and the prior state in Read, so that
+// whichever name the configuration uses survives whether or not the API echoes it back.
+// The replacement name always ends up populated, which makes a rename from the deprecated
+// name a no-op rather than a diff that Update never applies.
+func vmHostChannelAdaptersToTerraformResourceModel(hostChannelAdapters []swagger.HostChannelAdapter,
+	ref types.List,
+) (hcaList types.List) {
 	hcas := make([]vmHostChannelAdapterResourceModel, 0, 1)
 	if len(hostChannelAdapters) >= 1 {
+		refHCA := firstHostChannelAdapterRef(ref)
+
+		// The deprecated name is plan-owned: keep the referenced value when the API stops
+		// echoing it, so a configuration still on ib_partition_id does not see a diff it
+		// cannot resolve.
+		ibPartitionID := hostChannelAdapters[0].IbPartitionId
+		if ibPartitionID == "" {
+			ibPartitionID = refHCA.IBPartitionID
+		}
+
+		transportPartitionID := common.EffectiveAliasString(
+			hostChannelAdapters[0].IbPartitionId, hostChannelAdapters[0].TransportPartitionId)
+		if transportPartitionID == "" {
+			transportPartitionID = common.EffectiveAliasString(refHCA.IBPartitionID, refHCA.TransportPartitionID)
+		}
+
 		hcas = append(hcas, vmHostChannelAdapterResourceModel{
-			IBPartitionID:        hostChannelAdapters[0].IbPartitionId,
-			TransportPartitionID: hostChannelAdapters[0].TransportPartitionId,
+			IBPartitionID:        ibPartitionID,
+			TransportPartitionID: transportPartitionID,
 		})
 	}
 
 	values, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hcas)
 
 	return values
+}
+
+// firstHostChannelAdapterRef reads the first host channel adapter out of a plan or prior
+// state list. A missing or unreadable list yields a zero value, which reads as unset.
+func firstHostChannelAdapterRef(ref types.List) vmHostChannelAdapterResourceModel {
+	if ref.IsNull() || ref.IsUnknown() || len(ref.Elements()) == 0 {
+		return vmHostChannelAdapterResourceModel{}
+	}
+
+	refHCAs := make([]vmHostChannelAdapterResourceModel, 0, len(ref.Elements()))
+	if diags := ref.ElementsAs(context.Background(), &refHCAs, true); diags.HasError() || len(refHCAs) == 0 {
+		return vmHostChannelAdapterResourceModel{}
+	}
+
+	return refHCAs[0]
 }
 
 // vmHostChannelAdaptersToTerraformDataModel creates a slice of Terraform-compatible host channel adapters
@@ -364,7 +403,10 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1, state *vmResourceM
 	}
 
 	if len(instance.HostChannelAdapters) > 0 {
-		state.HostChannelAdapters = vmHostChannelAdaptersToTerraformResourceModel(instance.HostChannelAdapters)
+		// state still holds the plan (Create) or the prior state (Read) here, which is what
+		// owns the partition alias pair. Read it before overwriting it.
+		state.HostChannelAdapters = vmHostChannelAdaptersToTerraformResourceModel(
+			instance.HostChannelAdapters, state.HostChannelAdapters)
 	} else {
 		state.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
 	}

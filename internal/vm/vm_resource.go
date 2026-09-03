@@ -224,10 +224,13 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				// fails schema validation in terraform-plugin-framework >= v1.15.
 				Default: setdefault.StaticValue(types.SetValueMust(vmDiskAttachmentSchema, nil)),
 			},
+			// The replacement notice is a description rather than a DeprecationMessage: see
+			// the note on FormatDeprecation. fqdn is read-only, so warning every
+			// configuration that references the instance gives them nothing to act on.
 			"fqdn": schema.StringAttribute{
-				Computed:           true,
-				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				DeprecationMessage: FQDNDeprecationMessage,
+				Computed:      true,
+				Description:   FQDNDeprecationMessage,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"internal_dns_name": schema.StringAttribute{
 				Computed:      true,

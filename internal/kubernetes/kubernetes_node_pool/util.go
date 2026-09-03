@@ -11,7 +11,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -26,7 +29,8 @@ var (
 
 // apiDesc* — schema descriptions derived from the client-go swagger spec
 // (KubernetesNodePool / KubernetesNodeTaint definitions; version,
-// requested_node_labels, and ssh_key from KubernetesNodePoolPostRequest).
+// requested_node_labels, ssh_key, and transport_partition_id from
+// KubernetesNodePoolPostRequest).
 const (
 	apiDescID                            = "ID of the node pool."
 	apiDescVersion                       = "Version of the Kubernetes node pool."
@@ -45,6 +49,7 @@ const (
 	apiDescNvlinkDomainID                = "NVLink domain ID assigned to the node pool."
 	apiDescPublicIPType                  = "Public IP type for the node pool's nodes. Possible values: `dynamic`, `static`, `none`."
 	apiDescNodeTaints                    = "Taints applied to nodes in the node pool."
+	apiDescTransportPartitionID          = "ID of the Infiniband or RoCE partition to create node pool in. Must be in the location of the cluster if specified."
 
 	apiDescTaintKey    = "Taint key. Follows the Kubernetes qualified-name format: an optional DNS subdomain prefix (up to 253 characters) followed by a `/`, then a name segment (up to 63 characters). Allowed characters: alphanumerics, `-`, `_`, and `.`. Must start and end with an alphanumeric character. Keys beginning with `crusoe.ai/` are reserved for internal use."
 	apiDescTaintValue  = "Taint value. May be empty. Follows the same format rules as a Kubernetes label value: up to 63 characters, alphanumerics and `-`, `_`, `.`."
@@ -71,6 +76,47 @@ const (
 // transport_partition_id. The spec does not describe ib_partition_id, so this
 // text is provider-side only.
 var providerDescIBPartitionIDDeprecated = common.FormatDeprecationWithReplacement("v1.3.0", "transport_partition_id")
+
+// The two names of the partition alias pair. Both the schema and ValidateConfig refer to
+// these, so the pair is described in one place.
+const (
+	attrIBPartitionID        = "ib_partition_id"
+	attrTransportPartitionID = "transport_partition_id"
+)
+
+const aliasPairReplaceDescription = "Recreates the node pool when the partition changes. " +
+	"Renaming ib_partition_id to transport_partition_id is not a change."
+
+// aliasPairReplaceIfModifier builds the plan modifier both halves of the partition alias
+// pair share.
+func aliasPairReplaceIfModifier() planmodifier.String {
+	return stringplanmodifier.RequiresReplaceIf(
+		common.AliasPairRequiresReplaceIf(attrIBPartitionID, attrTransportPartitionID),
+		aliasPairReplaceDescription,
+		aliasPairReplaceDescription,
+	)
+}
+
+// validateAliasPairConfig rejects a configuration that gives the two names of the
+// partition alias pair different values, which does not say which partition to use.
+//
+// Setting both to the same value stays legal, so a configuration written during the
+// migration keeps working. Only a conflict is an error.
+func validateAliasPairConfig(deprecated, replacement types.String, diags *diag.Diagnostics) {
+	if !common.AliasPairConflicts(deprecated, replacement) {
+		return
+	}
+
+	diags.AddAttributeError(
+		path.Root(attrTransportPartitionID),
+		"Conflicting partition configuration",
+		fmt.Sprintf("%s is %q and %s is %q. The two attributes name the same partition, so they "+
+			"cannot be set to different values. Remove %s and keep %s.",
+			attrIBPartitionID, deprecated.ValueString(),
+			attrTransportPartitionID, replacement.ValueString(),
+			attrIBPartitionID, attrTransportPartitionID),
+	)
+}
 
 func ParseOpResultStrict[T any](opResult interface{}) (*T, error) {
 	b, err := json.Marshal(opResult)

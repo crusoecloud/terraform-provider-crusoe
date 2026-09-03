@@ -153,16 +153,19 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Description:   apiDescSubnet,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
+			// ib_partition and transport_partition_id name the same partition, so renaming
+			// one to the other is not a change to the template and must not recreate it.
+			// A change to the partition itself still forces replacement.
 			"ib_partition": schema.StringAttribute{
 				Optional:           true,
-				PlanModifiers:      []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers:      []planmodifier.String{aliasPairReplaceIfModifier()},
 				DeprecationMessage: providerDescIBPartitionDeprecated,
 				Description:        providerDescIBPartitionDeprecated,
 			},
 			"transport_partition_id": schema.StringAttribute{
 				Optional:      true,
 				Description:   apiDescTransportPartitionID,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers: []planmodifier.String{aliasPairReplaceIfModifier()},
 			},
 			"public_ip_address_type": schema.StringAttribute{
 				Optional:      true,
@@ -200,11 +203,23 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				Description:   apiDescSharedVolumeAttachments,
 				PlanModifiers: []planmodifier.Set{setplanmodifier.RequiresReplace()}, // cannot be updated in place
 			},
+			// reservation_id and nvlink_domain_id are set only by the user: the backend
+			// never supplies or normalizes either one, so both are null in state whenever
+			// the configuration omits them. UseStateForUnknown does nothing with a null
+			// prior value, which would leave the planned value unknown and make
+			// RequiresReplace recreate the template on every plan.
 			"reservation_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
-				Description:   providerDescReservationID,
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					// Order matters. Modifiers run in slice order, the planned value is
+					// threaded from one to the next, and RequiresReplace cannot be unset
+					// once it fires. Resolving the unknown has to come first, or
+					// RequiresReplace compares an unknown against the prior value.
+					common.UseStateForUnknownIncludingNull(),
+					stringplanmodifier.RequiresReplace(), // cannot be updated in place
+				},
+				Description: providerDescReservationID,
 			},
 			"placement_policy": schema.StringAttribute{
 				Optional:      true,
@@ -215,13 +230,30 @@ func (r *instanceTemplateResource) Schema(ctx context.Context, req resource.Sche
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
 			},
 			"nvlink_domain_id": schema.StringAttribute{
-				Optional:      true,
-				Computed:      true,
-				Description:   apiDescNvlinkDomainID,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()}, // cannot be updated in place
+				Optional:    true,
+				Computed:    true,
+				Description: apiDescNvlinkDomainID,
+				PlanModifiers: []planmodifier.String{
+					// Resolving the unknown must precede RequiresReplace; see reservation_id.
+					common.UseStateForUnknownIncludingNull(),
+					stringplanmodifier.RequiresReplace(), // cannot be updated in place
+				},
 			},
 		},
 	}
+}
+
+// ValidateConfig runs at plan time and surfaces config-only violations before any API call.
+//
+//nolint:gocritic // Implements Terraform defined interface
+func (r *instanceTemplateResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config instanceTemplateResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validateAliasPairConfig(config.IBPartition, config.TransportPartitionID, &resp.Diagnostics)
 }
 
 func (r *instanceTemplateResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -354,14 +386,48 @@ func (r *instanceTemplateResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
+	hydrateAliasPairForImport(&state, &instanceTemplate)
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
 
+// Update handles the only change an instance template permits in place: swapping the
+// deprecated ib_partition attribute for its replacement transport_partition_id. Both names
+// address the same partition, so the backend object does not change and this method makes
+// no API call. It records the planned attribute names in state.
+//
+// Any other change is rejected, as it always was. aliasOnlyChange verifies that rather than
+// trusting the schema's replace-forcing plan modifiers, so an attribute that does not force
+// replacement degrades to the error below instead of silently corrupting state.
+//
 //nolint:gocritic // Implements Terraform defined interface
 func (r *instanceTemplateResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("Failed to update instance template",
-		"Instance templates are immutable and cannot be updated. Please delete and recreate the resource instead.")
+	aliasOnly, err := aliasOnlyChange(ctx, &req.Plan, &req.State, &resp.Diagnostics)
+	if err != nil {
+		return
+	}
+
+	if !aliasOnly {
+		resp.Diagnostics.AddError("Failed to update instance template",
+			"Instance templates are immutable and cannot be updated. Please delete and recreate the resource instead.")
+
+		return
+	}
+
+	var plan instanceTemplateResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// The plan is written verbatim. It holds no unknown values, because id and every
+	// Optional+Computed attribute carry UseStateForUnknown. The write has to be explicit:
+	// the framework prepopulates resp.State with the prior state, so returning without
+	// setting it would drop the rename.
+	diags = resp.State.Set(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface

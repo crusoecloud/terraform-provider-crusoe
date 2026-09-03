@@ -246,3 +246,126 @@ func Test_resizeRequiresReplace(t *testing.T) {
 		})
 	}
 }
+
+// hcaRefList builds a host channel adapter list to stand in for the plan (Create) or the
+// prior state (Read). An empty string means the attribute is unset.
+func hcaRefList(t *testing.T, ibPartitionID, transportPartitionID string) types.List {
+	t.Helper()
+
+	list, diags := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema,
+		[]vmHostChannelAdapterResourceModel{{
+			IBPartitionID:        ibPartitionID,
+			TransportPartitionID: transportPartitionID,
+		}})
+	if diags.HasError() {
+		t.Fatalf("building reference list: %v", diags)
+	}
+
+	return list
+}
+
+// readHCA reads the single host channel adapter out of a mapped list.
+func readHCA(t *testing.T, list types.List) vmHostChannelAdapterResourceModel {
+	t.Helper()
+
+	var hcas []vmHostChannelAdapterResourceModel
+	if diags := list.ElementsAs(context.Background(), &hcas, true); diags.HasError() {
+		t.Fatalf("reading host channel adapters: %v", diags)
+	}
+	if len(hcas) != 1 {
+		t.Fatalf("got %d host channel adapters, want 1", len(hcas))
+	}
+
+	return hcas[0]
+}
+
+// Test_vmHostChannelAdaptersToTerraformResourceModel covers the partition alias pair on a
+// host channel adapter. ib_partition_id and transport_partition_id name the same
+// partition, so whichever name the configuration uses has to survive, and the replacement
+// name always ends up populated.
+//
+// Preserving the deprecated half matters because vmToTerraformResourceModel runs only in
+// Create and Read: Update never rewrites host channel adapter state. A diff on that half
+// would have no way to resolve itself.
+func Test_vmHostChannelAdaptersToTerraformResourceModel(t *testing.T) {
+	tests := []struct {
+		name          string
+		apiIB         string
+		apiTransport  string
+		ref           types.List
+		wantIB        string
+		wantTransport string
+	}{
+		{
+			name:  "API reports only the deprecated name",
+			apiIB: "p1", apiTransport: "",
+			ref: hcaRefList(t, "p1", ""),
+			// The replacement name is filled in from the deprecated one, so a rename in
+			// the configuration is a no-op rather than a diff.
+			wantIB: "p1", wantTransport: "p1",
+		},
+		{
+			name:  "API reports only the replacement name, configuration uses the deprecated one",
+			apiIB: "", apiTransport: "p1",
+			ref: hcaRefList(t, "p1", ""),
+			// The deprecated half comes from the reference, so a configuration still on
+			// ib_partition_id does not see a diff it cannot resolve.
+			wantIB: "p1", wantTransport: "p1",
+		},
+		{
+			name:  "API reports both names",
+			apiIB: "p1", apiTransport: "p1",
+			ref:    hcaRefList(t, "", "p1"),
+			wantIB: "p1", wantTransport: "p1",
+		},
+		{
+			name:  "API reports neither name, reference supplies the partition",
+			apiIB: "", apiTransport: "",
+			ref:    hcaRefList(t, "", "p1"),
+			wantIB: "", wantTransport: "p1",
+		},
+		{
+			name:  "API reports neither name and there is no reference",
+			apiIB: "", apiTransport: "",
+			ref:    types.ListNull(vmHostChannelAdapterSchema),
+			wantIB: "", wantTransport: "",
+		},
+		{
+			name:  "unknown reference on create",
+			apiIB: "p1", apiTransport: "",
+			ref:    types.ListUnknown(vmHostChannelAdapterSchema),
+			wantIB: "p1", wantTransport: "p1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			api := []swagger.HostChannelAdapter{{
+				IbPartitionId:        tt.apiIB,
+				TransportPartitionId: tt.apiTransport,
+			}}
+
+			got := readHCA(t, vmHostChannelAdaptersToTerraformResourceModel(api, tt.ref))
+
+			if got.IBPartitionID != tt.wantIB {
+				t.Errorf("ib_partition_id = %q, want %q", got.IBPartitionID, tt.wantIB)
+			}
+			if got.TransportPartitionID != tt.wantTransport {
+				t.Errorf("transport_partition_id = %q, want %q", got.TransportPartitionID, tt.wantTransport)
+			}
+		})
+	}
+}
+
+// Test_vmHostChannelAdaptersToTerraformResourceModel_empty checks that a VM with no host
+// channel adapters maps to an empty list rather than a list holding a blank adapter.
+func Test_vmHostChannelAdaptersToTerraformResourceModel_empty(t *testing.T) {
+	got := vmHostChannelAdaptersToTerraformResourceModel(nil, types.ListNull(vmHostChannelAdapterSchema))
+
+	if got.IsNull() || got.IsUnknown() {
+		t.Fatalf("got %v, want a known empty list", got)
+	}
+	if n := len(got.Elements()); n != 0 {
+		t.Errorf("got %d host channel adapters, want 0", n)
+	}
+}

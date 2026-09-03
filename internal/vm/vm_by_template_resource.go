@@ -139,10 +139,11 @@ func (r *vmByTemplateResource) Schema(ctx context.Context, req resource.SchemaRe
 					},
 				},
 			},
+			// Description rather than DeprecationMessage; see the note on FormatDeprecation.
 			"fqdn": schema.StringAttribute{
-				Computed:           true,
-				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-				DeprecationMessage: FQDNDeprecationMessage,
+				Computed:      true,
+				Description:   FQDNDeprecationMessage,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 			},
 			"internal_dns_name": schema.StringAttribute{
 				Computed:      true,
@@ -378,8 +379,10 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	hostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(instance.HostChannelAdapters))
 	for _, hca := range instance.HostChannelAdapters {
 		hostChannelAdapters = append(hostChannelAdapters, vmHostChannelAdapterResourceModel{
-			IBPartitionID:        hca.IbPartitionId,
-			TransportPartitionID: hca.TransportPartitionId,
+			IBPartitionID: hca.IbPartitionId,
+			// ib_partition_id and transport_partition_id name the same partition, so the
+			// replacement name is populated even when the API reports only the deprecated one.
+			TransportPartitionID: common.EffectiveAliasString(hca.IbPartitionId, hca.TransportPartitionId),
 		})
 	}
 	hostChannelAdaptersList, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hostChannelAdapters)

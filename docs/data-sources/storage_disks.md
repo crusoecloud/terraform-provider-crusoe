@@ -32,7 +32,7 @@ data "crusoe_storage_disks" "example" {}
 
 Read-Only:
 
-- `block_size` (Number, Deprecated) Block size of the disk, in bytes. Possible values: `512`, `4096`.
+- `block_size` (Number) Block size of the disk, in bytes. Possible values: `512`, `4096`. This field is deprecated as of provider version v0.6.0 and will be removed in the next major version. Please remove this field from your configuration. All persistent disks now use a 512-byte block size; any value set here is ignored.
 - `dns_name` (String) DNS name used to mount the disk. Populated only for `shared-volume` disks. Empty for other disk types.
 - `id` (String) ID of the disk.
 - `location` (String) Location where the disk is provisioned.

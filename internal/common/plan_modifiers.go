@@ -12,6 +12,58 @@ const (
 	defaultDevWarningSummary = "Feature In Development"
 )
 
+// UseStateForUnknownIncludingNullModifier keeps the prior state value for a Computed
+// attribute, including when that value is null.
+//
+// The framework's UseStateForUnknown gives up when the prior state is null, which leaves
+// the planned value unknown. On an attribute that pairs Computed with RequiresReplace, an
+// unknown planned value never equals the null state value, so the resource is recreated on
+// every plan, forever. Preserving the null keeps the plan empty.
+//
+// Use this for an attribute that only the user sets. Once the resource exists, the prior
+// value is the truth whether or not it holds anything, so there is nothing to wait for.
+// Do not use it where the backend supplies or normalizes the value, because a null state
+// would then be preserved instead of being filled in.
+type UseStateForUnknownIncludingNullModifier struct{}
+
+// UseStateForUnknownIncludingNull returns a plan modifier that preserves the prior state
+// value, null included. It is UseStateForUnknown without the null blind spot.
+func UseStateForUnknownIncludingNull() planmodifier.String {
+	return UseStateForUnknownIncludingNullModifier{}
+}
+
+func (m UseStateForUnknownIncludingNullModifier) Description(_ context.Context) string {
+	return "Once the resource exists, the value of this attribute in state is preserved."
+}
+
+func (m UseStateForUnknownIncludingNullModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+//nolint:gocritic // hugeParam: req signature required by planmodifier.String interface
+func (m UseStateForUnknownIncludingNullModifier) PlanModifyString(_ context.Context,
+	req planmodifier.StringRequest, resp *planmodifier.StringResponse,
+) {
+	// On create there is no prior value to preserve, and the provider still has to fill the
+	// attribute in. This guard replaces the null-state check that UseStateForUnknown relies
+	// on to skip creates.
+	if req.State.Raw.IsNull() {
+		return
+	}
+
+	// A known planned value comes from the configuration; leave it alone.
+	if !req.PlanValue.IsUnknown() {
+		return
+	}
+
+	// An unknown configuration value has to stay unknown, or interpolation breaks.
+	if req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	resp.PlanValue = req.StateValue
+}
+
 // ImmutableStringModifier prevents changes to a string attribute with a clear error message.
 // This is preferable to RequiresReplace() when you want to block changes entirely
 // rather than silently destroying and recreating the resource.

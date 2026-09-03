@@ -82,7 +82,7 @@ resource "crusoe_compute_instance" "example" {
 ### Read-Only
 
 - `external_dns_name` (String) External DNS name of the network interface.
-- `fqdn` (String, Deprecated)
+- `fqdn` (String) This field is deprecated as of provider version v0.5.29 and will be removed in the next major version. Please remove this field from your configuration. Use internal_dns_name instead.
 - `id` (String) ID of the VM.
 - `internal_dns_name` (String)
 

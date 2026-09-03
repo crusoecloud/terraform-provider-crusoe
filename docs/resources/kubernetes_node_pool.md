@@ -64,7 +64,7 @@ resource "crusoe_kubernetes_node_pool" "example" {
 - `public_ip_type` (String) Public IP type for the node pool's nodes. Possible values: `dynamic`, `static`, `none`.
 - `requested_node_labels` (Map of String) Labels to assign to nodes in the new node pool.
 - `subnet_id` (String) ID of the subnet the node pool belongs to.
-- `transport_partition_id` (String)
+- `transport_partition_id` (String) ID of the Infiniband or RoCE partition to create node pool in. Must be in the location of the cluster if specified.
 - `version` (String) Version of the Kubernetes node pool.
 
 ### Read-Only

@@ -166,15 +166,18 @@ func (ds *vmDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, re
 						"guid": schema.StringAttribute{
 							Computed: true,
 						},
+						// These carry the replacement notice as a description rather than a
+						// DeprecationMessage. See the note on FormatDeprecation: Terraform
+						// propagates an attribute deprecation to every reference to a
+						// containing object, and a read-only attribute gives the reader
+						// nothing to act on.
 						"ib_network_id": schema.StringAttribute{
-							Computed:           true,
-							DeprecationMessage: providerDescIBNetworkIDDeprecated,
-							Description:        providerDescIBNetworkIDDeprecated,
+							Computed:    true,
+							Description: providerDescIBNetworkIDDeprecated,
 						},
 						"ib_partition_id": schema.StringAttribute{
-							Computed:           true,
-							DeprecationMessage: providerDescIBPartitionIDDeprecated,
-							Description:        providerDescIBPartitionIDDeprecated,
+							Computed:    true,
+							Description: providerDescIBPartitionIDDeprecated,
 						},
 						"transport_network_id": schema.StringAttribute{
 							Computed: true,

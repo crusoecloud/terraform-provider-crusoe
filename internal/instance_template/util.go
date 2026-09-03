@@ -2,8 +2,14 @@ package instance_template
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -49,17 +55,42 @@ const (
 // text is provider-side only.
 var providerDescIBPartitionDeprecated = common.FormatDeprecationWithReplacement("v1.3.0", "transport_partition_id")
 
+// The two names of the partition alias pair. Both the schema and Update refer to these,
+// so the pair is described in one place.
+const (
+	attrIBPartition          = "ib_partition"
+	attrTransportPartitionID = "transport_partition_id"
+)
+
+const aliasPairReplaceDescription = "Recreates the instance template when the partition changes. " +
+	"Renaming ib_partition to transport_partition_id is not a change."
+
+// aliasPairReplaceIfModifier builds the plan modifier both halves of the partition alias
+// pair share.
+func aliasPairReplaceIfModifier() planmodifier.String {
+	return stringplanmodifier.RequiresReplaceIf(
+		common.AliasPairRequiresReplaceIf(attrIBPartition, attrTransportPartitionID),
+		aliasPairReplaceDescription,
+		aliasPairReplaceDescription,
+	)
+}
+
 // instanceTemplateToResourceModel maps an API instance template onto model, with
 // the API object as the source of truth. Create and Read both call it so their
 // mappings cannot drift apart.
 //
 // Every API-backed field comes from the response: disks are read from the response
-// rather than rebuilt from the create request, the nullable fields (ib_partition,
-// transport_partition_id, startup_script, shutdown_script, nvlink_domain_id) are
-// null-normalized, and an empty placement_policy falls back to "unspecified".
+// rather than rebuilt from the create request, the nullable fields (startup_script,
+// shutdown_script, nvlink_domain_id) are null-normalized, and an empty
+// placement_policy falls back to "unspecified".
 //
-// The deprecated, plan-owned reservation_id is left untouched: Create handles its
-// own deprecation logic and Read preserves the prior-state value.
+// Two groups of attributes are plan-owned and left untouched here. The deprecated
+// reservation_id is handled by Create, and Read preserves the prior-state value. The
+// ib_partition and transport_partition_id alias pair names one partition under two
+// names, so the half the configuration uses has to survive: both are Optional and not
+// Computed, which makes their planned value a known null, and writing an API value over
+// that null on create fails Terraform's post-apply consistency check. Read calls
+// hydrateAliasPairForImport to cover the one case with no planned value.
 func instanceTemplateToResourceModel(ctx context.Context, template *swagger.InstanceTemplate,
 	model *instanceTemplateResourceModel, diags *diag.Diagnostics,
 ) {
@@ -73,8 +104,6 @@ func instanceTemplateToResourceModel(ctx context.Context, template *swagger.Inst
 	model.Subnet = types.StringValue(template.SubnetId)
 	model.PublicIpAddressType = types.StringValue(template.PublicIpAddressType)
 
-	model.IBPartition = stringOrNull(template.IbPartitionId)
-	model.TransportPartitionID = stringOrNull(template.TransportPartitionId)
 	model.StartupScript = stringOrNull(template.StartupScript)
 	model.ShutdownScript = stringOrNull(template.ShutdownScript)
 	model.NvlinkDomainID = stringOrNull(template.NvlinkDomainId)
@@ -87,6 +116,72 @@ func instanceTemplateToResourceModel(ctx context.Context, template *swagger.Inst
 
 	model.DisksToCreate = disksToSet(ctx, template.Disks, model.DisksToCreate, diags)
 	model.SharedVolumes = stringsToSet(ctx, template.SharedVolumeAttachments, model.SharedVolumes, diags)
+}
+
+// validateAliasPairConfig rejects a configuration that gives the two names of the
+// partition alias pair different values, which does not say which partition to use.
+//
+// Setting both to the same value stays legal, so a configuration written during the
+// migration keeps working. Only a conflict is an error.
+func validateAliasPairConfig(deprecated, replacement types.String, diags *diag.Diagnostics) {
+	if !common.AliasPairConflicts(deprecated, replacement) {
+		return
+	}
+
+	diags.AddAttributeError(
+		path.Root(attrTransportPartitionID),
+		"Conflicting partition configuration",
+		fmt.Sprintf("%s is %q and %s is %q. The two attributes name the same partition, so they "+
+			"cannot be set to different values. Remove %s and keep %s.",
+			attrIBPartition, deprecated.ValueString(),
+			attrTransportPartitionID, replacement.ValueString(),
+			attrIBPartition, attrTransportPartitionID),
+	)
+}
+
+// ErrAliasOnlyChange reports that aliasOnlyChange could not compare the plan and state.
+// The diagnostics carry the reason.
+var ErrAliasOnlyChange = errors.New("unable to compare plan and state")
+
+// aliasOnlyChange reports whether plan and state are identical once the partition alias
+// pair is masked out of both. It compares the raw values rather than the resource models,
+// because instanceTemplateResourceModel holds Set fields and is not comparable.
+func aliasOnlyChange(ctx context.Context, plan *tfsdk.Plan, state *tfsdk.State,
+	diags *diag.Diagnostics,
+) (bool, error) {
+	maskedPlan := *plan
+	maskedState := *state
+
+	for _, name := range []string{attrIBPartition, attrTransportPartitionID} {
+		attrPath := path.Root(name)
+		diags.Append(maskedPlan.SetAttribute(ctx, attrPath, (*string)(nil))...)
+		diags.Append(maskedState.SetAttribute(ctx, attrPath, (*string)(nil))...)
+	}
+
+	if diags.HasError() {
+		return false, ErrAliasOnlyChange
+	}
+
+	return maskedPlan.Raw.Equal(maskedState.Raw), nil
+}
+
+// hydrateAliasPairForImport fills transport_partition_id from the API when neither half of
+// the alias pair is in state. That happens only for a freshly imported template, which has
+// no configuration to own the value.
+//
+// Otherwise the pair is left alone. It is plan-owned, so re-reading it from the API would
+// fight the alias plan modifier and leave a permanent diff for a configuration still on
+// ib_partition. Only the replacement name is filled in, so an import never puts a value on
+// the deprecated attribute.
+//
+// This belongs in Read and not in Create: Terraform does not consistency-check a refresh.
+func hydrateAliasPairForImport(model *instanceTemplateResourceModel, template *swagger.InstanceTemplate) {
+	if !model.IBPartition.IsNull() || !model.TransportPartitionID.IsNull() {
+		return
+	}
+
+	model.TransportPartitionID = stringOrNull(
+		common.EffectiveAliasString(template.IbPartitionId, template.TransportPartitionId))
 }
 
 // stringsToSet builds a string Set from the API response, preserving the caller's

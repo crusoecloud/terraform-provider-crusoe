@@ -123,10 +123,14 @@ func (ds *instanceTemplatesDataSource) Schema(ctx context.Context, request datas
 						Computed:    true,
 						Description: apiDescSubnet,
 					},
+					// The replacement notice is a description rather than a
+					// DeprecationMessage. See the note on FormatDeprecation: Terraform
+					// propagates an attribute deprecation to every reference to a
+					// containing object, and a read-only attribute gives the reader
+					// nothing to act on.
 					"ib_partition": schema.StringAttribute{
-						Computed:           true,
-						DeprecationMessage: providerDescIBPartitionDeprecated,
-						Description:        providerDescIBPartitionDeprecated,
+						Computed:    true,
+						Description: providerDescIBPartitionDeprecated,
 					},
 					"transport_partition_id": schema.StringAttribute{
 						Computed:    true,

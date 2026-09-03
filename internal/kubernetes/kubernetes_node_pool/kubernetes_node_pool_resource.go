@@ -93,6 +93,8 @@ func (r *kubernetesNodePoolResource) ValidateConfig(
 		return
 	}
 
+	validateAliasPairConfig(data.IBPartitionID, data.TransportPartitionID, &resp.Diagnostics)
+
 	nodeTaints, err := tfSetToNodeTaints(ctx, data.NodeTaints)
 	if err != nil {
 		// Unresolved/unknown values; let plan/apply re-evaluate.
@@ -146,15 +148,19 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				MarkdownDescription: apiDescSubnetID,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}, // cannot be updated in place by user
 			},
+			// ib_partition_id and transport_partition_id name the same partition, so renaming
+			// one to the other is not a change to the node pool and must not recreate it.
+			// A change to the partition itself still forces replacement.
 			"ib_partition_id": schema.StringAttribute{
 				Optional:           true,
-				PlanModifiers:      []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers:      []planmodifier.String{aliasPairReplaceIfModifier()},
 				DeprecationMessage: providerDescIBPartitionIDDeprecated,
 				Description:        providerDescIBPartitionIDDeprecated,
 			},
 			"transport_partition_id": schema.StringAttribute{
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Description:   apiDescTransportPartitionID,
+				PlanModifiers: []planmodifier.String{aliasPairReplaceIfModifier()},
 			},
 			"requested_node_labels": schema.MapAttribute{
 				ElementType:         types.StringType,

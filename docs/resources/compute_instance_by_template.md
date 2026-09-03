@@ -59,7 +59,7 @@ resource "crusoe_compute_instance_by_template" "example" {
 
 - `disks` (Attributes Set) (see [below for nested schema](#nestedatt--disks))
 - `external_dns_name` (String)
-- `fqdn` (String, Deprecated)
+- `fqdn` (String) This field is deprecated as of provider version v0.5.29 and will be removed in the next major version. Please remove this field from your configuration. Use internal_dns_name instead.
 - `host_channel_adapters` (Attributes List) (see [below for nested schema](#nestedatt--host_channel_adapters))
 - `id` (String) The ID of this resource.
 - `image` (String)

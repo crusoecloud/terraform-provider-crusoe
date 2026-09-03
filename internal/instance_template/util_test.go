@@ -57,8 +57,10 @@ func Test_instanceTemplateToResourceModel(t *testing.T) {
 	if got := model.PlacementPolicy.ValueString(); got != unspecifiedPlacementPolicy {
 		t.Errorf("placement_policy = %q, want %q (empty API value falls back)", got, unspecifiedPlacementPolicy)
 	}
+	// ib_partition and transport_partition_id are deliberately absent from this loop.
+	// They are plan-owned, so the transform does not write them at all; their behavior is
+	// covered by Test_instanceTemplateToResourceModel_leavesAliasPairUntouched.
 	for name, v := range map[string]types.String{
-		"ib_partition":     model.IBPartition,
 		"startup_script":   model.StartupScript,
 		"shutdown_script":  model.ShutdownScript,
 		"nvlink_domain_id": model.NvlinkDomainID,
@@ -77,6 +79,142 @@ func Test_instanceTemplateToResourceModel(t *testing.T) {
 	}
 	if got := disks[0].Type.ValueString(); got != "persistent-ssd" {
 		t.Errorf("disk type = %q, want %q (sourced from API, not the empty request value)", got, "persistent-ssd")
+	}
+}
+
+// Test_instanceTemplateToResourceModel_leavesAliasPairUntouched pins the ownership of the
+// partition alias pair. The transform must not write either half, even when the API
+// reports values for both.
+//
+// This matters on Create. Both attributes are Optional and not Computed, so their planned
+// value is a known null, and writing an API value over that null fails Terraform's
+// post-apply consistency check.
+func Test_instanceTemplateToResourceModel_leavesAliasPairUntouched(t *testing.T) {
+	api := sampleAPITemplate()
+	api.IbPartitionId = "p1"
+	api.TransportPartitionId = "p1"
+
+	tests := []struct {
+		name            string
+		ibPartition     types.String
+		transportID     types.String
+		wantIBPartition types.String
+		wantTransportID types.String
+	}{
+		{
+			// A configuration still on the deprecated name keeps it, and does not gain the
+			// replacement name behind the user's back.
+			name:            "configuration uses the deprecated name",
+			ibPartition:     types.StringValue("p1"),
+			transportID:     types.StringNull(),
+			wantIBPartition: types.StringValue("p1"),
+			wantTransportID: types.StringNull(),
+		},
+		{
+			// A configuration on the replacement name keeps a null deprecated half, even
+			// though the API echoes ib_partition_id.
+			name:            "configuration uses the replacement name",
+			ibPartition:     types.StringNull(),
+			transportID:     types.StringValue("p1"),
+			wantIBPartition: types.StringNull(),
+			wantTransportID: types.StringValue("p1"),
+		},
+		{
+			name:            "configuration sets neither",
+			ibPartition:     types.StringNull(),
+			transportID:     types.StringNull(),
+			wantIBPartition: types.StringNull(),
+			wantTransportID: types.StringNull(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var diags diag.Diagnostics
+			model := &instanceTemplateResourceModel{
+				IBPartition:          tt.ibPartition,
+				TransportPartitionID: tt.transportID,
+			}
+
+			instanceTemplateToResourceModel(context.Background(), api, model, &diags)
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+
+			if !model.IBPartition.Equal(tt.wantIBPartition) {
+				t.Errorf("ib_partition = %v, want %v", model.IBPartition, tt.wantIBPartition)
+			}
+			if !model.TransportPartitionID.Equal(tt.wantTransportID) {
+				t.Errorf("transport_partition_id = %v, want %v", model.TransportPartitionID, tt.wantTransportID)
+			}
+		})
+	}
+}
+
+// Test_hydrateAliasPairForImport covers the one case with no configuration to own the
+// alias pair: a freshly imported template, whose state has neither half populated.
+func Test_hydrateAliasPairForImport(t *testing.T) {
+	tests := []struct {
+		name                    string
+		stateIB, stateTransport types.String
+		apiIB, apiTransport     string
+		wantIB, wantTransport   types.String
+	}{
+		{
+			name:    "import with only the deprecated name from the API",
+			stateIB: types.StringNull(), stateTransport: types.StringNull(),
+			apiIB: "p1", apiTransport: "",
+			// The replacement name is filled in, never the deprecated one, so an import
+			// does not start life on a deprecated attribute.
+			wantIB: types.StringNull(), wantTransport: types.StringValue("p1"),
+		},
+		{
+			name:    "import with the replacement name from the API",
+			stateIB: types.StringNull(), stateTransport: types.StringNull(),
+			apiIB: "", apiTransport: "p2",
+			wantIB: types.StringNull(), wantTransport: types.StringValue("p2"),
+		},
+		{
+			name:    "import of a template with no partition",
+			stateIB: types.StringNull(), stateTransport: types.StringNull(),
+			apiIB: "", apiTransport: "",
+			wantIB: types.StringNull(), wantTransport: types.StringNull(),
+		},
+		{
+			// Not an import: state already owns the pair, so the API must not overwrite it.
+			name:    "deprecated half already in state",
+			stateIB: types.StringValue("p1"), stateTransport: types.StringNull(),
+			apiIB: "p1", apiTransport: "p1",
+			wantIB: types.StringValue("p1"), wantTransport: types.StringNull(),
+		},
+		{
+			name:    "replacement half already in state",
+			stateIB: types.StringNull(), stateTransport: types.StringValue("p2"),
+			apiIB: "p1", apiTransport: "p2",
+			wantIB: types.StringNull(), wantTransport: types.StringValue("p2"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &instanceTemplateResourceModel{
+				IBPartition:          tt.stateIB,
+				TransportPartitionID: tt.stateTransport,
+			}
+			api := &swagger.InstanceTemplate{
+				IbPartitionId:        tt.apiIB,
+				TransportPartitionId: tt.apiTransport,
+			}
+
+			hydrateAliasPairForImport(model, api)
+
+			if !model.IBPartition.Equal(tt.wantIB) {
+				t.Errorf("ib_partition = %v, want %v", model.IBPartition, tt.wantIB)
+			}
+			if !model.TransportPartitionID.Equal(tt.wantTransport) {
+				t.Errorf("transport_partition_id = %v, want %v", model.TransportPartitionID, tt.wantTransport)
+			}
+		})
 	}
 }
 

@@ -42,7 +42,7 @@ Optional:
 Read-Only:
 
 - `disks` (Attributes List) Disks attached to all VMs created from this instance template. (see [below for nested schema](#nestedatt--instance_templates--disks))
-- `ib_partition` (String, Deprecated) This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
+- `ib_partition` (String) This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
 - `id` (String) ID of the instance template.
 - `name` (String) Name of the instance template. (This is not the name of the VMs created from this instance template.)
 - `shared_volume_attachments` (List of String) IDs of existing shared disks to attach to every VM created from this instance template. Attached read-write.
