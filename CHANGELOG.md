@@ -1,3 +1,12 @@
+## 1.3.1
+
+BUG FIXES:
+
+- Fixed renaming the deprecated `ib_partition` / `ib_partition_id` attribute to `transport_partition_id` forcing replacement on `crusoe_instance_template` and `crusoe_kubernetes_node_pool`. The two names address the same partition, so the rename now plans as an update in place. Replacement still happens when the partition itself changes. Setting both names to different partitions is now rejected at plan time. Setting both to the same partition stays valid.
+- Fixed `crusoe_instance_template` planning a replacement on every plan when the configuration omits `reservation_id` or `nvlink_domain_id`.
+- Fixed deprecation warnings on read-only attributes firing for configurations that never use them. Terraform propagates an attribute deprecation to every reference to the object that contains it, so passing a whole data source item or resource to an output produced a warning with no way to silence it. The notice moved to the attribute description for `ib_network_id` and `ib_partition_id` on the `crusoe_compute_instance` data source, `ib_partition` on the `crusoe_instance_templates` data source, `fqdn` on `crusoe_compute_instance` and `crusoe_compute_instance_by_template`, and `block_size` on the `crusoe_storage_disks` data source. These attributes are still deprecated and will be removed in the next major version. Attributes you set in a configuration keep their deprecation warning.
+- Added the missing `transport_partition_id` description on `crusoe_kubernetes_node_pool`.
+
 ## 1.3.0
 
 NEW FEATURES:
