@@ -57,6 +57,7 @@ resource "crusoe_kubernetes_cluster" "example" {
 - `oidc_username_prefix` (String) Prefix added before the username to avoid name conflicts.
 - `private` (Boolean) Whether the cluster is private (without a public IP).
 - `project_id` (String) ID of the project that owns the Kubernetes cluster. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `routing_mode` (String) How pod traffic is routed for the cluster. Possible values: `overlay`, `native`. An unset value is treated as `overlay`. In native mode, `cluster_cidr` is the VPC prefix reservation's range.
 - `scheduler_extra_args` (Map of String) Extra arguments passed to the kube-scheduler control plane component. Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI.
 - `service_cluster_ip_range` (String) Range of IP addresses allocated to Kubernetes services, in CIDR notation.
 - `subnet_id` (String) ID of the subnet the Kubernetes cluster belongs to.

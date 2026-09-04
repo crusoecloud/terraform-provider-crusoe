@@ -44,4 +44,5 @@ data "crusoe_kubernetes_cluster" "example" {
 - `dns_name` (String) DNS name of the cluster.
 - `nodepool_ids` (List of String) IDs of the node pools within the Kubernetes cluster.
 - `private` (Boolean) Whether the cluster is private (without a public IP).
+- `routing_mode` (String) How pod traffic is routed for the cluster. Possible values: `overlay`, `native`. An unset value is treated as `overlay`. In native mode, `cluster_cidr` is the VPC prefix reservation's range.
 - `scheduler_extra_args` (Map of String) Extra arguments passed to the kube-scheduler control plane component.

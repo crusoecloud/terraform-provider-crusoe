@@ -62,6 +62,7 @@ type kubernetesClusterResourceModel struct {
 	OIDCGroupsClaim            types.String `tfsdk:"oidc_groups_claim"`
 	OIDCCACert                 types.String `tfsdk:"oidc_ca_cert"`
 	Private                    types.Bool   `tfsdk:"private"`
+	RoutingMode                types.String `tfsdk:"routing_mode"`
 	ApiserverExtraArgs         types.Map    `tfsdk:"apiserver_extra_args"`
 	SchedulerExtraArgs         types.Map    `tfsdk:"scheduler_extra_args"`
 	ControllerManagerExtraArgs types.Map    `tfsdk:"controller_manager_extra_args"`
@@ -209,6 +210,15 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				},
 				Default: booldefault.StaticBool(false), // Default to false
 			},
+			"routing_mode": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescRoutingMode,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				Validators: []validator.String{
+					stringvalidator.OneOf(routingModeOverlay, routingModeNative),
+				},
+			},
 			"apiserver_extra_args": schema.MapAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
@@ -256,6 +266,7 @@ func (r *kubernetesClusterResource) Create(ctx context.Context, req resource.Cre
 		SubnetId:                   plan.SubnetID.ValueString(),
 		Version:                    plan.Version.ValueString(),
 		Private:                    plan.Private.ValueBool(),
+		RoutingMode:                plan.RoutingMode.ValueString(), // "" when unset; omitted from the request so the API applies its default
 		ApiserverExtraArgs:         tfMapToStringMap(plan.ApiserverExtraArgs),
 		SchedulerExtraArgs:         tfMapToStringMap(plan.SchedulerExtraArgs),
 		ControllerManagerExtraArgs: tfMapToStringMap(plan.ControllerManagerExtraArgs),

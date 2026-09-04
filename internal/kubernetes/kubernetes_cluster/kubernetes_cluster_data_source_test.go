@@ -68,3 +68,22 @@ func TestKubernetesClusterDataSource_ExtraArgsSchemaAttributes(t *testing.T) {
 		}
 	}
 }
+
+func TestKubernetesClusterDataSource_RoutingModeSchema(t *testing.T) {
+	ds := NewKubernetesClusterDataSource()
+
+	schemaResp := &datasource.SchemaResponse{}
+	ds.Schema(context.Background(), datasource.SchemaRequest{}, schemaResp)
+
+	strAttr, ok := schemaResp.Schema.Attributes["routing_mode"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("routing_mode attribute not found or not StringAttribute")
+	}
+
+	if !strAttr.Computed {
+		t.Error("routing_mode should be Computed in the data source")
+	}
+	if strAttr.Optional || strAttr.Required {
+		t.Error("routing_mode should be read-only in the data source")
+	}
+}

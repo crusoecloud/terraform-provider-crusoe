@@ -124,6 +124,13 @@ resource "crusoe_kubernetes_cluster" "my_cluster" {
   # Optional: Enable private cluster creation
   # private = true
 
+  # Optional: Set the pod routing mode (overlay or native). Defaults to overlay.
+  # Native routing requires account enablement. In native mode, cluster_cidr is
+  # the routable pod range and must be a block within your VPC CIDR that does not
+  # overlap any subnet.
+  # routing_mode = "native"
+  # cluster_cidr = "10.1.0.0/20"
+
   # Optional: Extra arguments for control plane components.
   # Changes take effect after a cluster rotation.
   apiserver_extra_args         = var.apiserver_extra_args

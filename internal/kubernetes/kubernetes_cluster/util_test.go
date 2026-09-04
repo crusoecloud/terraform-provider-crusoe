@@ -75,6 +75,7 @@ func Test_clusterToResourceModel(t *testing.T) {
 		Name:               "my-cluster",
 		Version:            "1.2.3-cmk.4",
 		NodePools:          []string{"np-c", "np-a", "np-b"},
+		RoutingMode:        routingModeNative,
 		ApiserverExtraArgs: map[string]string{"audit-log-maxage": "30"},
 		SchedulerExtraArgs: map[string]string{}, // API echoes {}
 	}
@@ -97,6 +98,9 @@ func Test_clusterToResourceModel(t *testing.T) {
 	}
 	if got := model.OIDCIssuerURL.ValueString(); got != "https://issuer.example" {
 		t.Errorf("oidc_issuer_url = %q, want it preserved from ref", got)
+	}
+	if got := model.RoutingMode.ValueString(); got != routingModeNative {
+		t.Errorf("routing_mode = %q, want %q (API is the source of truth)", got, routingModeNative)
 	}
 
 	var ids []string

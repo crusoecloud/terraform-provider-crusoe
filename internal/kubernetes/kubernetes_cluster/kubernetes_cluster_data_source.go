@@ -40,6 +40,7 @@ type kubernetesClusterDataSourceModel struct {
 	DNSName                    types.String `tfsdk:"dns_name"`
 	NodePoolIds                types.List   `tfsdk:"nodepool_ids"`
 	Private                    types.Bool   `tfsdk:"private"`
+	RoutingMode                types.String `tfsdk:"routing_mode"`
 	ApiserverExtraArgs         types.Map    `tfsdk:"apiserver_extra_args"`
 	SchedulerExtraArgs         types.Map    `tfsdk:"scheduler_extra_args"`
 	ControllerManagerExtraArgs types.Map    `tfsdk:"controller_manager_extra_args"`
@@ -131,6 +132,10 @@ func (ds *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sc
 				Computed:            true,
 				MarkdownDescription: apiDescPrivate,
 			},
+			"routing_mode": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: apiDescRoutingMode,
+			},
 			"apiserver_extra_args": schema.MapAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
@@ -196,6 +201,7 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 	state.NodePoolIds, diags = common.StringSliceToTFList(sortedNodePools(kubernetesCluster.NodePools))
 	resp.Diagnostics.Append(diags...)
 	state.Private = types.BoolValue(kubernetesCluster.Private)
+	state.RoutingMode = types.StringValue(kubernetesCluster.RoutingMode)
 	state.ApiserverExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ApiserverExtraArgs)
 	resp.Diagnostics.Append(diags...)
 	state.SchedulerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.SchedulerExtraArgs)

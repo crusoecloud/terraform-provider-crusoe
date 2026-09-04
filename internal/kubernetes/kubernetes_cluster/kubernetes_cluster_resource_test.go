@@ -332,3 +332,40 @@ func TestKubernetesClusterResource_ExtraArgsAreNotComputed(t *testing.T) {
 		}
 	}
 }
+
+// routing_mode is a create-time API field: user-settable but immutable, with the
+// API supplying the effective value (overlay) when the config leaves it unset.
+func TestKubernetesClusterResource_RoutingModeSchema(t *testing.T) {
+	r := NewKubernetesClusterResource()
+
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	strAttr, ok := schemaResp.Schema.Attributes["routing_mode"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("routing_mode attribute not found or not StringAttribute")
+	}
+
+	if !strAttr.Optional {
+		t.Error("routing_mode should be Optional")
+	}
+	if strAttr.Required {
+		t.Error("routing_mode should not be Required")
+	}
+	if !strAttr.Computed {
+		t.Error("routing_mode should be Computed (API returns the effective value)")
+	}
+	// No static default: when unset, the field stays off the create request so the
+	// API applies its own default. A provider-side default combined with
+	// RequiresReplace could force replacement of clusters whose API response
+	// predates the field.
+	if strAttr.Default != nil {
+		t.Error("routing_mode should have no static default")
+	}
+	if len(strAttr.Validators) == 0 {
+		t.Error("routing_mode should have validators (OneOf overlay, native)")
+	}
+	if len(strAttr.PlanModifiers) == 0 {
+		t.Error("routing_mode should have plan modifiers (RequiresReplace); it cannot be updated in place")
+	}
+}

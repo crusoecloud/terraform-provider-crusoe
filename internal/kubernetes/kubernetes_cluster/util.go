@@ -26,6 +26,7 @@ const (
 	apiDescDNSName               = "DNS name of the cluster."
 	apiDescNodePoolIDs           = "IDs of the node pools within the Kubernetes cluster."
 	apiDescPrivate               = "Whether the cluster is private (without a public IP)."
+	apiDescRoutingMode           = "How pod traffic is routed for the cluster. Possible values: `overlay`, `native`. An unset value is treated as `overlay`. In native mode, `cluster_cidr` is the VPC prefix reservation's range."
 
 	apiDescApiserverExtraArgs         = "Extra arguments passed to the kube-apiserver control plane component."
 	apiDescSchedulerExtraArgs         = "Extra arguments passed to the kube-scheduler control plane component."
@@ -46,6 +47,12 @@ const (
 	// providerDescExtraArgsNote is appended (resource-side only) to the *_extra_args
 	// descriptions to document Crusoe-specific update behavior.
 	providerDescExtraArgsNote = "Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI."
+)
+
+// Pod routing modes supported by the API (swagger `routing_mode` enum).
+const (
+	routingModeOverlay = "overlay"
+	routingModeNative  = "native"
 )
 
 // clusterToResourceModel maps an API Kubernetes cluster onto model, with the API
@@ -72,6 +79,7 @@ func clusterToResourceModel(cluster *swagger.KubernetesCluster, ref, model *kube
 	model.Location = types.StringValue(cluster.Location)
 	model.DNSName = types.StringValue(cluster.DnsName)
 	model.Private = types.BoolValue(cluster.Private)
+	model.RoutingMode = types.StringValue(cluster.RoutingMode)
 
 	addOns, d := common.StringSliceToTFList(cluster.AddOns)
 	diags.Append(d...)
