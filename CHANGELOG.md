@@ -1,3 +1,9 @@
+## 1.4.0
+
+ENHANCEMENTS:
+
+- Added `routing_mode` to the `crusoe_kubernetes_cluster` resource and data source. Set it to `native` for VPC-native pod routing, which makes pod IPs directly routable on the cluster's VPC; the default, `overlay`, keeps the existing VXLAN behavior. In native mode, `cluster_cidr` is required and must lie inside the VPC's CIDR without overlapping any subnet — it is reserved for pods on your behalf — and `node_cidr_mask_size` must be set to at least the cluster CIDR's mask. Native routing requires account enablement. `routing_mode` cannot be changed after create.
+
 ## 1.3.1
 
 BUG FIXES:
