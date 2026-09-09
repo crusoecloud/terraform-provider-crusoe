@@ -1,15 +1,10 @@
-## 1.5.0
-
-ENHANCEMENTS:
-
-- `crusoe_transport_partition` now accepts a Terraform `moved` block from `crusoe_ib_partition`. Both resource types manage the same partition, so the move renames `ib_network_id` to `transport_network_id` in state and leaves the partition in place. Terraform does not destroy or recreate the partition. This requires Terraform CLI 1.8 or later. A `crusoe_ib_partition` state at schema version 0 predates `project_id`, so the move rejects it. Run `terraform apply -refresh-only` first to upgrade that state, then apply the `moved` block. On Terraform 1.7 or earlier, use `removed` and `import` blocks instead.
-- Added a "Migrating to the transport resources" guide. It covers the partition move and the `ib_*` to `transport_*` attribute renames on `crusoe_compute_instance`, `crusoe_compute_instance_by_template`, `crusoe_instance_template`, and `crusoe_kubernetes_node_pool`.
-
 ## 1.4.0
 
 ENHANCEMENTS:
 
 - Added `routing_mode` to the `crusoe_kubernetes_cluster` resource and data source. Set it to `native` for VPC-native pod routing, which makes pod IPs directly routable on the cluster's VPC; the default, `overlay`, keeps the existing VXLAN behavior. In native mode, `cluster_cidr` is required and must lie inside the VPC's CIDR without overlapping any subnet — it is reserved for pods on your behalf — and `node_cidr_mask_size` must be set to at least the cluster CIDR's mask. Native routing requires account enablement. `routing_mode` cannot be changed after create.
+- `crusoe_transport_partition` now accepts a Terraform `moved` block from `crusoe_ib_partition`. Both resource types manage the same partition, so the move renames `ib_network_id` to `transport_network_id` in state and leaves the partition in place. Terraform does not destroy or recreate the partition. This requires Terraform CLI 1.8 or later. A `crusoe_ib_partition` state at schema version 0 predates `project_id`, so the move rejects it. Run `terraform apply -refresh-only` first to upgrade that state, then apply the `moved` block. On Terraform 1.7 or earlier, use `removed` and `import` blocks instead.
+- Added a "Migrating to the transport resources" guide. It covers the partition move and the `ib_*` to `transport_*` attribute renames on `crusoe_compute_instance`, `crusoe_compute_instance_by_template`, `crusoe_instance_template`, and `crusoe_kubernetes_node_pool`.
 
 ## 1.3.1
 

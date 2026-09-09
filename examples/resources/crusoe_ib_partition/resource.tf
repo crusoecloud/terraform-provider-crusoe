@@ -9,7 +9,7 @@ resource "crusoe_ib_partition" "example" {
 
 # To migrate an existing partition, change the resource type and add a moved
 # block. Terraform keeps the partition in place. See the "Migrating to the
-# transport resources" guide. Needs Terraform 1.8 or later and provider v1.5.0
+# transport resources" guide. Needs Terraform 1.8 or later and provider v1.4.0
 # or later.
 #
 # resource "crusoe_transport_partition" "example" {

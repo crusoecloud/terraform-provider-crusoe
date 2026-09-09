@@ -32,7 +32,7 @@ The `crusoe_ib_partition` and `crusoe_transport_partition` resources manage the
 same partition. A `moved` block changes the resource type in state. Your partition
 stays in place. Terraform does not destroy it and does not create a new one.
 
-This needs Terraform CLI 1.8 or later and provider v1.5.0 or later.
+This needs Terraform CLI 1.8 or later and provider v1.4.0 or later.
 
 1. Change the resource type and rename `ib_network_id` to `transport_network_id`.
 
