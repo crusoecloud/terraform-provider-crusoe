@@ -165,13 +165,13 @@ func Test_versionUsesSemanticEqualityType(t *testing.T) {
 	resourceSchema := &resource.SchemaResponse{}
 	NewKubernetesClusterResource().Schema(ctx, resource.SchemaRequest{}, resourceSchema)
 
-	attr, ok := resourceSchema.Schema.Attributes["version"].(schema.StringAttribute)
+	versionAttr, ok := resourceSchema.Schema.Attributes["version"].(schema.StringAttribute)
 	if !ok {
 		t.Fatalf("resource version attribute is %T, want schema.StringAttribute",
 			resourceSchema.Schema.Attributes["version"])
 	}
-	if _, isVersionType := attr.CustomType.(common.K8sVersionType); !isVersionType {
-		t.Errorf("resource version CustomType = %T, want common.K8sVersionType", attr.CustomType)
+	if _, isVersionType := versionAttr.CustomType.(common.K8sVersionType); !isVersionType {
+		t.Errorf("resource version CustomType = %T, want common.K8sVersionType", versionAttr.CustomType)
 	}
 
 	dataSourceSchema := &datasource.SchemaResponse{}

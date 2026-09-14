@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -353,12 +352,12 @@ func TestVersionUsesSemanticEqualityType(t *testing.T) {
 	schemaResp := &resource.SchemaResponse{}
 	NewKubernetesNodePoolResource().Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
 
-	attr, ok := schemaResp.Schema.Attributes["version"].(schema.StringAttribute)
+	versionAttr, ok := schemaResp.Schema.Attributes["version"].(schema.StringAttribute)
 	if !ok {
 		t.Fatalf("version attribute is %T, want schema.StringAttribute", schemaResp.Schema.Attributes["version"])
 	}
-	if _, isVersionType := attr.CustomType.(common.K8sVersionType); !isVersionType {
-		t.Errorf("version CustomType = %T, want common.K8sVersionType", attr.CustomType)
+	if _, isVersionType := versionAttr.CustomType.(common.K8sVersionType); !isVersionType {
+		t.Errorf("version CustomType = %T, want common.K8sVersionType", versionAttr.CustomType)
 	}
 }
 
@@ -501,8 +500,10 @@ func TestHealthIssuesSortedAndPresent(t *testing.T) {
 	var diags diag.Diagnostics
 	health, d := healthToTFObject(context.Background(), &swagger.KubernetesNodePoolHealth{
 		Issues: []swagger.KubernetesNodePoolHealthIssue{
-			{Code: "NODE_NOT_READY", Message: "one node is not ready", AffectedCount: 1,
-				AffectedNodeIds: []string{"vm-c", "vm-a", "vm-b"}},
+			{
+				Code: "NODE_NOT_READY", Message: "one node is not ready", AffectedCount: 1,
+				AffectedNodeIds: []string{"vm-c", "vm-a", "vm-b"},
+			},
 			{Code: "INSUFFICIENT_CAPACITY", Message: "waiting for capacity", AffectedCount: 2},
 		},
 	})
@@ -563,9 +564,8 @@ func TestUpdateSettingsPresenceRidesOnThePointer(t *testing.T) {
 		t.Error("an absent block must yield a nil pointer, so the request omits update_settings entirely")
 	}
 
-	configured, diags := types.ObjectValue(updateSettingsAttrTypes(), map[string]attr.Value{
-		"allow_scale_down": types.BoolValue(false),
-	})
+	configured, diags := types.ObjectValueFrom(ctx, updateSettingsAttrTypes(),
+		updateSettingsModel{AllowScaleDown: types.BoolValue(false)})
 	if diags.HasError() {
 		t.Fatalf("building the object: %v", diags)
 	}
