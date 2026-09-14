@@ -106,3 +106,22 @@ func TestK8sVersionTypeEqual(t *testing.T) {
 		t.Error("K8sVersionType should not equal a plain StringType")
 	}
 }
+
+// TestSameK8sVersionPreReleaseSemver covers an upstream semver carrying a hyphen
+// of its own. The schema validator rejects this spelling today, so it is not
+// reachable from a configuration — but the earlier "first two hyphen-separated
+// parts" rule reduced both of these to "1.35.5-rc.1" and called two different
+// builds equal, which is the silent-wrong-answer class this guards against.
+func TestSameK8sVersionPreReleaseSemver(t *testing.T) {
+	t.Parallel()
+
+	if SameK8sVersion("1.35.5-rc.1-cmk.22", "1.35.5-rc.1-cmk.23") {
+		t.Error("two builds of one pre-release must not compare equal")
+	}
+	if !SameK8sVersion("1.35.5-rc.1-cmk.22"+tarballSuffix, "1.35.5-rc.1-cmk.22") {
+		t.Error("a tarball suffix should still be dropped on a pre-release version")
+	}
+	if !SameK8sVersion("1.35.5-rc.1-cmk.22", "1.35.5-rc.1") {
+		t.Error("dropping the build component should still compare equal")
+	}
+}

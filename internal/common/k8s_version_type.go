@@ -18,14 +18,7 @@ import (
 // 1.35.5, with a tarball. Each part is separated from the last by a hyphen.
 const (
 	cmkBuildSeparator = "-cmk."
-	versionSeparator  = "-"
-
-	// versionPartsWithTarball mirrors the gateway's own threshold
-	// (minPartsForTarballExtraction): splitting on the separator yields
-	// ["<semver>", "cmk.<n>"] for a plain version, and a third part only when a
-	// tarball URL follows. The URL may itself contain separators, so everything
-	// from the third part on is tarball.
-	versionPartsWithTarball = 3
+	versionSeparator  = '-'
 )
 
 // errUnexpectedK8sVersionValue marks a framework-supplied value that is not the
@@ -194,15 +187,31 @@ func SameK8sVersion(a, b string) bool {
 	return a == b || a == upstreamSemver(b) || b == upstreamSemver(a)
 }
 
-// withoutTarball drops a bootstrap tarball URL, matching how the gateway splits
-// one off (checkImageVersionForBootstrapTarball).
+// withoutTarball drops a bootstrap tarball URL.
+//
+// The tarball is whatever follows the build number, so this anchors on the build
+// separator and cuts at the next hyphen after it. The gateway splits the same
+// suffix off by taking the first two hyphen-separated parts
+// (checkImageVersionForBootstrapTarball); the two agree on every version that
+// can actually reach here, and this one additionally survives an upstream semver
+// that contains a hyphen of its own — "1.35.5-rc.1-cmk.22" keeps its build
+// component instead of being truncated to "1.35.5-rc.1", which would have made
+// two different builds compare equal. The schema validator rejects that spelling
+// today, so this is guarding the comparison rather than fixing a live bug.
 func withoutTarball(version string) string {
-	parts := strings.Split(version, versionSeparator)
-	if len(parts) < versionPartsWithTarball {
+	idx := strings.Index(version, cmkBuildSeparator)
+	if idx < 0 {
+		// No build component, so no tarball either: a tarball only ever follows
+		// one.
 		return version
 	}
 
-	return strings.Join(parts[:versionPartsWithTarball-1], versionSeparator)
+	afterBuild := idx + len(cmkBuildSeparator)
+	if sep := strings.IndexByte(version[afterBuild:], versionSeparator); sep >= 0 {
+		return version[:afterBuild+sep]
+	}
+
+	return version
 }
 
 // upstreamSemver drops the Crusoe build component, leaving the upstream
