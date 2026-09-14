@@ -503,6 +503,17 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		NodeTaints:                    nodeTaints,
 		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 		NodePoolVersion:               plan.Version.ValueString(),
+		// ssh_public_key has no omitempty in the generated client, so leaving
+		// this unset does not omit it — it sends the empty string, which the
+		// backend reads as a request to change the key. The node pool v2
+		// backend then rebuilds the pool's instance template with NO key, so
+		// replacement nodes come up without the customer's key; v1 happens to
+		// guard the empty string but still churns the template, marking every
+		// existing node as not using the latest config.
+		//
+		// ssh_key is Required and RequiresReplace, so the plan always carries
+		// the pool's standing key and the backend's diff is a no-op.
+		SshPublicKey: plan.SSHKey.ValueString(),
 	}
 
 	updateAsyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.UpdateNodePool(

@@ -2,6 +2,7 @@ package kubernetes_node_pool
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -382,5 +383,47 @@ func TestNodePoolNeedsRolloutIgnoresVersionSpelling(t *testing.T) {
 	state = base("1.35.5-cmk.22")
 	if !nodePoolNeedsRollout(plan, state) {
 		t.Error("a different build of one release is a real version change and should trigger a rollout")
+	}
+}
+
+// TestPatchRequestCarriesSSHKey pins the one field whose absence is destructive
+// rather than merely missing.
+//
+// The generated client has no omitempty on ssh_public_key, so an unset field
+// still serializes as `"ssh_public_key": ""`. The gateway's own field is a
+// pointer, so the empty string arrives as a present value and reaches the
+// backend as a request to change the key — and the node pool v2 update path has
+// no empty guard, so it rebuilds the pool's instance template with no key at
+// all. Every update, including a bare instance_count change, silently stripped
+// the customer's SSH key from future nodes.
+//
+// The assertion is on the marshalled bytes because the bug lives in the
+// serialization, not in the struct.
+func TestPatchRequestCarriesSSHKey(t *testing.T) {
+	const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test@example.com"
+
+	patch := swagger.KubernetesNodePoolPatchRequest{
+		Count:        3,
+		SshPublicKey: sshKey,
+	}
+
+	body, err := json.Marshal(patch)
+	if err != nil {
+		t.Fatalf("marshalling the patch request: %v", err)
+	}
+
+	var sent map[string]any
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("unmarshalling the patch body: %v", err)
+	}
+
+	got, present := sent["ssh_public_key"]
+	if !present {
+		t.Fatal("ssh_public_key is absent from the patch body; the generated client has no omitempty, " +
+			"so this should never happen")
+	}
+	if got != sshKey {
+		t.Errorf("ssh_public_key = %q, want the pool's standing key %q; an empty value rebuilds the "+
+			"instance template without an SSH key on the v2 backend", got, sshKey)
 	}
 }
