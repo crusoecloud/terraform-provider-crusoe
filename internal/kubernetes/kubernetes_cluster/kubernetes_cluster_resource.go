@@ -112,7 +112,9 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Required:            true,
 				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
-				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
+				PlanModifiers: []planmodifier.String{common.NewSemanticEqualityStringModifier(
+					"same Kubernetes version", common.SameK8sVersion,
+				), common.NewImmutableStringModifier(
 					"Kubernetes Version Change Not Supported",
 					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
 						"Cannot change version from %q to %q. "+

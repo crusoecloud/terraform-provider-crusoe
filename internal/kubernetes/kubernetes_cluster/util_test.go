@@ -186,3 +186,34 @@ func Test_versionUsesSemanticEqualityType(t *testing.T) {
 		t.Errorf("data source version CustomType = %T, want common.K8sVersionType", dsAttr.CustomType)
 	}
 }
+
+// Test_versionPlanModifierOrder pins an ordering the correctness of `terraform
+// import` depends on.
+//
+// The framework feeds each plan modifier the running plan value, so the
+// semantic-equality suppressor has to run before the immutability check. Reverse
+// them and the check compares the API's spelling against the configured one and
+// fails a plan it should not — the exact failure the suppressor exists to
+// prevent.
+func Test_versionPlanModifierOrder(t *testing.T) {
+	resourceSchema := &resource.SchemaResponse{}
+	NewKubernetesClusterResource().Schema(context.Background(), resource.SchemaRequest{}, resourceSchema)
+
+	versionAttr, ok := resourceSchema.Schema.Attributes["version"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("version attribute is %T, want schema.StringAttribute", resourceSchema.Schema.Attributes["version"])
+	}
+
+	if len(versionAttr.PlanModifiers) < 2 {
+		t.Fatalf("version has %d plan modifiers, want the suppressor and the immutability check",
+			len(versionAttr.PlanModifiers))
+	}
+
+	if _, isSuppressor := versionAttr.PlanModifiers[0].(common.SemanticEqualityStringModifier); !isSuppressor {
+		t.Errorf("first plan modifier is %T, want common.SemanticEqualityStringModifier; it must run "+
+			"before the immutability check", versionAttr.PlanModifiers[0])
+	}
+	if _, isImmutable := versionAttr.PlanModifiers[1].(common.ImmutableStringModifier); !isImmutable {
+		t.Errorf("second plan modifier is %T, want common.ImmutableStringModifier", versionAttr.PlanModifiers[1])
+	}
+}

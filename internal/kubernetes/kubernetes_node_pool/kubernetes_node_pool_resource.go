@@ -130,7 +130,10 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				Computed:            true,
 				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(), // maintain across updates
+					common.NewSemanticEqualityStringModifier("same Kubernetes version", common.SameK8sVersion),
+				},
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
@@ -255,6 +258,11 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				MarkdownDescription: apiDescUpdateSettings + " " + providerDescLimitedAvailability,
 				PlanModifiers:       []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 				Attributes: map[string]schema.Attribute{
+					// The default applies only when the block is present and
+					// this field is not — it never materializes the block
+					// itself. A node pool that does not support update settings
+					// keeps a null object, which UseStateForUnknown carries
+					// forward, so the two never contend.
 					"allow_scale_down": schema.BoolAttribute{
 						Optional:            true,
 						Computed:            true,
