@@ -7,10 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -425,5 +427,180 @@ func TestPatchRequestCarriesSSHKey(t *testing.T) {
 	if got != sshKey {
 		t.Errorf("ssh_public_key = %q, want the pool's standing key %q; an empty value rebuilds the "+
 			"instance template without an SSH key on the v2 backend", got, sshKey)
+	}
+}
+
+// TestV2FieldsAbsentOnV1Pool is the central contract for the four fields only a
+// v2-backed node pool carries: absence is carried through, never defaulted.
+//
+// The API omits all four for a v1-backed pool, and each absence means something
+// specific. Defaulting update_settings to {allow_scale_down: false} would claim
+// scale-down is configured and off; defaulting consent_mode to "off" would claim
+// remediation is deliberately disabled on a pool that has its own remediation
+// path; and an empty health block would claim the pool is healthy when the
+// backend only meant it does not report.
+func TestV2FieldsAbsentOnV1Pool(t *testing.T) {
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolResourceModel
+	ref := &kubernetesNodePoolResourceModel{RequestedNodeLabels: types.MapNull(types.StringType)}
+
+	// A v1-backed pool: no consent mode, no update settings, no health, and a
+	// current the generated client cannot tell apart from a real zero.
+	nodePoolToResourceModel(context.Background(), &swagger.KubernetesNodePool{Id: "pool-1"}, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !model.ConsentMode.IsNull() {
+		t.Errorf("consent_mode = %v, want null", model.ConsentMode)
+	}
+	if !model.UpdateSettings.IsNull() {
+		t.Errorf("update_settings = %v, want null", model.UpdateSettings)
+	}
+	if !model.Health.IsNull() {
+		t.Errorf("health = %v, want null (absent means not reported, not healthy)", model.Health)
+	}
+	if !model.Current.IsNull() {
+		t.Errorf("current = %v, want null; reporting 0 would read as no ready nodes", model.Current)
+	}
+}
+
+// TestV2FieldsPresentOnV2Pool is the other half: a genuine zero must survive.
+func TestV2FieldsPresentOnV2Pool(t *testing.T) {
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolResourceModel
+	ref := &kubernetesNodePoolResourceModel{RequestedNodeLabels: types.MapNull(types.StringType)}
+
+	nodePoolToResourceModel(context.Background(), &swagger.KubernetesNodePool{
+		Id:             "pool-1",
+		ConsentMode:    "propose",
+		UpdateSettings: &swagger.KubernetesNodePoolUpdateSettings{AllowScaleDown: true},
+		Current:        0, // genuinely no ready nodes yet
+	}, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if got := model.ConsentMode.ValueString(); got != "propose" {
+		t.Errorf("consent_mode = %q, want %q", got, "propose")
+	}
+	if model.UpdateSettings.IsNull() {
+		t.Fatal("update_settings should be present")
+	}
+	if model.Current.IsNull() || model.Current.ValueInt64() != 0 {
+		t.Errorf("current = %v, want 0; a v2 pool serving zero means zero ready nodes", model.Current)
+	}
+	if !planAllowsScaleDown(context.Background(), model.UpdateSettings) {
+		t.Error("allow_scale_down should read back as true")
+	}
+}
+
+// TestHealthIssuesSortedAndPresent covers the derived block, including the
+// ordering the CCX-4394 rule requires of any API-ordered Computed list.
+func TestHealthIssuesSortedAndPresent(t *testing.T) {
+	var diags diag.Diagnostics
+	health, d := healthToTFObject(context.Background(), &swagger.KubernetesNodePoolHealth{
+		Issues: []swagger.KubernetesNodePoolHealthIssue{
+			{Code: "NODE_NOT_READY", Message: "one node is not ready", AffectedCount: 1,
+				AffectedNodeIds: []string{"vm-c", "vm-a", "vm-b"}},
+			{Code: "INSUFFICIENT_CAPACITY", Message: "waiting for capacity", AffectedCount: 2},
+		},
+	})
+	diags.Append(d...)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if health.IsNull() {
+		t.Fatal("health should be present when there are issues")
+	}
+
+	var decoded struct {
+		Issues []struct {
+			Code            types.String `tfsdk:"code"`
+			Message         types.String `tfsdk:"message"`
+			Since           types.String `tfsdk:"since"`
+			AffectedCount   types.Int64  `tfsdk:"affected_count"`
+			AffectedNodeIDs types.List   `tfsdk:"affected_node_ids"`
+		} `tfsdk:"issues"`
+	}
+	if d := health.As(context.Background(), &decoded, basetypes.ObjectAsOptions{}); d.HasError() {
+		t.Fatalf("reading the health object: %v", d)
+	}
+
+	if len(decoded.Issues) != 2 {
+		t.Fatalf("got %d issues, want 2", len(decoded.Issues))
+	}
+	// Sorted by code, so the capacity issue comes first regardless of API order.
+	if got := decoded.Issues[0].Code.ValueString(); got != "INSUFFICIENT_CAPACITY" {
+		t.Errorf("first issue code = %q, want INSUFFICIENT_CAPACITY (issues sort by code)", got)
+	}
+	// since is optional; an absent one is null rather than an empty string.
+	if !decoded.Issues[0].Since.IsNull() {
+		t.Errorf("since = %v, want null when the API omits it", decoded.Issues[0].Since)
+	}
+
+	var nodeIDs []string
+	if d := decoded.Issues[1].AffectedNodeIDs.ElementsAs(context.Background(), &nodeIDs, false); d.HasError() {
+		t.Fatalf("reading affected_node_ids: %v", d)
+	}
+	if want := []string{"vm-a", "vm-b", "vm-c"}; !reflect.DeepEqual(nodeIDs, want) {
+		t.Errorf("affected_node_ids = %v, want %v (sorted)", nodeIDs, want)
+	}
+}
+
+// TestUpdateSettingsPresenceRidesOnThePointer pins the distinction the API
+// depends on. allow_scale_down has omitempty, so a present block holding false
+// marshals as {} — the pointer is the only thing that separates "leave the
+// stored setting alone" from "turn scale-down off".
+func TestUpdateSettingsPresenceRidesOnThePointer(t *testing.T) {
+	ctx := context.Background()
+
+	absent, diags := tfObjectToUpdateSettings(ctx, types.ObjectNull(updateSettingsAttrTypes()))
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if absent != nil {
+		t.Error("an absent block must yield a nil pointer, so the request omits update_settings entirely")
+	}
+
+	configured, diags := types.ObjectValue(updateSettingsAttrTypes(), map[string]attr.Value{
+		"allow_scale_down": types.BoolValue(false),
+	})
+	if diags.HasError() {
+		t.Fatalf("building the object: %v", diags)
+	}
+
+	present, diags := tfObjectToUpdateSettings(ctx, configured)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if present == nil {
+		t.Fatal("a configured block must yield a non-nil pointer even when allow_scale_down is false")
+	}
+	if present.AllowScaleDown {
+		t.Error("allow_scale_down should be false")
+	}
+
+	body, err := json.Marshal(present)
+	if err != nil {
+		t.Fatalf("marshalling update settings: %v", err)
+	}
+	if string(body) != "{}" {
+		t.Errorf("update_settings marshalled as %s; expected {} because allow_scale_down has omitempty — "+
+			"if this changes, re-check that the API still reads a present block as an assertion", body)
+	}
+}
+
+// TestConsentModeValuesExcludeDetectOnly guards the one enum value that must
+// not be offered: the API rejects detect_only as "not yet available", so
+// accepting it here would only let a configuration fail on every apply.
+func TestConsentModeValuesExcludeDetectOnly(t *testing.T) {
+	for _, mode := range consentModeValues {
+		if mode == "detect_only" {
+			t.Fatal("detect_only must not be an accepted consent_mode; the API rejects it")
+		}
+	}
+	if want := []string{"auto", "propose", "off"}; !reflect.DeepEqual(consentModeValues, want) {
+		t.Errorf("consentModeValues = %v, want %v", consentModeValues, want)
 	}
 }

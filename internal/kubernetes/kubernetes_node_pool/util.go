@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -49,6 +50,18 @@ const (
 	apiDescPublicIPType                  = "Public IP type for the node pool's nodes. Possible values: `dynamic`, `static`, `none`."
 	apiDescNodeTaints                    = "Taints applied to nodes in the node pool."
 	apiDescTransportPartitionID          = "ID of the Infiniband or RoCE partition to create node pool in. Must be in the location of the cluster if specified."
+	apiDescCurrent                       = "Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads."
+	apiDescUpdateSettings                = "Settings controlling how update operations may act on the node pool's existing nodes."
+	apiDescAllowScaleDown                = "Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed. Only supported on CMK v2 clusters."
+	apiDescHealth                        = "Issues currently detected on the node pool."
+	apiDescHealthIssues                  = "Current issues detected on the node pool."
+	apiDescIssueCode                     = "Machine-readable code for the issue, e.g. `INSUFFICIENT_CAPACITY`, `INSUFFICIENT_QUOTA`, `NODE_NOT_READY` or `INTERNAL_ERROR`. New codes may be added; treat unknown values as display-only. A code persists until the node deficit behind it is resolved."
+	apiDescIssueMessage                  = "Human-readable description of the issue."
+	apiDescIssueSince                    = "Time the issue started, in RFC3339 format."
+	apiDescAffectedCount                 = "Number of nodes affected by the issue."
+	apiDescAffectedNodeIDs               = "IDs of the affected nodes, when known. Node IDs are the IDs of the VMs backing the nodes."
+
+	apiDescConsentMode = "Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`."
 
 	apiDescTaintKey    = "Taint key. Follows the Kubernetes qualified-name format: an optional DNS subdomain prefix (up to 253 characters) followed by a `/`, then a name segment (up to 63 characters). Allowed characters: alphanumerics, `-`, `_`, and `.`. Must start and end with an alphanumeric character. Keys beginning with `crusoe.ai/` are reserved for internal use."
 	apiDescTaintValue  = "Taint value. May be empty. Follows the same format rules as a Kubernetes label value: up to 63 characters, alphanumerics and `-`, `_`, `.`."
@@ -69,6 +82,15 @@ const (
 		"The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. " +
 		"If both this and batch_size are omitted, existing nodes will not be updated, " +
 		"but new nodes will use the new configuration."
+
+	// providerDescV2Only marks the fields only a node pool served by the v2
+	// backend carries. Setting one on a pool served by v1 is refused by the API,
+	// and reads omit them, so they are null rather than defaulted.
+	providerDescV2Only = "Only available for node pools on CMK v2 clusters; null for others."
+
+	providerDescConsentModeDefault = "Newly created node pools default to `propose`. " +
+		"A node pool migrated from CMK v1 starts at `off`, so that remediation does not begin on a " +
+		"pool whose owner was never asked."
 )
 
 // providerDescIBPartitionIDDeprecated marks ib_partition_id as replaced by
@@ -368,6 +390,21 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	diags.Append(d...)
 	model.InstanceIDs = instanceIDs
 
+	// The v2-only group. All four are absent on a node pool served by v1, and
+	// absence is carried through rather than defaulted — see the API contract
+	// notes on each helper.
+	model.ConsentMode = stringOrNull(nodePool.ConsentMode)
+
+	updateSettings, d := updateSettingsToTFObject(nodePool.UpdateSettings)
+	diags.Append(d...)
+	model.UpdateSettings = updateSettings
+
+	health, d := healthToTFObject(ctx, nodePool.Health)
+	diags.Append(d...)
+	model.Health = health
+
+	model.Current = currentOrNull(nodePool)
+
 	// Terraform-only fields (not returned by the API) come from the reference model.
 	model.IBPartitionID = ref.IBPartitionID
 	model.TransportPartitionID = ref.TransportPartitionID
@@ -400,4 +437,169 @@ func sortedInstanceIDs(instanceIDs []string) []string {
 	slices.Sort(sorted)
 
 	return sorted
+}
+
+// Attribute names for the two nested blocks, referenced by both schemas and by
+// the conversions below.
+const (
+	attrAllowScaleDown  = "allow_scale_down"
+	attrHealthIssues    = "issues"
+	attrIssueCode       = "code"
+	attrIssueMessage    = "message"
+	attrIssueSince      = "since"
+	attrAffectedCount   = "affected_count"
+	attrAffectedNodeIDs = "affected_node_ids"
+)
+
+// Consent modes the API accepts on a write. detect_only is deliberately absent:
+// it is a real mode the backend rejects as "not yet available", so accepting it
+// here would only let a configuration fail on every apply.
+var consentModeValues = []string{"auto", "propose", "off"}
+
+func updateSettingsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		attrAllowScaleDown: types.BoolType,
+	}
+}
+
+func healthIssueAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		attrIssueCode:       types.StringType,
+		attrIssueMessage:    types.StringType,
+		attrIssueSince:      types.StringType,
+		attrAffectedCount:   types.Int64Type,
+		attrAffectedNodeIDs: types.ListType{ElemType: types.StringType},
+	}
+}
+
+func healthAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		attrHealthIssues: types.ListType{ElemType: types.ObjectType{AttrTypes: healthIssueAttrTypes()}},
+	}
+}
+
+// updateSettingsToTFObject renders the pool's update settings, preserving
+// absence: only a backend that carries them serves the block, and a null object
+// says "this pool has no update settings" rather than "scale-down is off".
+func updateSettingsToTFObject(settings *swagger.KubernetesNodePoolUpdateSettings) (types.Object, diag.Diagnostics) {
+	if settings == nil {
+		return types.ObjectNull(updateSettingsAttrTypes()), nil
+	}
+
+	return types.ObjectValue(updateSettingsAttrTypes(), map[string]attr.Value{
+		attrAllowScaleDown: types.BoolValue(settings.AllowScaleDown),
+	})
+}
+
+// tfObjectToUpdateSettings is the request direction. A null or unknown object
+// yields nil, and nil is meaningful: the API leaves the stored settings alone
+// when the block is absent and treats a present block as an assertion, so
+// presence must ride on the pointer rather than on the bool inside it. The
+// bool's own omitempty means a present block carrying false marshals as {},
+// which the API still reads as a present block.
+func tfObjectToUpdateSettings(ctx context.Context, obj types.Object) (
+	*swagger.KubernetesNodePoolUpdateSettings, diag.Diagnostics,
+) {
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil, nil
+	}
+
+	var model updateSettingsModel
+	diags := obj.As(ctx, &model, basetypes.ObjectAsOptions{})
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return &swagger.KubernetesNodePoolUpdateSettings{
+		AllowScaleDown: model.AllowScaleDown.ValueBool(),
+	}, diags
+}
+
+type updateSettingsModel struct {
+	AllowScaleDown types.Bool `tfsdk:"allow_scale_down"`
+}
+
+// healthToTFObject renders the derived health block.
+//
+// Absence is preserved for the same reason the API preserves it: a pool with
+// nothing to report carries no block at all, so "healthy" and "not reported"
+// look the same on the wire — and inventing an empty issues list here would
+// claim the former on a backend that only meant the latter.
+//
+// Issues are sorted by code, and each issue's node IDs lexically: both are
+// API-ordered collections with no guaranteed order, and an unsorted Computed
+// list re-orders between reads and shows up as a spurious diff (CCX-4394).
+func healthToTFObject(ctx context.Context, health *swagger.KubernetesNodePoolHealth) (
+	types.Object, diag.Diagnostics,
+) {
+	var diags diag.Diagnostics
+
+	if health == nil {
+		return types.ObjectNull(healthAttrTypes()), diags
+	}
+
+	issues := append([]swagger.KubernetesNodePoolHealthIssue(nil), health.Issues...)
+	slices.SortFunc(issues, func(a, b swagger.KubernetesNodePoolHealthIssue) int {
+		return strings.Compare(a.Code, b.Code)
+	})
+
+	issueValues := make([]attr.Value, 0, len(issues))
+	for _, issue := range issues {
+		nodeIDs, d := common.StringSliceToTFList(sortedInstanceIDs(issue.AffectedNodeIds))
+		diags.Append(d...)
+
+		issueValue, d := types.ObjectValue(healthIssueAttrTypes(), map[string]attr.Value{
+			attrIssueCode:       types.StringValue(issue.Code),
+			attrIssueMessage:    types.StringValue(issue.Message),
+			attrIssueSince:      stringOrNull(issue.Since),
+			attrAffectedCount:   types.Int64Value(issue.AffectedCount),
+			attrAffectedNodeIDs: nodeIDs,
+		})
+		diags.Append(d...)
+		issueValues = append(issueValues, issueValue)
+	}
+
+	issueList, d := types.ListValue(types.ObjectType{AttrTypes: healthIssueAttrTypes()}, issueValues)
+	diags.Append(d...)
+
+	healthObject, d := types.ObjectValue(healthAttrTypes(), map[string]attr.Value{
+		attrHealthIssues: issueList,
+	})
+	diags.Append(d...)
+
+	return healthObject, diags
+}
+
+// currentOrNull renders the pool's ready node count, preserving the absence the
+// API contract depends on: the spec says an omitted `current` means the serving
+// backend does not compute it, while zero "means the pool genuinely has no ready
+// nodes". The generated client models the field as a plain int64, so decoding
+// collapses those two into 0 and the distinction has to be recovered here.
+//
+// update_settings is the discriminator, because it is modelled as a pointer and
+// so survives decoding: a backend that derives read-time fields serves it
+// always, and one that does not never serves it. The narrow claim this rests on
+// is not "the pool is v2" but "this response carried derived read fields at
+// all" — if a backend ever computes `current` without also serving
+// update_settings, this would null a real count, and the fix then is to have the
+// spec model `current` as nullable rather than to widen the guess.
+func currentOrNull(nodePool *swagger.KubernetesNodePool) types.Int64 {
+	if nodePool.UpdateSettings == nil {
+		return types.Int64Null()
+	}
+
+	return types.Int64Value(nodePool.Current)
+}
+
+// planAllowsScaleDown reports whether the planned update_settings turn
+// scale-down on. An absent, unknown, or unreadable block is "off", matching the
+// API's own default — a plan-time warning must not claim nodes will be deleted
+// on a guess.
+func planAllowsScaleDown(ctx context.Context, updateSettings types.Object) bool {
+	settings, diags := tfObjectToUpdateSettings(ctx, updateSettings)
+	if diags.HasError() || settings == nil {
+		return false
+	}
+
+	return settings.AllowScaleDown
 }

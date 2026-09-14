@@ -40,6 +40,10 @@ type kubernetesNodePoolDataSourceModel struct {
 	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
 	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
 	PublicIPType                  types.String `tfsdk:"public_ip_type"`
+	ConsentMode                   types.String `tfsdk:"consent_mode"`
+	UpdateSettings                types.Object `tfsdk:"update_settings"`
+	Health                        types.Object `tfsdk:"health"`
+	Current                       types.Int64  `tfsdk:"current"`
 }
 
 func (e *kubernetesNodePoolDataSource) Metadata(_ context.Context,
@@ -144,6 +148,43 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 				Computed:            true,
 				MarkdownDescription: apiDescPublicIPType,
 			},
+			"consent_mode": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: apiDescConsentMode + " " + providerDescV2Only,
+			},
+			"update_settings": schema.SingleNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: apiDescUpdateSettings + " " + providerDescV2Only,
+				Attributes: map[string]schema.Attribute{
+					"allow_scale_down": schema.BoolAttribute{
+						Computed:            true,
+						MarkdownDescription: apiDescAllowScaleDown,
+					},
+				},
+			},
+			"health": schema.SingleNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: apiDescHealth + " " + providerDescV2Only,
+				Attributes: map[string]schema.Attribute{
+					"issues": schema.ListNestedAttribute{
+						Computed:            true,
+						MarkdownDescription: apiDescHealthIssues,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"code":              schema.StringAttribute{Computed: true, MarkdownDescription: apiDescIssueCode},
+								"message":           schema.StringAttribute{Computed: true, MarkdownDescription: apiDescIssueMessage},
+								"since":             schema.StringAttribute{Computed: true, MarkdownDescription: apiDescIssueSince},
+								"affected_count":    schema.Int64Attribute{Computed: true, MarkdownDescription: apiDescAffectedCount},
+								"affected_node_ids": schema.ListAttribute{Computed: true, ElementType: types.StringType, MarkdownDescription: apiDescAffectedNodeIDs},
+							},
+						},
+					},
+				},
+			},
+			"current": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: apiDescCurrent + " " + providerDescV2Only,
+			},
 		},
 	}
 }
@@ -209,6 +250,12 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
 	state.NvlinkDomainID = stringOrNull(kubernetesNodePool.NvlinkDomainId)
 	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
+	state.ConsentMode = stringOrNull(kubernetesNodePool.ConsentMode)
+	state.UpdateSettings, diags = updateSettingsToTFObject(kubernetesNodePool.UpdateSettings)
+	resp.Diagnostics.Append(diags...)
+	state.Health, diags = healthToTFObject(ctx, kubernetesNodePool.Health)
+	resp.Diagnostics.Append(diags...)
+	state.Current = currentOrNull(&kubernetesNodePool)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
