@@ -569,8 +569,19 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 			stored.ID.ValueString(),
 		)
 		if rolloutAsyncOperationErr != nil {
-			resp.Diagnostics.AddError("Failed to initiate rollout of nodes",
-				fmt.Sprintf("Unable to rollout nodes changes: %s", common.UnpackAPIError(rolloutAsyncOperationErr)))
+			// A warning, not an error: the node pool's own update already
+			// succeeded above, so failing the apply here reports a change that
+			// did happen as a change that did not, and leaves the customer with
+			// an apply that fails on every run while batch_size or
+			// batch_percentage stays in the configuration. Rollout is not
+			// available for every node pool — it is feature-gated, and the node
+			// pool v2 backend does not implement it at all — so an unavailable
+			// rollout must not block managing the pool.
+			resp.Diagnostics.AddWarning("Nodes were not rolled out",
+				fmt.Sprintf("The node pool's configuration was updated, but rolling out the change to "+
+					"existing nodes failed: %s\n\nNew nodes will use the new configuration. Existing nodes "+
+					"keep their current configuration until they are replaced.",
+					common.UnpackAPIError(rolloutAsyncOperationErr)))
 		} else {
 			resp.Diagnostics.AddWarning(
 				"Rollout initiated",
