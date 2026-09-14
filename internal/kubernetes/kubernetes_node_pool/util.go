@@ -543,8 +543,12 @@ func healthToTFObject(ctx context.Context, health *swagger.KubernetesNodePoolHea
 	}
 
 	issues := append([]swagger.KubernetesNodePoolHealthIssue(nil), health.Issues...)
-	slices.SortFunc(issues, func(a, b swagger.KubernetesNodePoolHealthIssue) int {
-		return strings.Compare(a.Code, b.Code)
+	slices.SortStableFunc(issues, func(a, b swagger.KubernetesNodePoolHealthIssue) int {
+		if byCode := strings.Compare(a.Code, b.Code); byCode != 0 {
+			return byCode
+		}
+
+		return strings.Compare(a.Message, b.Message)
 	})
 
 	issueValues := make([]attr.Value, 0, len(issues))

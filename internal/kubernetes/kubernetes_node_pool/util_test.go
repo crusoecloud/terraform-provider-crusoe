@@ -604,3 +604,45 @@ func TestConsentModeValuesExcludeDetectOnly(t *testing.T) {
 		t.Errorf("consentModeValues = %v, want %v", consentModeValues, want)
 	}
 }
+
+// TestHealthIssuesSortIsTotal covers two issues sharing a code. Ordering by code
+// alone would leave them in API order, which is not guaranteed stable — the
+// spurious-diff problem the sort exists to prevent, just one level down.
+func TestHealthIssuesSortIsTotal(t *testing.T) {
+	render := func(first, second string) []string {
+		health, diags := healthToTFObject(context.Background(), &swagger.KubernetesNodePoolHealth{
+			Issues: []swagger.KubernetesNodePoolHealthIssue{
+				{Code: "NODE_NOT_READY", Message: first},
+				{Code: "NODE_NOT_READY", Message: second},
+			},
+		})
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", diags)
+		}
+
+		var decoded struct {
+			Issues []struct {
+				Code            types.String `tfsdk:"code"`
+				Message         types.String `tfsdk:"message"`
+				Since           types.String `tfsdk:"since"`
+				AffectedCount   types.Int64  `tfsdk:"affected_count"`
+				AffectedNodeIDs types.List   `tfsdk:"affected_node_ids"`
+			} `tfsdk:"issues"`
+		}
+		if d := health.As(context.Background(), &decoded, basetypes.ObjectAsOptions{}); d.HasError() {
+			t.Fatalf("reading health: %v", d)
+		}
+
+		got := make([]string, 0, len(decoded.Issues))
+		for _, issue := range decoded.Issues {
+			got = append(got, issue.Message.ValueString())
+		}
+
+		return got
+	}
+
+	// The same two issues in either API order must render identically.
+	if a, b := render("alpha", "beta"), render("beta", "alpha"); !reflect.DeepEqual(a, b) {
+		t.Errorf("API order changed the rendered order: %v vs %v", a, b)
+	}
+}
