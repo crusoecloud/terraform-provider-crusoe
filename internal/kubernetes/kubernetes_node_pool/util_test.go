@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 func TestStringOrNull(t *testing.T) {
@@ -336,5 +337,50 @@ func TestValidateNodeTaintDuplicates(t *testing.T) {
 	err = validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{})
 	if err != nil {
 		t.Errorf("unexpected error for empty taints: %s", err)
+	}
+}
+
+// TestVersionUsesSemanticEqualityType is the node pool's counterpart to the
+// cluster's identical guard. version is mapped from the API's image_id, whose
+// spelling the provider does not control: a node pool reports the resolved
+// worker image's canonical version, never the bootstrap tarball suffix a
+// customer may legitimately configure. Without the custom type the framework
+// never asks whether the two spellings mean the same version.
+func TestVersionUsesSemanticEqualityType(t *testing.T) {
+	schemaResp := &resource.SchemaResponse{}
+	NewKubernetesNodePoolResource().Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	attr, ok := schemaResp.Schema.Attributes["version"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("version attribute is %T, want schema.StringAttribute", schemaResp.Schema.Attributes["version"])
+	}
+	if _, isVersionType := attr.CustomType.(common.K8sVersionType); !isVersionType {
+		t.Errorf("version CustomType = %T, want common.K8sVersionType", attr.CustomType)
+	}
+}
+
+// TestNodePoolNeedsRolloutIgnoresVersionSpelling checks that rollout detection
+// uses the same notion of "same version" as state does. A tarball-carrying
+// config against the canonical version the API reports is one version, not a
+// change, and must not propose replacing every node in the pool.
+func TestNodePoolNeedsRolloutIgnoresVersionSpelling(t *testing.T) {
+	base := func(version string) *kubernetesNodePoolResourceModel {
+		return &kubernetesNodePoolResourceModel{
+			Version:             common.NewK8sVersionValue(version),
+			RequestedNodeLabels: types.MapNull(types.StringType),
+			NodeTaints:          types.SetNull(types.ObjectType{AttrTypes: nodeTaintAttrTypes()}),
+		}
+	}
+
+	plan := base("1.35.5-cmk.22-https://example.com/bootstrap.tar.gz")
+	state := base("1.35.5-cmk.22")
+	if nodePoolNeedsRollout(plan, state) {
+		t.Error("a tarball suffix alone is not a version change and must not trigger a rollout")
+	}
+
+	plan = base("1.35.5-cmk.23")
+	state = base("1.35.5-cmk.22")
+	if !nodePoolNeedsRollout(plan, state) {
+		t.Error("a different build of one release is a real version change and should trigger a rollout")
 	}
 }

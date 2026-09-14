@@ -27,23 +27,23 @@ type kubernetesClusterDataSource struct {
 }
 
 type kubernetesClusterDataSourceModel struct {
-	ID                         types.String `tfsdk:"id"`
-	ProjectID                  types.String `tfsdk:"project_id"`
-	Name                       types.String `tfsdk:"name"`
-	Version                    types.String `tfsdk:"version"`
-	SubnetID                   types.String `tfsdk:"subnet_id"`
-	ClusterCidr                types.String `tfsdk:"cluster_cidr"`
-	NodeCidrMaskSize           types.Int64  `tfsdk:"node_cidr_mask_size"`
-	ServiceClusterIpRange      types.String `tfsdk:"service_cluster_ip_range"`
-	AddOns                     types.List   `tfsdk:"add_ons"`
-	Location                   types.String `tfsdk:"location"`
-	DNSName                    types.String `tfsdk:"dns_name"`
-	NodePoolIds                types.List   `tfsdk:"nodepool_ids"`
-	Private                    types.Bool   `tfsdk:"private"`
-	RoutingMode                types.String `tfsdk:"routing_mode"`
-	ApiserverExtraArgs         types.Map    `tfsdk:"apiserver_extra_args"`
-	SchedulerExtraArgs         types.Map    `tfsdk:"scheduler_extra_args"`
-	ControllerManagerExtraArgs types.Map    `tfsdk:"controller_manager_extra_args"`
+	ID                         types.String      `tfsdk:"id"`
+	ProjectID                  types.String      `tfsdk:"project_id"`
+	Name                       types.String      `tfsdk:"name"`
+	Version                    common.K8sVersion `tfsdk:"version"`
+	SubnetID                   types.String      `tfsdk:"subnet_id"`
+	ClusterCidr                types.String      `tfsdk:"cluster_cidr"`
+	NodeCidrMaskSize           types.Int64       `tfsdk:"node_cidr_mask_size"`
+	ServiceClusterIpRange      types.String      `tfsdk:"service_cluster_ip_range"`
+	AddOns                     types.List        `tfsdk:"add_ons"`
+	Location                   types.String      `tfsdk:"location"`
+	DNSName                    types.String      `tfsdk:"dns_name"`
+	NodePoolIds                types.List        `tfsdk:"nodepool_ids"`
+	Private                    types.Bool        `tfsdk:"private"`
+	RoutingMode                types.String      `tfsdk:"routing_mode"`
+	ApiserverExtraArgs         types.Map         `tfsdk:"apiserver_extra_args"`
+	SchedulerExtraArgs         types.Map         `tfsdk:"scheduler_extra_args"`
+	ControllerManagerExtraArgs types.Map         `tfsdk:"controller_manager_extra_args"`
 }
 
 func (ds *kubernetesClusterDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -86,6 +86,7 @@ func (ds *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sc
 			"version": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
+				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
 			},
 			"subnet_id": schema.StringAttribute{
@@ -189,7 +190,7 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 	state.ID = types.StringValue(kubernetesCluster.Id)
 	state.ProjectID = types.StringValue(kubernetesCluster.ProjectId)
 	state.Name = types.StringValue(kubernetesCluster.Name)
-	state.Version = types.StringValue(kubernetesCluster.Version)
+	state.Version = common.NewK8sVersionValue(kubernetesCluster.Version)
 	state.SubnetID = types.StringValue(kubernetesCluster.SubnetId)
 	state.NodeCidrMaskSize = types.Int64Value(int64(kubernetesCluster.NodeCidrMaskSize))
 	state.ClusterCidr = types.StringValue(kubernetesCluster.ClusterCidr)

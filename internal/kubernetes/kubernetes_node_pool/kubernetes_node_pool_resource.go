@@ -37,27 +37,27 @@ func NewKubernetesNodePoolResource() resource.Resource {
 }
 
 type kubernetesNodePoolResourceModel struct {
-	ID                            types.String `tfsdk:"id"`
-	ProjectID                     types.String `tfsdk:"project_id"`
-	Version                       types.String `tfsdk:"version"`
-	Type                          types.String `tfsdk:"type"`
-	InstanceCount                 types.Int64  `tfsdk:"instance_count"`
-	ClusterID                     types.String `tfsdk:"cluster_id"`
-	SubnetID                      types.String `tfsdk:"subnet_id"`
-	IBPartitionID                 types.String `tfsdk:"ib_partition_id"`
-	TransportPartitionID          types.String `tfsdk:"transport_partition_id"`
-	RequestedNodeLabels           types.Map    `tfsdk:"requested_node_labels"`
-	AllNodeLabels                 types.Map    `tfsdk:"all_node_labels"`
-	NodeTaints                    types.Set    `tfsdk:"node_taints"`
-	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
-	SSHKey                        types.String `tfsdk:"ssh_key"`
-	State                         types.String `tfsdk:"state"`
-	Name                          types.String `tfsdk:"name"`
-	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
-	BatchSize                     types.Int64  `tfsdk:"batch_size"`
-	BatchPercentage               types.Int64  `tfsdk:"batch_percentage"`
-	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
-	PublicIPType                  types.String `tfsdk:"public_ip_type"`
+	ID                            types.String      `tfsdk:"id"`
+	ProjectID                     types.String      `tfsdk:"project_id"`
+	Version                       common.K8sVersion `tfsdk:"version"`
+	Type                          types.String      `tfsdk:"type"`
+	InstanceCount                 types.Int64       `tfsdk:"instance_count"`
+	ClusterID                     types.String      `tfsdk:"cluster_id"`
+	SubnetID                      types.String      `tfsdk:"subnet_id"`
+	IBPartitionID                 types.String      `tfsdk:"ib_partition_id"`
+	TransportPartitionID          types.String      `tfsdk:"transport_partition_id"`
+	RequestedNodeLabels           types.Map         `tfsdk:"requested_node_labels"`
+	AllNodeLabels                 types.Map         `tfsdk:"all_node_labels"`
+	NodeTaints                    types.Set         `tfsdk:"node_taints"`
+	InstanceIDs                   types.List        `tfsdk:"instance_ids"`
+	SSHKey                        types.String      `tfsdk:"ssh_key"`
+	State                         types.String      `tfsdk:"state"`
+	Name                          types.String      `tfsdk:"name"`
+	EphemeralStorageForContainerd types.Bool        `tfsdk:"ephemeral_storage_for_containerd"`
+	BatchSize                     types.Int64       `tfsdk:"batch_size"`
+	BatchPercentage               types.Int64       `tfsdk:"batch_percentage"`
+	NvlinkDomainID                types.String      `tfsdk:"nvlink_domain_id"`
+	PublicIPType                  types.String      `tfsdk:"public_ip_type"`
 }
 
 func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -122,6 +122,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"version": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
+				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Validators: []validator.String{stringvalidator.RegexMatches(

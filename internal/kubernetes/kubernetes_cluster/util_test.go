@@ -6,10 +6,15 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	dsschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 func mustMap(t *testing.T, m map[string]string) types.Map {
@@ -145,5 +150,39 @@ func Test_clusterToResourceModel_createReadIdentical(t *testing.T) {
 
 	if !reflect.DeepEqual(createModel, readModel) {
 		t.Errorf("Create and Read produced different state:\n create = %+v\n read   = %+v", createModel, readModel)
+	}
+}
+
+// Test_versionUsesSemanticEqualityType guards the wiring that makes a CMKv2
+// cluster creatable. The preservation itself happens in the framework, which
+// only invokes semantic equality when the attribute declares the custom type —
+// so dropping CustomType here would silently restore "Provider produced
+// inconsistent result after apply" on every CMKv2 create. Both schemas are
+// checked because state flows through each.
+func Test_versionUsesSemanticEqualityType(t *testing.T) {
+	ctx := context.Background()
+
+	resourceSchema := &resource.SchemaResponse{}
+	NewKubernetesClusterResource().Schema(ctx, resource.SchemaRequest{}, resourceSchema)
+
+	attr, ok := resourceSchema.Schema.Attributes["version"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("resource version attribute is %T, want schema.StringAttribute",
+			resourceSchema.Schema.Attributes["version"])
+	}
+	if _, isVersionType := attr.CustomType.(common.K8sVersionType); !isVersionType {
+		t.Errorf("resource version CustomType = %T, want common.K8sVersionType", attr.CustomType)
+	}
+
+	dataSourceSchema := &datasource.SchemaResponse{}
+	NewKubernetesClusterDataSource().Schema(ctx, datasource.SchemaRequest{}, dataSourceSchema)
+
+	dsAttr, ok := dataSourceSchema.Schema.Attributes["version"].(dsschema.StringAttribute)
+	if !ok {
+		t.Fatalf("data source version attribute is %T, want dsschema.StringAttribute",
+			dataSourceSchema.Schema.Attributes["version"])
+	}
+	if _, isVersionType := dsAttr.CustomType.(common.K8sVersionType); !isVersionType {
+		t.Errorf("data source version CustomType = %T, want common.K8sVersionType", dsAttr.CustomType)
 	}
 }

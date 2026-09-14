@@ -202,7 +202,7 @@ func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operati
 
 // nodePoolNeedsRollout checks if plan and state differences require rollout of changes
 func nodePoolNeedsRollout(plan, state *kubernetesNodePoolResourceModel) bool {
-	return !plan.Version.Equal(state.Version) ||
+	return !common.SameK8sVersion(plan.Version.ValueString(), state.Version.ValueString()) ||
 		!plan.RequestedNodeLabels.Equal(state.RequestedNodeLabels) ||
 		!plan.NodeTaints.Equal(state.NodeTaints) ||
 		!plan.EphemeralStorageForContainerd.Equal(state.EphemeralStorageForContainerd) ||
@@ -332,7 +332,7 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	model.ID = types.StringValue(nodePool.Id)
 	model.ProjectID = types.StringValue(nodePool.ProjectId)
 	model.InstanceCount = types.Int64Value(nodePool.Count)
-	model.Version = types.StringValue(nodePool.ImageId)
+	model.Version = common.NewK8sVersionValue(nodePool.ImageId)
 	model.Type = types.StringValue(nodePool.Type_)
 	model.ClusterID = types.StringValue(nodePool.ClusterId)
 	model.SubnetID = types.StringValue(nodePool.SubnetId)
