@@ -1,7 +1,6 @@
 package kubernetes_node_pool
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -118,18 +117,33 @@ func validateAliasPairConfig(deprecated, replacement types.String, diags *diag.D
 	)
 }
 
-func ParseOpResultStrict[T any](opResult interface{}) (*T, error) {
+// parseNodePoolOpResult decodes an operation result document into T, ignoring
+// fields T does not model.
+//
+// The leniency is deliberate and load-bearing, which is why it is stated here:
+// the API adds response fields over the life of a released provider, and a
+// provider that refused a document carrying one would break against a newer API
+// until its pinned client-go caught up — backwards for a client, whose job is to
+// keep working. A node pool served by the v2 backend already carries fields
+// (health, current, update_settings, consent_mode) that older client-go versions
+// do not model.
+//
+// This function used to construct a json.Decoder and call DisallowUnknownFields
+// on it, then decode with json.Unmarshal instead — so the strictness never took
+// effect and the name claimed the opposite of the behavior. Making it real would
+// have broken every create and update against a v2-backed pool.
+//
+// AwaitNodePoolOrNodePoolResponse's fallback does not depend on strictness: it
+// discriminates on NodePool being nil, which is what a bare KubernetesNodePool
+// document (no "node_pool" key) decodes to here.
+func parseNodePoolOpResult[T any](opResult interface{}) (*T, error) {
 	b, err := json.Marshal(opResult)
 	if err != nil {
 		return nil, common.ErrUnableToGetOpRes
 	}
 
 	var result T
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
-
-	err = json.Unmarshal(b, &result)
-	if err != nil {
+	if err := json.Unmarshal(b, &result); err != nil {
 		return nil, common.ErrUnableToGetOpRes
 	}
 
@@ -162,10 +176,10 @@ func AwaitNodePoolOrNodePoolResponse(ctx context.Context, asyncOperation *swagge
 	}
 
 	// Try new node pool response
-	nodePoolResponse, err = ParseOpResultStrict[nodePoolOpResult](finalOp.Result)
+	nodePoolResponse, err = parseNodePoolOpResult[nodePoolOpResult](finalOp.Result)
 	if err != nil || nodePoolResponse.NodePool == nil {
 		// Handle old node pool response
-		nodePool, secondErr = ParseOpResultStrict[swagger.KubernetesNodePool](finalOp.Result)
+		nodePool, secondErr = parseNodePoolOpResult[swagger.KubernetesNodePool](finalOp.Result)
 		if secondErr != nil {
 			// Both demarshal attempts failed
 			return nil, nil, fmt.Errorf("%w: %w and %w", ErrFailedDemarshal, err, secondErr)
