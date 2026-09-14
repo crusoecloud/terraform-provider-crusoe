@@ -56,7 +56,7 @@ resource "crusoe_kubernetes_node_pool" "example" {
 
 - `batch_percentage` (Number) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. Percentage of nodes to update concurrently during rollout. The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. If both this and batch_size are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
 - `batch_size` (Number) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. Number of nodes to update at a time during rollout (minimum 1, maximum 10). Mutually exclusive with batch_percentage. If both this and batch_percentage are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
-- `consent_mode` (String) Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`. Newly created node pools default to `propose`. A node pool migrated from CMK v1 starts at `off`, so that remediation does not begin on a pool whose owner was never asked. Only available for node pools on CMK v2 clusters; null for others.
+- `consent_mode` (String) Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`. Newly created node pools default to `propose`. A node pool that predates this setting starts at `off`, so that remediation does not begin on a pool whose owner was never asked. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
 - `ephemeral_storage_for_containerd` (Boolean) Whether the first local ephemeral NVMe disk is used for containerd storage.
 - `ib_partition_id` (String, Deprecated) This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
 - `node_taints` (Block Set) Taints applied to nodes in the node pool. (see [below for nested schema](#nestedblock--node_taints))
@@ -66,14 +66,14 @@ resource "crusoe_kubernetes_node_pool" "example" {
 - `requested_node_labels` (Map of String) Labels to assign to nodes in the new node pool.
 - `subnet_id` (String) ID of the subnet the node pool belongs to.
 - `transport_partition_id` (String) ID of the Infiniband or RoCE partition to create node pool in. Must be in the location of the cluster if specified.
-- `update_settings` (Attributes) Settings controlling how update operations may act on the node pool's existing nodes. Only available for node pools on CMK v2 clusters; null for others. (see [below for nested schema](#nestedatt--update_settings))
+- `update_settings` (Attributes) Settings controlling how update operations may act on the node pool's existing nodes. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--update_settings))
 - `version` (String) Version of the Kubernetes node pool.
 
 ### Read-Only
 
 - `all_node_labels` (Map of String) Labels assigned to nodes in the node pool.
-- `current` (Number) Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads. Only available for node pools on CMK v2 clusters; null for others.
-- `health` (Attributes) Issues currently detected on the node pool. Only available for node pools on CMK v2 clusters; null for others. (see [below for nested schema](#nestedatt--health))
+- `current` (Number) Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
+- `health` (Attributes) Issues currently detected on the node pool. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--health))
 - `id` (String) ID of the node pool.
 - `instance_ids` (List of String) IDs of the instances within the node pool.
 - `state` (String) Current state of the node pool.
@@ -96,7 +96,7 @@ Optional:
 
 Optional:
 
-- `allow_scale_down` (Boolean) Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed. Only supported on CMK v2 clusters.
+- `allow_scale_down` (Boolean) Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed.
 
 
 <a id="nestedatt--health"></a>

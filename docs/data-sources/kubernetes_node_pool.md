@@ -42,12 +42,12 @@ data "crusoe_kubernetes_node_pool" "example" {
 
 ### Read-Only
 
-- `consent_mode` (String) Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`. Only available for node pools on CMK v2 clusters; null for others.
-- `current` (Number) Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads. Only available for node pools on CMK v2 clusters; null for others.
-- `health` (Attributes) Issues currently detected on the node pool. Only available for node pools on CMK v2 clusters; null for others. (see [below for nested schema](#nestedatt--health))
+- `consent_mode` (String) Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
+- `current` (Number) Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
+- `health` (Attributes) Issues currently detected on the node pool. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--health))
 - `node_taints` (Attributes Set) Taints applied to nodes in the node pool. (see [below for nested schema](#nestedatt--node_taints))
 - `public_ip_type` (String) Public IP type for the node pool's nodes. Possible values: `dynamic`, `static`, `none`.
-- `update_settings` (Attributes) Settings controlling how update operations may act on the node pool's existing nodes. Only available for node pools on CMK v2 clusters; null for others. (see [below for nested schema](#nestedatt--update_settings))
+- `update_settings` (Attributes) Settings controlling how update operations may act on the node pool's existing nodes. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--update_settings))
 
 <a id="nestedatt--health"></a>
 ### Nested Schema for `health`
@@ -84,4 +84,4 @@ Read-Only:
 
 Read-Only:
 
-- `allow_scale_down` (Boolean) Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed. Only supported on CMK v2 clusters.
+- `allow_scale_down` (Boolean) Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed.

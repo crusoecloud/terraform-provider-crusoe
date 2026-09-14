@@ -245,14 +245,14 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				Optional: true,
 				Computed: true,
 				MarkdownDescription: apiDescConsentMode + " " + providerDescConsentModeDefault + " " +
-					providerDescV2Only,
+					providerDescLimitedAvailability,
 				Validators:    []validator.String{stringvalidator.OneOf(consentModeValues...)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"update_settings": schema.SingleNestedAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: apiDescUpdateSettings + " " + providerDescV2Only,
+				MarkdownDescription: apiDescUpdateSettings + " " + providerDescLimitedAvailability,
 				PlanModifiers:       []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 				Attributes: map[string]schema.Attribute{
 					"allow_scale_down": schema.BoolAttribute{
@@ -265,7 +265,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			},
 			"health": schema.SingleNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: apiDescHealth + " " + providerDescV2Only,
+				MarkdownDescription: apiDescHealth + " " + providerDescLimitedAvailability,
 				Attributes: map[string]schema.Attribute{
 					"issues": schema.ListNestedAttribute{
 						Computed:            true,
@@ -284,7 +284,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			},
 			"current": schema.Int64Attribute{
 				Computed:            true,
-				MarkdownDescription: apiDescCurrent + " " + providerDescV2Only,
+				MarkdownDescription: apiDescCurrent + " " + providerDescLimitedAvailability,
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -490,7 +490,8 @@ func (r *kubernetesNodePoolResource) ModifyPlan(ctx context.Context, req resourc
 	// Warn if instance count is decreasing. What actually happens depends on
 	// update_settings.allow_scale_down, so the two outcomes are described
 	// separately: with it off — the default, and the only behavior available on
-	// a CMK v1 cluster — the API records the new target and reports a health
+	// a cluster that does not support the setting — the API records the new
+	// target and reports a health
 	// issue without removing anything, which is the case the single old message
 	// described. With it on, the update drains and deletes nodes, which is
 	// destructive and worth saying plainly.
@@ -510,7 +511,7 @@ func (r *kubernetesNodePoolResource) ModifyPlan(ctx context.Context, req resourc
 				"Node pool instance count decreased",
 				"Decreasing the count records the new target but does not delete existing nodes, and the "+
 					"node pool reports a health issue while it has more nodes than desired. To let updates "+
-					"remove nodes, set update_settings.allow_scale_down (CMK v2 clusters only). Otherwise "+
+					"remove nodes, set update_settings.allow_scale_down where it is supported. Otherwise "+
 					"delete the nodes manually.",
 			)
 		}

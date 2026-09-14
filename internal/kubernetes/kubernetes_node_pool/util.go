@@ -52,7 +52,7 @@ const (
 	apiDescTransportPartitionID          = "ID of the Infiniband or RoCE partition to create node pool in. Must be in the location of the cluster if specified."
 	apiDescCurrent                       = "Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads."
 	apiDescUpdateSettings                = "Settings controlling how update operations may act on the node pool's existing nodes."
-	apiDescAllowScaleDown                = "Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed. Only supported on CMK v2 clusters."
+	apiDescAllowScaleDown                = "Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed."
 	apiDescHealth                        = "Issues currently detected on the node pool."
 	apiDescHealthIssues                  = "Current issues detected on the node pool."
 	apiDescIssueCode                     = "Machine-readable code for the issue, e.g. `INSUFFICIENT_CAPACITY`, `INSUFFICIENT_QUOTA`, `NODE_NOT_READY` or `INTERNAL_ERROR`. New codes may be added; treat unknown values as display-only. A code persists until the node deficit behind it is resolved."
@@ -83,14 +83,18 @@ const (
 		"If both this and batch_size are omitted, existing nodes will not be updated, " +
 		"but new nodes will use the new configuration."
 
-	// providerDescV2Only marks the fields only a node pool served by the v2
-	// backend carries. Setting one on a pool served by v1 is refused by the API,
-	// and reads omit them, so they are null rather than defaulted.
-	providerDescV2Only = "Only available for node pools on CMK v2 clusters; null for others."
+	// providerDescLimitedAvailability marks the fields not every node pool
+	// carries. Which node pools support them depends on the cluster and is not
+	// something a customer can read off their own configuration, so the text
+	// points at support rather than naming an internal cluster generation.
+	// Setting one where it is unsupported is refused by the API, and reads omit
+	// it, so it is null rather than defaulted.
+	providerDescLimitedAvailability = "Supported only on some clusters; null on node pools where it is " +
+		"not supported. " + common.DevelopmentSupportMessage
 
 	providerDescConsentModeDefault = "Newly created node pools default to `propose`. " +
-		"A node pool migrated from CMK v1 starts at `off`, so that remediation does not begin on a " +
-		"pool whose owner was never asked."
+		"A node pool that predates this setting starts at `off`, so that remediation does not begin " +
+		"on a pool whose owner was never asked."
 )
 
 // providerDescIBPartitionIDDeprecated marks ib_partition_id as replaced by

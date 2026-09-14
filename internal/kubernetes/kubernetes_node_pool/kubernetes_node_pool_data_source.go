@@ -150,11 +150,11 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 			},
 			"consent_mode": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: apiDescConsentMode + " " + providerDescV2Only,
+				MarkdownDescription: apiDescConsentMode + " " + providerDescLimitedAvailability,
 			},
 			"update_settings": schema.SingleNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: apiDescUpdateSettings + " " + providerDescV2Only,
+				MarkdownDescription: apiDescUpdateSettings + " " + providerDescLimitedAvailability,
 				Attributes: map[string]schema.Attribute{
 					"allow_scale_down": schema.BoolAttribute{
 						Computed:            true,
@@ -164,7 +164,7 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 			},
 			"health": schema.SingleNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: apiDescHealth + " " + providerDescV2Only,
+				MarkdownDescription: apiDescHealth + " " + providerDescLimitedAvailability,
 				Attributes: map[string]schema.Attribute{
 					"issues": schema.ListNestedAttribute{
 						Computed:            true,
@@ -183,7 +183,7 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 			},
 			"current": schema.Int64Attribute{
 				Computed:            true,
-				MarkdownDescription: apiDescCurrent + " " + providerDescV2Only,
+				MarkdownDescription: apiDescCurrent + " " + providerDescLimitedAvailability,
 			},
 		},
 	}
