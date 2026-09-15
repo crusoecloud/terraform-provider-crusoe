@@ -2,6 +2,7 @@ package kubernetes_node_pool
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,8 +11,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
 func TestStringOrNull(t *testing.T) {
@@ -336,5 +339,310 @@ func TestValidateNodeTaintDuplicates(t *testing.T) {
 	err = validateNodeTaintDuplicates([]swagger.KubernetesNodeTaint{})
 	if err != nil {
 		t.Errorf("unexpected error for empty taints: %s", err)
+	}
+}
+
+// TestVersionUsesSemanticEqualityType is the node pool's counterpart to the
+// cluster's identical guard. version is mapped from the API's image_id, whose
+// spelling the provider does not control: a node pool reports the resolved
+// worker image's canonical version, never the bootstrap tarball suffix a
+// customer may legitimately configure. Without the custom type the framework
+// never asks whether the two spellings mean the same version.
+func TestVersionUsesSemanticEqualityType(t *testing.T) {
+	schemaResp := &resource.SchemaResponse{}
+	NewKubernetesNodePoolResource().Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	versionAttr, ok := schemaResp.Schema.Attributes["version"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("version attribute is %T, want schema.StringAttribute", schemaResp.Schema.Attributes["version"])
+	}
+	if _, isVersionType := versionAttr.CustomType.(common.K8sVersionType); !isVersionType {
+		t.Errorf("version CustomType = %T, want common.K8sVersionType", versionAttr.CustomType)
+	}
+}
+
+// TestNodePoolNeedsRolloutIgnoresVersionSpelling checks that rollout detection
+// uses the same notion of "same version" as state does. A tarball-carrying
+// config against the canonical version the API reports is one version, not a
+// change, and must not propose replacing every node in the pool.
+func TestNodePoolNeedsRolloutIgnoresVersionSpelling(t *testing.T) {
+	base := func(version string) *kubernetesNodePoolResourceModel {
+		return &kubernetesNodePoolResourceModel{
+			Version:             common.NewK8sVersionValue(version),
+			RequestedNodeLabels: types.MapNull(types.StringType),
+			NodeTaints:          types.SetNull(types.ObjectType{AttrTypes: nodeTaintAttrTypes()}),
+		}
+	}
+
+	plan := base("1.35.5-cmk.22-https://example.com/bootstrap.tar.gz")
+	state := base("1.35.5-cmk.22")
+	if nodePoolNeedsRollout(plan, state) {
+		t.Error("a tarball suffix alone is not a version change and must not trigger a rollout")
+	}
+
+	plan = base("1.35.5-cmk.23")
+	state = base("1.35.5-cmk.22")
+	if !nodePoolNeedsRollout(plan, state) {
+		t.Error("a different build of one release is a real version change and should trigger a rollout")
+	}
+}
+
+// TestPatchRequestCarriesSSHKey pins the one field whose absence is destructive
+// rather than merely missing.
+//
+// The generated client has no omitempty on ssh_public_key, so an unset field
+// still serializes as `"ssh_public_key": ""`. The gateway's own field is a
+// pointer, so the empty string arrives as a present value and reaches the
+// backend as a request to change the key — and the node pool v2 update path has
+// no empty guard, so it rebuilds the pool's instance template with no key at
+// all. Every update, including a bare instance_count change, silently stripped
+// the customer's SSH key from future nodes.
+//
+// The assertion is on the marshalled bytes because the bug lives in the
+// serialization, not in the struct.
+func TestPatchRequestCarriesSSHKey(t *testing.T) {
+	const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test@example.com"
+
+	patch := swagger.KubernetesNodePoolPatchRequest{
+		Count:        3,
+		SshPublicKey: sshKey,
+	}
+
+	body, err := json.Marshal(patch)
+	if err != nil {
+		t.Fatalf("marshalling the patch request: %v", err)
+	}
+
+	var sent map[string]any
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("unmarshalling the patch body: %v", err)
+	}
+
+	got, present := sent["ssh_public_key"]
+	if !present {
+		t.Fatal("ssh_public_key is absent from the patch body; the generated client has no omitempty, " +
+			"so this should never happen")
+	}
+	if got != sshKey {
+		t.Errorf("ssh_public_key = %q, want the pool's standing key %q; an empty value rebuilds the "+
+			"instance template without an SSH key on the v2 backend", got, sshKey)
+	}
+}
+
+// TestV2FieldsAbsentOnV1Pool is the central contract for the four fields only a
+// v2-backed node pool carries: absence is carried through, never defaulted.
+//
+// The API omits all four for a v1-backed pool, and each absence means something
+// specific. Defaulting update_settings to {allow_scale_down: false} would claim
+// scale-down is configured and off; defaulting consent_mode to "off" would claim
+// remediation is deliberately disabled on a pool that has its own remediation
+// path; and an empty health block would claim the pool is healthy when the
+// backend only meant it does not report.
+func TestV2FieldsAbsentOnV1Pool(t *testing.T) {
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolResourceModel
+	ref := &kubernetesNodePoolResourceModel{RequestedNodeLabels: types.MapNull(types.StringType)}
+
+	// A v1-backed pool: no consent mode, no update settings, no health, and a
+	// current the generated client cannot tell apart from a real zero.
+	nodePoolToResourceModel(context.Background(), &swagger.KubernetesNodePool{Id: "pool-1"}, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !model.ConsentMode.IsNull() {
+		t.Errorf("consent_mode = %v, want null", model.ConsentMode)
+	}
+	if !model.UpdateSettings.IsNull() {
+		t.Errorf("update_settings = %v, want null", model.UpdateSettings)
+	}
+	if !model.Health.IsNull() {
+		t.Errorf("health = %v, want null (absent means not reported, not healthy)", model.Health)
+	}
+	if !model.Current.IsNull() {
+		t.Errorf("current = %v, want null; reporting 0 would read as no ready nodes", model.Current)
+	}
+}
+
+// TestV2FieldsPresentOnV2Pool is the other half: a genuine zero must survive.
+func TestV2FieldsPresentOnV2Pool(t *testing.T) {
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolResourceModel
+	ref := &kubernetesNodePoolResourceModel{RequestedNodeLabels: types.MapNull(types.StringType)}
+
+	nodePoolToResourceModel(context.Background(), &swagger.KubernetesNodePool{
+		Id:             "pool-1",
+		ConsentMode:    "propose",
+		UpdateSettings: &swagger.KubernetesNodePoolUpdateSettings{AllowScaleDown: true},
+		Current:        0, // genuinely no ready nodes yet
+	}, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if got := model.ConsentMode.ValueString(); got != "propose" {
+		t.Errorf("consent_mode = %q, want %q", got, "propose")
+	}
+	if model.UpdateSettings.IsNull() {
+		t.Fatal("update_settings should be present")
+	}
+	if model.Current.IsNull() || model.Current.ValueInt64() != 0 {
+		t.Errorf("current = %v, want 0; a v2 pool serving zero means zero ready nodes", model.Current)
+	}
+	if !planAllowsScaleDown(context.Background(), model.UpdateSettings) {
+		t.Error("allow_scale_down should read back as true")
+	}
+}
+
+// TestHealthIssuesSortedAndPresent covers the derived block, including the
+// ordering the CCX-4394 rule requires of any API-ordered Computed list.
+func TestHealthIssuesSortedAndPresent(t *testing.T) {
+	var diags diag.Diagnostics
+	health, d := healthToTFObject(context.Background(), &swagger.KubernetesNodePoolHealth{
+		Issues: []swagger.KubernetesNodePoolHealthIssue{
+			{
+				Code: "NODE_NOT_READY", Message: "one node is not ready", AffectedCount: 1,
+				AffectedNodeIds: []string{"vm-c", "vm-a", "vm-b"},
+			},
+			{Code: "INSUFFICIENT_CAPACITY", Message: "waiting for capacity", AffectedCount: 2},
+		},
+	})
+	diags.Append(d...)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if health.IsNull() {
+		t.Fatal("health should be present when there are issues")
+	}
+
+	var decoded struct {
+		Issues []struct {
+			Code            types.String `tfsdk:"code"`
+			Message         types.String `tfsdk:"message"`
+			Since           types.String `tfsdk:"since"`
+			AffectedCount   types.Int64  `tfsdk:"affected_count"`
+			AffectedNodeIDs types.List   `tfsdk:"affected_node_ids"`
+		} `tfsdk:"issues"`
+	}
+	if d := health.As(context.Background(), &decoded, basetypes.ObjectAsOptions{}); d.HasError() {
+		t.Fatalf("reading the health object: %v", d)
+	}
+
+	if len(decoded.Issues) != 2 {
+		t.Fatalf("got %d issues, want 2", len(decoded.Issues))
+	}
+	// Sorted by code, so the capacity issue comes first regardless of API order.
+	if got := decoded.Issues[0].Code.ValueString(); got != "INSUFFICIENT_CAPACITY" {
+		t.Errorf("first issue code = %q, want INSUFFICIENT_CAPACITY (issues sort by code)", got)
+	}
+	// since is optional; an absent one is null rather than an empty string.
+	if !decoded.Issues[0].Since.IsNull() {
+		t.Errorf("since = %v, want null when the API omits it", decoded.Issues[0].Since)
+	}
+
+	var nodeIDs []string
+	if d := decoded.Issues[1].AffectedNodeIDs.ElementsAs(context.Background(), &nodeIDs, false); d.HasError() {
+		t.Fatalf("reading affected_node_ids: %v", d)
+	}
+	if want := []string{"vm-a", "vm-b", "vm-c"}; !reflect.DeepEqual(nodeIDs, want) {
+		t.Errorf("affected_node_ids = %v, want %v (sorted)", nodeIDs, want)
+	}
+}
+
+// TestUpdateSettingsPresenceRidesOnThePointer pins the distinction the API
+// depends on. allow_scale_down has omitempty, so a present block holding false
+// marshals as {} — the pointer is the only thing that separates "leave the
+// stored setting alone" from "turn scale-down off".
+func TestUpdateSettingsPresenceRidesOnThePointer(t *testing.T) {
+	ctx := context.Background()
+
+	absent, diags := tfObjectToUpdateSettings(ctx, types.ObjectNull(updateSettingsAttrTypes()))
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if absent != nil {
+		t.Error("an absent block must yield a nil pointer, so the request omits update_settings entirely")
+	}
+
+	configured, diags := types.ObjectValueFrom(ctx, updateSettingsAttrTypes(),
+		updateSettingsModel{AllowScaleDown: types.BoolValue(false)})
+	if diags.HasError() {
+		t.Fatalf("building the object: %v", diags)
+	}
+
+	present, diags := tfObjectToUpdateSettings(ctx, configured)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if present == nil {
+		t.Fatal("a configured block must yield a non-nil pointer even when allow_scale_down is false")
+	}
+	if present.AllowScaleDown {
+		t.Error("allow_scale_down should be false")
+	}
+
+	body, err := json.Marshal(present)
+	if err != nil {
+		t.Fatalf("marshalling update settings: %v", err)
+	}
+	if string(body) != "{}" {
+		t.Errorf("update_settings marshalled as %s; expected {} because allow_scale_down has omitempty — "+
+			"if this changes, re-check that the API still reads a present block as an assertion", body)
+	}
+}
+
+// TestConsentModeValuesExcludeDetectOnly guards the one enum value that must
+// not be offered: the API rejects detect_only as "not yet available", so
+// accepting it here would only let a configuration fail on every apply.
+func TestConsentModeValuesExcludeDetectOnly(t *testing.T) {
+	for _, mode := range consentModeValues {
+		if mode == "detect_only" {
+			t.Fatal("detect_only must not be an accepted consent_mode; the API rejects it")
+		}
+	}
+	if want := []string{"auto", "propose", "off"}; !reflect.DeepEqual(consentModeValues, want) {
+		t.Errorf("consentModeValues = %v, want %v", consentModeValues, want)
+	}
+}
+
+// TestHealthIssuesSortIsTotal covers two issues sharing a code. Ordering by code
+// alone would leave them in API order, which is not guaranteed stable — the
+// spurious-diff problem the sort exists to prevent, just one level down.
+func TestHealthIssuesSortIsTotal(t *testing.T) {
+	render := func(first, second string) []string {
+		health, diags := healthToTFObject(context.Background(), &swagger.KubernetesNodePoolHealth{
+			Issues: []swagger.KubernetesNodePoolHealthIssue{
+				{Code: "NODE_NOT_READY", Message: first},
+				{Code: "NODE_NOT_READY", Message: second},
+			},
+		})
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", diags)
+		}
+
+		var decoded struct {
+			Issues []struct {
+				Code            types.String `tfsdk:"code"`
+				Message         types.String `tfsdk:"message"`
+				Since           types.String `tfsdk:"since"`
+				AffectedCount   types.Int64  `tfsdk:"affected_count"`
+				AffectedNodeIDs types.List   `tfsdk:"affected_node_ids"`
+			} `tfsdk:"issues"`
+		}
+		if d := health.As(context.Background(), &decoded, basetypes.ObjectAsOptions{}); d.HasError() {
+			t.Fatalf("reading health: %v", d)
+		}
+
+		got := make([]string, 0, len(decoded.Issues))
+		for _, issue := range decoded.Issues {
+			got = append(got, issue.Message.ValueString())
+		}
+
+		return got
+	}
+
+	// The same two issues in either API order must render identically.
+	if a, b := render("alpha", "beta"), render("beta", "alpha"); !reflect.DeepEqual(a, b) {
+		t.Errorf("API order changed the rendered order: %v vs %v", a, b)
 	}
 }

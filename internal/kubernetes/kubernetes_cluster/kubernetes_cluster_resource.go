@@ -43,29 +43,29 @@ func NewKubernetesClusterResource() resource.Resource {
 }
 
 type kubernetesClusterResourceModel struct {
-	ID                         types.String `tfsdk:"id"`
-	ProjectID                  types.String `tfsdk:"project_id"`
-	Name                       types.String `tfsdk:"name"`
-	Version                    types.String `tfsdk:"version"`
-	SubnetID                   types.String `tfsdk:"subnet_id"`
-	ClusterCidr                types.String `tfsdk:"cluster_cidr"`
-	NodeCidrMaskSize           types.Int64  `tfsdk:"node_cidr_mask_size"`
-	ServiceClusterIpRange      types.String `tfsdk:"service_cluster_ip_range"`
-	AddOns                     types.List   `tfsdk:"add_ons"`
-	Location                   types.String `tfsdk:"location"`
-	DNSName                    types.String `tfsdk:"dns_name"`
-	NodePoolIds                types.List   `tfsdk:"nodepool_ids"`
-	OIDCIssuerURL              types.String `tfsdk:"oidc_issuer_url"`
-	OIDCClientID               types.String `tfsdk:"oidc_client_id"`
-	OIDCUsernameClaim          types.String `tfsdk:"oidc_username_claim"`
-	OIDCUsernamePrefix         types.String `tfsdk:"oidc_username_prefix"`
-	OIDCGroupsClaim            types.String `tfsdk:"oidc_groups_claim"`
-	OIDCCACert                 types.String `tfsdk:"oidc_ca_cert"`
-	Private                    types.Bool   `tfsdk:"private"`
-	RoutingMode                types.String `tfsdk:"routing_mode"`
-	ApiserverExtraArgs         types.Map    `tfsdk:"apiserver_extra_args"`
-	SchedulerExtraArgs         types.Map    `tfsdk:"scheduler_extra_args"`
-	ControllerManagerExtraArgs types.Map    `tfsdk:"controller_manager_extra_args"`
+	ID                         types.String      `tfsdk:"id"`
+	ProjectID                  types.String      `tfsdk:"project_id"`
+	Name                       types.String      `tfsdk:"name"`
+	Version                    common.K8sVersion `tfsdk:"version"`
+	SubnetID                   types.String      `tfsdk:"subnet_id"`
+	ClusterCidr                types.String      `tfsdk:"cluster_cidr"`
+	NodeCidrMaskSize           types.Int64       `tfsdk:"node_cidr_mask_size"`
+	ServiceClusterIpRange      types.String      `tfsdk:"service_cluster_ip_range"`
+	AddOns                     types.List        `tfsdk:"add_ons"`
+	Location                   types.String      `tfsdk:"location"`
+	DNSName                    types.String      `tfsdk:"dns_name"`
+	NodePoolIds                types.List        `tfsdk:"nodepool_ids"`
+	OIDCIssuerURL              types.String      `tfsdk:"oidc_issuer_url"`
+	OIDCClientID               types.String      `tfsdk:"oidc_client_id"`
+	OIDCUsernameClaim          types.String      `tfsdk:"oidc_username_claim"`
+	OIDCUsernamePrefix         types.String      `tfsdk:"oidc_username_prefix"`
+	OIDCGroupsClaim            types.String      `tfsdk:"oidc_groups_claim"`
+	OIDCCACert                 types.String      `tfsdk:"oidc_ca_cert"`
+	Private                    types.Bool        `tfsdk:"private"`
+	RoutingMode                types.String      `tfsdk:"routing_mode"`
+	ApiserverExtraArgs         types.Map         `tfsdk:"apiserver_extra_args"`
+	SchedulerExtraArgs         types.Map         `tfsdk:"scheduler_extra_args"`
+	ControllerManagerExtraArgs types.Map         `tfsdk:"controller_manager_extra_args"`
 }
 
 func (r *kubernetesClusterResource) Configure(_ context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -110,13 +110,14 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			},
 			"version": schema.StringAttribute{
 				Required:            true,
+				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
 				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
 					"Kubernetes Version Change Not Supported",
 					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
 						"Cannot change version from %q to %q. "+
 						"Please contact support@crusoecloud.com for assistance with cluster upgrades.",
-				)}, // in-place upgrades not supported by API
+				).WithSemanticEquality(common.SameK8sVersion)}, // in-place upgrades not supported by API
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
@@ -162,7 +163,13 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"dns_name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: apiDescDNSName,
-				PlanModifiers:       []planmodifier.String{},
+				// A cluster's DNS name is derived from its name and id, neither
+				// of which can change in place, so the stored value is always
+				// the right one. Without this it is stamped "known after apply"
+				// by any other difference in the plan (MarkComputedNilsAsUnknown
+				// covers every Computed attribute whose config is null), which
+				// shows up as a change on a cluster nothing is changing.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"nodepool_ids": schema.ListAttribute{
 				ElementType:         types.StringType,

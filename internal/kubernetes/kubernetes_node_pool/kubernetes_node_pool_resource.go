@@ -10,8 +10,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -37,27 +39,31 @@ func NewKubernetesNodePoolResource() resource.Resource {
 }
 
 type kubernetesNodePoolResourceModel struct {
-	ID                            types.String `tfsdk:"id"`
-	ProjectID                     types.String `tfsdk:"project_id"`
-	Version                       types.String `tfsdk:"version"`
-	Type                          types.String `tfsdk:"type"`
-	InstanceCount                 types.Int64  `tfsdk:"instance_count"`
-	ClusterID                     types.String `tfsdk:"cluster_id"`
-	SubnetID                      types.String `tfsdk:"subnet_id"`
-	IBPartitionID                 types.String `tfsdk:"ib_partition_id"`
-	TransportPartitionID          types.String `tfsdk:"transport_partition_id"`
-	RequestedNodeLabels           types.Map    `tfsdk:"requested_node_labels"`
-	AllNodeLabels                 types.Map    `tfsdk:"all_node_labels"`
-	NodeTaints                    types.Set    `tfsdk:"node_taints"`
-	InstanceIDs                   types.List   `tfsdk:"instance_ids"`
-	SSHKey                        types.String `tfsdk:"ssh_key"`
-	State                         types.String `tfsdk:"state"`
-	Name                          types.String `tfsdk:"name"`
-	EphemeralStorageForContainerd types.Bool   `tfsdk:"ephemeral_storage_for_containerd"`
-	BatchSize                     types.Int64  `tfsdk:"batch_size"`
-	BatchPercentage               types.Int64  `tfsdk:"batch_percentage"`
-	NvlinkDomainID                types.String `tfsdk:"nvlink_domain_id"`
-	PublicIPType                  types.String `tfsdk:"public_ip_type"`
+	ID                            types.String      `tfsdk:"id"`
+	ProjectID                     types.String      `tfsdk:"project_id"`
+	Version                       common.K8sVersion `tfsdk:"version"`
+	Type                          types.String      `tfsdk:"type"`
+	InstanceCount                 types.Int64       `tfsdk:"instance_count"`
+	ClusterID                     types.String      `tfsdk:"cluster_id"`
+	SubnetID                      types.String      `tfsdk:"subnet_id"`
+	IBPartitionID                 types.String      `tfsdk:"ib_partition_id"`
+	TransportPartitionID          types.String      `tfsdk:"transport_partition_id"`
+	RequestedNodeLabels           types.Map         `tfsdk:"requested_node_labels"`
+	AllNodeLabels                 types.Map         `tfsdk:"all_node_labels"`
+	NodeTaints                    types.Set         `tfsdk:"node_taints"`
+	InstanceIDs                   types.List        `tfsdk:"instance_ids"`
+	SSHKey                        types.String      `tfsdk:"ssh_key"`
+	State                         types.String      `tfsdk:"state"`
+	Name                          types.String      `tfsdk:"name"`
+	EphemeralStorageForContainerd types.Bool        `tfsdk:"ephemeral_storage_for_containerd"`
+	BatchSize                     types.Int64       `tfsdk:"batch_size"`
+	BatchPercentage               types.Int64       `tfsdk:"batch_percentage"`
+	NvlinkDomainID                types.String      `tfsdk:"nvlink_domain_id"`
+	PublicIPType                  types.String      `tfsdk:"public_ip_type"`
+	ConsentMode                   types.String      `tfsdk:"consent_mode"`
+	UpdateSettings                types.Object      `tfsdk:"update_settings"`
+	Health                        types.Object      `tfsdk:"health"`
+	Current                       types.Int64       `tfsdk:"current"`
 }
 
 func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -122,6 +128,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"version": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
+				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Validators: []validator.String{stringvalidator.RegexMatches(
@@ -234,6 +241,56 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 					common.NewPrivateNodePoolsWarningModifier(),
 				}, // maintain across updates
 			},
+			"consent_mode": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				MarkdownDescription: apiDescConsentMode + " " + providerDescConsentModeDefault + " " +
+					providerDescLimitedAvailability,
+				Validators:    []validator.String{stringvalidator.OneOf(consentModeValues...)},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"update_settings": schema.SingleNestedAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: apiDescUpdateSettings + " " + providerDescLimitedAvailability,
+				PlanModifiers:       []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
+				Attributes: map[string]schema.Attribute{
+					// The default applies only when the block is present and
+					// this field is not — it never materializes the block
+					// itself. A node pool that does not support update settings
+					// keeps a null object, which UseStateForUnknown carries
+					// forward, so the two never contend.
+					"allow_scale_down": schema.BoolAttribute{
+						Optional:            true,
+						Computed:            true,
+						Default:             booldefault.StaticBool(false),
+						MarkdownDescription: apiDescAllowScaleDown,
+					},
+				},
+			},
+			"health": schema.SingleNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: apiDescHealth + " " + providerDescLimitedAvailability,
+				Attributes: map[string]schema.Attribute{
+					"issues": schema.ListNestedAttribute{
+						Computed:            true,
+						MarkdownDescription: apiDescHealthIssues,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"code":              schema.StringAttribute{Computed: true, MarkdownDescription: apiDescIssueCode},
+								"message":           schema.StringAttribute{Computed: true, MarkdownDescription: apiDescIssueMessage},
+								"since":             schema.StringAttribute{Computed: true, MarkdownDescription: apiDescIssueSince},
+								"affected_count":    schema.Int64Attribute{Computed: true, MarkdownDescription: apiDescAffectedCount},
+								"affected_node_ids": schema.ListAttribute{Computed: true, ElementType: types.StringType, MarkdownDescription: apiDescAffectedNodeIDs},
+							},
+						},
+					},
+				},
+			},
+			"current": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: apiDescCurrent + " " + providerDescLimitedAvailability,
+			},
 		},
 		Blocks: map[string]schema.Block{
 			"node_taints": schema.SetNestedBlock{
@@ -299,6 +356,12 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
+	updateSettings, settingsDiags := tfObjectToUpdateSettings(ctx, plan.UpdateSettings)
+	resp.Diagnostics.Append(settingsDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	asyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.CreateNodePool(ctx, swagger.KubernetesNodePoolPostRequest{
 		ClusterId:                     plan.ClusterID.ValueString(),
 		Count:                         plan.InstanceCount.ValueInt64(),
@@ -314,6 +377,10 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 		NvlinkDomainId:                plan.NvlinkDomainID.ValueString(),
 		PublicIpType:                  plan.PublicIPType.ValueString(),
+		// Both have omitempty, so an unset value is genuinely omitted and the
+		// backend keeps its own default rather than being told "".
+		ConsentMode:    plan.ConsentMode.ValueString(),
+		UpdateSettings: updateSettings,
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
@@ -338,8 +405,32 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 				kubernetesNodePoolResponse.Details.Error_))
 	}
 
+	// Re-read the node pool, as Update does. The operation result describes the
+	// pool as the create built it and carries none of the fields derived at read
+	// time — health and current among them — so mapping straight from it would
+	// report a pool that came up short as healthy until the next refresh.
+	//
+	// Best-effort: the pool exists either way, and failing here would leave it
+	// unmanaged and absent from state. Fall back to the operation result, whose
+	// only gap is the derived fields.
+	createdNodePool := kubernetesNodePoolResponse.NodePool
+	refreshed, httpResp, refreshErr := r.client.APIClient.KubernetesNodePoolsApi.GetNodePool(
+		ctx, projectID, createdNodePool.Id)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
+	switch {
+	case refreshErr != nil:
+		resp.Diagnostics.AddWarning("Could not read the node pool after creating it",
+			fmt.Sprintf("The node pool was created, but reading it back failed: %s\n\nDerived values such as "+
+				"health and current are not yet known and will be populated on the next refresh.",
+				common.UnpackAPIError(refreshErr)))
+	default:
+		createdNodePool = &refreshed
+	}
+
 	var state kubernetesNodePoolResourceModel
-	nodePoolToResourceModel(ctx, kubernetesNodePoolResponse.NodePool, &plan, &state, &resp.Diagnostics)
+	nodePoolToResourceModel(ctx, createdNodePool, &plan, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
@@ -401,15 +492,34 @@ func (r *kubernetesNodePoolResource) ModifyPlan(ctx context.Context, req resourc
 		return
 	}
 
-	// Warn if instance count is decreasing
+	// Warn if instance count is decreasing. What actually happens depends on
+	// update_settings.allow_scale_down, so the two outcomes are described
+	// separately: with it off — the default, and the only behavior available on
+	// a cluster that does not support the setting — the API records the new
+	// target and reports a health
+	// issue without removing anything, which is the case the single old message
+	// described. With it on, the update drains and deletes nodes, which is
+	// destructive and worth saying plainly.
 	if !plan.InstanceCount.IsNull() && !state.InstanceCount.IsNull() &&
 		plan.InstanceCount.ValueInt64() < state.InstanceCount.ValueInt64() {
 
-		resp.Diagnostics.AddAttributeWarning(
-			path.Root("instance_count"),
-			"Node pool instance count decreased",
-			"Decreasing node pool instance count will not delete node pool VMs. Manual deletion is required.",
-		)
+		if planAllowsScaleDown(ctx, plan.UpdateSettings) {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("instance_count"),
+				"Node pool instance count decreased",
+				"allow_scale_down is enabled, so this update will drain and delete existing nodes to reach "+
+					"the new count. Workloads on those nodes will be evicted.",
+			)
+		} else {
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("instance_count"),
+				"Node pool instance count decreased",
+				"Decreasing the count records the new target but does not delete existing nodes, and the "+
+					"node pool reports a health issue while it has more nodes than desired. To let updates "+
+					"remove nodes, set update_settings.allow_scale_down where it is supported. Otherwise "+
+					"delete the nodes manually.",
+			)
+		}
 	}
 
 	// Check for mutual exclusivity
@@ -496,12 +606,36 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		nodeTaints = []swagger.KubernetesNodeTaint{}
 	}
 
+	planUpdateSettings, settingsDiags := tfObjectToUpdateSettings(ctx, plan.UpdateSettings)
+	resp.Diagnostics.Append(settingsDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	patchRequest := swagger.KubernetesNodePoolPatchRequest{
 		Count:                         plan.InstanceCount.ValueInt64(),
 		NodeLabels:                    nodeLabels,
 		NodeTaints:                    nodeTaints,
 		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
 		NodePoolVersion:               plan.Version.ValueString(),
+		// ssh_public_key has no omitempty in the generated client, so leaving
+		// this unset does not omit it — it sends the empty string, which the
+		// backend reads as a request to change the key. The node pool v2
+		// backend then rebuilds the pool's instance template with NO key, so
+		// replacement nodes come up without the customer's key; v1 happens to
+		// guard the empty string but still churns the template, marking every
+		// existing node as not using the latest config.
+		//
+		// ssh_key is Required and RequiresReplace, so the plan always carries
+		// the pool's standing key and the backend's diff is a no-op.
+		SshPublicKey: plan.SSHKey.ValueString(),
+		// Unlike the fields above, these two have omitempty: an unset value is
+		// omitted and the API leaves the stored setting alone. update_settings
+		// carries its presence on the pointer, because allow_scale_down's own
+		// omitempty means a present block holding false marshals as {} — which
+		// the API still reads as an assertion to turn scale-down off.
+		ConsentMode:    plan.ConsentMode.ValueString(),
+		UpdateSettings: planUpdateSettings,
 	}
 
 	updateAsyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.UpdateNodePool(
@@ -557,8 +691,19 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 			stored.ID.ValueString(),
 		)
 		if rolloutAsyncOperationErr != nil {
-			resp.Diagnostics.AddError("Failed to initiate rollout of nodes",
-				fmt.Sprintf("Unable to rollout nodes changes: %s", common.UnpackAPIError(rolloutAsyncOperationErr)))
+			// A warning, not an error: the node pool's own update already
+			// succeeded above, so failing the apply here reports a change that
+			// did happen as a change that did not, and leaves the customer with
+			// an apply that fails on every run while batch_size or
+			// batch_percentage stays in the configuration. Rollout is not
+			// available for every node pool — it is feature-gated, and the node
+			// pool v2 backend does not implement it at all — so an unavailable
+			// rollout must not block managing the pool.
+			resp.Diagnostics.AddWarning("Nodes were not rolled out",
+				fmt.Sprintf("The node pool's configuration was updated, but rolling out the change to "+
+					"existing nodes failed: %s\n\nNew nodes will use the new configuration. Existing nodes "+
+					"keep their current configuration until they are replaced.",
+					common.UnpackAPIError(rolloutAsyncOperationErr)))
 		} else {
 			resp.Diagnostics.AddWarning(
 				"Rollout initiated",

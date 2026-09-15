@@ -31,7 +31,12 @@ const (
 func filterCustomImagesListResponse(resp *swagger.ListImagesResponseV1, config customImageDataSourceModel) []customImageModel {
 	var filtered []customImageModel
 
-	for _, image := range resp.Items {
+	// Ranged by index: swagger.Image crossed gocritic's rangeValCopy threshold
+	// when client-go v1.0.14 added supported_product_lines, so copying each
+	// element by value is now a lint failure as well as needless work.
+	for i := range resp.Items {
+		image := &resp.Items[i]
+
 		// Apply name filter (exact match)
 		if config.Name != nil && *config.Name != "" {
 			if image.Name != *config.Name {

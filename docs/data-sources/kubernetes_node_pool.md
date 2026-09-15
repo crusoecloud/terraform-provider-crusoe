@@ -42,8 +42,32 @@ data "crusoe_kubernetes_node_pool" "example" {
 
 ### Read-Only
 
+- `consent_mode` (String) Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
+- `current` (Number) Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
+- `health` (Attributes) Issues currently detected on the node pool. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--health))
 - `node_taints` (Attributes Set) Taints applied to nodes in the node pool. (see [below for nested schema](#nestedatt--node_taints))
 - `public_ip_type` (String) Public IP type for the node pool's nodes. Possible values: `dynamic`, `static`, `none`.
+- `update_settings` (Attributes) Settings controlling how update operations may act on the node pool's existing nodes. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--update_settings))
+
+<a id="nestedatt--health"></a>
+### Nested Schema for `health`
+
+Read-Only:
+
+- `issues` (Attributes List) Current issues detected on the node pool. (see [below for nested schema](#nestedatt--health--issues))
+
+<a id="nestedatt--health--issues"></a>
+### Nested Schema for `health.issues`
+
+Read-Only:
+
+- `affected_count` (Number) Number of nodes affected by the issue.
+- `affected_node_ids` (List of String) IDs of the affected nodes, when known. Node IDs are the IDs of the VMs backing the nodes.
+- `code` (String) Machine-readable code for the issue, e.g. `INSUFFICIENT_CAPACITY`, `INSUFFICIENT_QUOTA`, `NODE_NOT_READY` or `INTERNAL_ERROR`. New codes may be added; treat unknown values as display-only. A code persists until the node deficit behind it is resolved.
+- `message` (String) Human-readable description of the issue.
+- `since` (String) Time the issue started, in RFC3339 format.
+
+
 
 <a id="nestedatt--node_taints"></a>
 ### Nested Schema for `node_taints`
@@ -53,3 +77,11 @@ Read-Only:
 - `effect` (String) Taint effect, controlling how pods are treated on matching nodes. `NoSchedule`: new pods are not scheduled unless they tolerate. `PreferNoSchedule`: new pods avoid the node if possible. `NoExecute`: new pods are not scheduled and existing non-tolerating pods are evicted.
 - `key` (String) Taint key. Follows the Kubernetes qualified-name format: an optional DNS subdomain prefix (up to 253 characters) followed by a `/`, then a name segment (up to 63 characters). Allowed characters: alphanumerics, `-`, `_`, and `.`. Must start and end with an alphanumeric character. Keys beginning with `crusoe.ai/` are reserved for internal use.
 - `value` (String) Taint value. May be empty. Follows the same format rules as a Kubernetes label value: up to 63 characters, alphanumerics and `-`, `_`, `.`.
+
+
+<a id="nestedatt--update_settings"></a>
+### Nested Schema for `update_settings`
+
+Read-Only:
+
+- `allow_scale_down` (Boolean) Whether an update may scale the node pool below its current node count, draining and deleting existing nodes. When false (the default), an update that lowers the count only records the new target and reports a health issue; no nodes are removed.

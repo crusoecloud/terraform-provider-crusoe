@@ -71,7 +71,7 @@ func clusterToResourceModel(cluster *swagger.KubernetesCluster, ref, model *kube
 	model.ID = types.StringValue(cluster.Id)
 	model.ProjectID = types.StringValue(cluster.ProjectId)
 	model.Name = types.StringValue(cluster.Name)
-	model.Version = types.StringValue(cluster.Version)
+	model.Version = common.NewK8sVersionValue(cluster.Version)
 	model.SubnetID = types.StringValue(cluster.SubnetId)
 	model.NodeCidrMaskSize = types.Int64Value(int64(cluster.NodeCidrMaskSize))
 	model.ClusterCidr = types.StringValue(cluster.ClusterCidr)
