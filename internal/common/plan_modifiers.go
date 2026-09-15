@@ -71,6 +71,27 @@ func (m UseStateForUnknownIncludingNullModifier) PlanModifyString(_ context.Cont
 type ImmutableStringModifier struct {
 	Summary string
 	Message string
+	// equal, when set, decides whether two spellings name the same value. A
+	// difference it accepts is not a change and is not refused.
+	equal func(stateValue, planValue string) bool
+}
+
+// WithSemanticEquality returns a copy of the modifier that treats values equal
+// under equal as unchanged.
+//
+// Needed because plan modifiers compare raw values: planmodifier.StringRequest
+// carries a plain types.String, so an attribute whose custom type defines
+// semantic equality loses it at this boundary, and the framework does not apply
+// semantic equality during PlanResourceChange at all. Without this, an
+// attribute that is both immutable and has two spellings refuses a plan over a
+// difference that is not a change — which is what `terraform import` produces,
+// since Read has no prior value to preserve and state takes the API spelling.
+func (m ImmutableStringModifier) WithSemanticEquality(
+	equal func(stateValue, planValue string) bool,
+) ImmutableStringModifier {
+	m.equal = equal
+
+	return m
 }
 
 // NewImmutableStringModifier creates an ImmutableStringModifier with the given summary and message.
@@ -105,6 +126,14 @@ func (m ImmutableStringModifier) PlanModifyString(_ context.Context, req planmod
 
 	// Allow if no change
 	if req.StateValue.Equal(req.PlanValue) {
+		return
+	}
+
+	// Allow a difference that is only a difference in spelling. The plan keeps
+	// the configured value, so one apply settles state on it and later plans
+	// see no difference at all — which is what stops an imported resource from
+	// planning a no-op update forever.
+	if m.equal != nil && m.equal(req.StateValue.ValueString(), req.PlanValue.ValueString()) {
 		return
 	}
 

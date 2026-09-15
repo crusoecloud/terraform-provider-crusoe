@@ -112,14 +112,12 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Required:            true,
 				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
-				PlanModifiers: []planmodifier.String{common.NewSemanticEqualityStringModifier(
-					"same Kubernetes version", common.SameK8sVersion,
-				), common.NewImmutableStringModifier(
+				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
 					"Kubernetes Version Change Not Supported",
 					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
 						"Cannot change version from %q to %q. "+
 						"Please contact support@crusoecloud.com for assistance with cluster upgrades.",
-				)}, // in-place upgrades not supported by API
+				).WithSemanticEquality(common.SameK8sVersion)}, // in-place upgrades not supported by API
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
@@ -165,7 +163,13 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"dns_name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: apiDescDNSName,
-				PlanModifiers:       []planmodifier.String{},
+				// A cluster's DNS name is derived from its name and id, neither
+				// of which can change in place, so the stored value is always
+				// the right one. Without this it is stamped "known after apply"
+				// by any other difference in the plan (MarkComputedNilsAsUnknown
+				// covers every Computed attribute whose config is null), which
+				// shows up as a change on a cluster nothing is changing.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"nodepool_ids": schema.ListAttribute{
 				ElementType:         types.StringType,

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -187,33 +188,78 @@ func Test_versionUsesSemanticEqualityType(t *testing.T) {
 	}
 }
 
-// Test_versionPlanModifierOrder pins an ordering the correctness of `terraform
-// import` depends on.
+// Test_versionIsImmutableButSpellingAware pins the two halves of the version
+// attribute's plan behaviour: a real version change is still refused, and a
+// difference that is only a difference in spelling is not.
 //
-// The framework feeds each plan modifier the running plan value, so the
-// semantic-equality suppressor has to run before the immutability check. Reverse
-// them and the check compares the API's spelling against the configured one and
-// fails a plan it should not — the exact failure the suppressor exists to
-// prevent.
-func Test_versionPlanModifierOrder(t *testing.T) {
+// The second half is what makes `terraform import` of a cluster workable. The
+// framework does not apply semantic equality during PlanResourceChange, so
+// after an import — where Read has no prior value to preserve and state takes
+// the API's spelling — the immutability check is the thing that would otherwise
+// refuse a plan over a version nobody changed.
+func Test_versionIsImmutableButSpellingAware(t *testing.T) {
+	ctx := context.Background()
+
 	resourceSchema := &resource.SchemaResponse{}
-	NewKubernetesClusterResource().Schema(context.Background(), resource.SchemaRequest{}, resourceSchema)
+	NewKubernetesClusterResource().Schema(ctx, resource.SchemaRequest{}, resourceSchema)
 
 	versionAttr, ok := resourceSchema.Schema.Attributes["version"].(schema.StringAttribute)
 	if !ok {
 		t.Fatalf("version attribute is %T, want schema.StringAttribute", resourceSchema.Schema.Attributes["version"])
 	}
-
-	if len(versionAttr.PlanModifiers) < 2 {
-		t.Fatalf("version has %d plan modifiers, want the suppressor and the immutability check",
-			len(versionAttr.PlanModifiers))
+	if len(versionAttr.PlanModifiers) != 1 {
+		t.Fatalf("version has %d plan modifiers, want 1", len(versionAttr.PlanModifiers))
 	}
 
-	if _, isSuppressor := versionAttr.PlanModifiers[0].(common.SemanticEqualityStringModifier); !isSuppressor {
-		t.Errorf("first plan modifier is %T, want common.SemanticEqualityStringModifier; it must run "+
-			"before the immutability check", versionAttr.PlanModifiers[0])
+	modifier, ok := versionAttr.PlanModifiers[0].(common.ImmutableStringModifier)
+	if !ok {
+		t.Fatalf("version plan modifier is %T, want common.ImmutableStringModifier", versionAttr.PlanModifiers[0])
 	}
-	if _, isImmutable := versionAttr.PlanModifiers[1].(common.ImmutableStringModifier); !isImmutable {
-		t.Errorf("second plan modifier is %T, want common.ImmutableStringModifier", versionAttr.PlanModifiers[1])
+
+	// A CMKv2 control plane reports the upstream semver; the configuration
+	// carries the display name. Same version, so the plan must survive.
+	spelling := planmodifier.StringRequest{
+		StateValue:  types.StringValue("1.35.5"),
+		PlanValue:   types.StringValue("1.35.5-cmk.22"),
+		ConfigValue: types.StringValue("1.35.5-cmk.22"),
+	}
+	spellingResp := &planmodifier.StringResponse{PlanValue: spelling.PlanValue}
+	modifier.PlanModifyString(ctx, spelling, spellingResp)
+	if spellingResp.Diagnostics.HasError() {
+		t.Errorf("a spelling-only difference was refused: %v", spellingResp.Diagnostics)
+	}
+	if !spellingResp.PlanValue.Equal(spelling.PlanValue) {
+		t.Errorf("PlanValue = %v, want the configured value kept so one apply settles state on it",
+			spellingResp.PlanValue)
+	}
+
+	// A genuine upgrade is still refused.
+	upgrade := planmodifier.StringRequest{
+		StateValue:  types.StringValue("1.35.5-cmk.22"),
+		PlanValue:   types.StringValue("1.36.1-cmk.1"),
+		ConfigValue: types.StringValue("1.36.1-cmk.1"),
+	}
+	upgradeResp := &planmodifier.StringResponse{PlanValue: upgrade.PlanValue}
+	modifier.PlanModifyString(ctx, upgrade, upgradeResp)
+	if !upgradeResp.Diagnostics.HasError() {
+		t.Error("a genuine version change should still be refused")
+	}
+}
+
+// Test_dnsNameSurvivesUnrelatedChanges guards the pin that keeps an imported
+// cluster from planning a no-op update forever. MarkComputedNilsAsUnknown
+// stamps every Computed attribute whose config is null as unknown as soon as
+// anything else in the plan differs, and it runs before plan modifiers —
+// UseStateForUnknown is what undoes that.
+func Test_dnsNameSurvivesUnrelatedChanges(t *testing.T) {
+	resourceSchema := &resource.SchemaResponse{}
+	NewKubernetesClusterResource().Schema(context.Background(), resource.SchemaRequest{}, resourceSchema)
+
+	dnsAttr, ok := resourceSchema.Schema.Attributes["dns_name"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("dns_name attribute is %T, want schema.StringAttribute", resourceSchema.Schema.Attributes["dns_name"])
+	}
+	if len(dnsAttr.PlanModifiers) == 0 {
+		t.Fatal("dns_name has no plan modifiers; it needs UseStateForUnknown to stay known across unrelated changes")
 	}
 }

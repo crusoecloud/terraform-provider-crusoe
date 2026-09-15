@@ -130,10 +130,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 				Computed:            true,
 				CustomType:          common.K8sVersionType{},
 				MarkdownDescription: apiDescVersion,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(), // maintain across updates
-					common.NewSemanticEqualityStringModifier("same Kubernetes version", common.SameK8sVersion),
-				},
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
 				)},
