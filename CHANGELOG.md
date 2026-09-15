@@ -1,3 +1,19 @@
+## 1.5.0
+
+ENHANCEMENTS:
+
+- Added `consent_mode` and `update_settings` to the `crusoe_kubernetes_node_pool` resource and data source. `consent_mode` sets the node pool's remediation posture: `auto`, `propose`, or `off`. `update_settings.allow_scale_down` lets an update that lowers `instance_count` drain and delete existing nodes; with it off, which is the default, the update records the new target, reports a health issue, and removes nothing. Both settings are supported only on some clusters and are null on node pools where they are not; reach out to support@crusoecloud.com for availability. Newly created node pools default to `propose`, and a node pool that predates the setting starts at `off`.
+- Added read-only `health` and `current` to the `crusoe_kubernetes_node_pool` resource and data source. `current` is the number of the pool's nodes that have joined the cluster and passed readiness; `health.issues` lists what is keeping a node pool short of its desired count, each issue carrying a code, a message, a start time, and the affected node IDs. A node pool create that brings up fewer nodes than requested still succeeds, so these are what explain the shortfall — a `postcondition` comparing `current` with `instance_count` will fail an apply that came up short. Both are null on node pools that do not report them.
+- The warning shown when `crusoe_kubernetes_node_pool` `instance_count` decreases now describes what will actually happen, and names `update_settings.allow_scale_down` as the setting that changes it. It previously described only the case where nodes are left in place.
+
+BUG FIXES:
+
+- Fixed creating a `crusoe_kubernetes_cluster` failing with "Provider produced inconsistent result after apply: .version". On some clusters the API reports the Kubernetes version without its Crusoe build component — `1.35.5` for a configured `1.35.5-cmk.22` — and the provider read the shorter spelling as a different version. The two spellings are now recognised as the same version, on both `crusoe_kubernetes_cluster` and `crusoe_kubernetes_node_pool`. Two different builds of one release, such as `1.35.5-cmk.22` and `1.35.5-cmk.23`, remain different versions, as does a version carrying a bootstrap tarball suffix compared against a different release.
+- Fixed importing a `crusoe_kubernetes_cluster` whose API version uses the shorter spelling failing every later plan with "Kubernetes Version Change Not Supported", naming a version nobody had changed. The first plan after such an import now shows `version` moving to the spelling in your configuration; applying it settles state, and later plans report no changes. A genuine version change is still refused.
+- Fixed every update to a `crusoe_kubernetes_node_pool` clearing the SSH key from the node pool's instance template, so nodes created afterwards came up without it. Updates now send the node pool's existing key.
+- Fixed a failed node rollout failing an apply whose changes had already been made. `batch_size` and `batch_percentage` start a rollout after the node pool's own update has succeeded, so a rollout that cannot start now warns and says what did and did not happen — the configuration is updated and new nodes use it, while existing nodes keep theirs — instead of reporting the whole apply as failed.
+- Fixed `crusoe_kubernetes_cluster` planning an update on a cluster nothing was changing, which showed `dns_name` and `nodepool_ids` as "known after apply" and never converged.
+
 ## 1.4.0
 
 ENHANCEMENTS:
