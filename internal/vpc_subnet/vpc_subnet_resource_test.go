@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -103,4 +104,30 @@ func TestVPCSubnetImportState(t *testing.T) {
 			t.Error("expected diagnostics error for invalid identifier, got none")
 		}
 	})
+}
+
+// The stock UseStateForUnknown carries nat_gateways through a nat_gateway_enabled
+// toggle and fails the apply.
+func TestVPCSubnetResourceSchema_NATGatewaysPlanModifier(t *testing.T) {
+	ctx := context.Background()
+
+	r := &vpcSubnetResource{}
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	if schemaResp.Diagnostics.HasError() {
+		t.Fatalf("failed to build schema: %v", schemaResp.Diagnostics)
+	}
+
+	attr, ok := schemaResp.Schema.Attributes["nat_gateways"].(schema.ListNestedAttribute)
+	if !ok {
+		t.Fatalf("nat_gateways attribute is %T, want schema.ListNestedAttribute", schemaResp.Schema.Attributes["nat_gateways"])
+	}
+
+	if len(attr.PlanModifiers) != 1 {
+		t.Fatalf("nat_gateways has %d plan modifiers, want 1", len(attr.PlanModifiers))
+	}
+
+	if _, ok := attr.PlanModifiers[0].(natGatewaysUseStateUnlessToggledModifier); !ok {
+		t.Errorf("nat_gateways plan modifier is %T, want natGatewaysUseStateUnlessToggledModifier", attr.PlanModifiers[0])
+	}
 }

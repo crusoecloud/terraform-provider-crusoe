@@ -2,9 +2,15 @@ package vpc_subnet
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -33,6 +39,15 @@ const (
 	providerDescProjectID = "ID of the project the VPC subnet belongs to. " + project.ProviderDescProjectIDFallback
 )
 
+const (
+	natGatewayPollInterval = 2 * time.Second
+	natGatewayPollTimeout  = 5 * time.Minute
+)
+
+var errNATGatewayTimeout = errors.New("timed out waiting for the NAT gateway to reach the requested state")
+
+type getVPCSubnetFunc func(ctx context.Context, projectID, subnetID string) (swagger.VpcSubnet, *http.Response, error)
+
 var vpcSubnetNatGatewaySchema = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"id":                  types.StringType,
@@ -51,6 +66,43 @@ func findVpcSubnet(ctx context.Context, client *swagger.APIClient, vpcSubnetID s
 	}
 
 	return common.FindResource[swagger.VpcSubnet](ctx, client, args)
+}
+
+func natGatewayPresent(vpcSubnet *swagger.VpcSubnet) bool {
+	return len(vpcSubnet.NatGateways) > 0
+}
+
+// awaitNATGatewayState polls the subnet until its NAT gateway list matches wantEnabled.
+// The update operation can succeed before the NAT gateway is attached or removed, and
+// state written from that result disagrees with the plan.
+func awaitNATGatewayState(ctx context.Context, get getVPCSubnetFunc, projectID, subnetID string,
+	wantEnabled bool, interval, timeout time.Duration,
+) (*swagger.VpcSubnet, error) {
+	deadline := time.Now().Add(timeout)
+
+	for {
+		vpcSubnet, httpResp, err := get(ctx, projectID, subnetID)
+		if httpResp != nil {
+			httpResp.Body.Close()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error getting VPC subnet %s: %w", subnetID, err)
+		}
+
+		if natGatewayPresent(&vpcSubnet) == wantEnabled {
+			return &vpcSubnet, nil
+		}
+
+		if time.Now().After(deadline) {
+			return nil, errNATGatewayTimeout
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(interval):
+		}
+	}
 }
 
 func vpcSubnetToTerraformResourceModel(ctx context.Context, vpcSubnet *swagger.VpcSubnet, state *vpcSubnetResourceModel, diags *diag.Diagnostics) {
@@ -80,4 +132,49 @@ func natGatewaysToTerraformResourceModel(ctx context.Context, natGateways []swag
 	common.SortByKeys(gateways, func(g vpcSubnetNatGatewayResourceModel) string { return g.ID.ValueString() })
 
 	return types.ListValueFrom(ctx, vpcSubnetNatGatewaySchema, gateways)
+}
+
+// natGatewaysUseStateUnlessToggledModifier keeps the prior nat_gateways value across
+// updates unless nat_gateway_enabled changes. The stock UseStateForUnknown copies the
+// prior list through a toggle, and the apply then fails because the API returns a
+// different list. Keeping the prior value on other updates leaves references to the
+// NAT gateway address known.
+type natGatewaysUseStateUnlessToggledModifier struct{}
+
+func natGatewaysUseStateUnlessToggled() planmodifier.List {
+	return natGatewaysUseStateUnlessToggledModifier{}
+}
+
+func (m natGatewaysUseStateUnlessToggledModifier) Description(_ context.Context) string {
+	return "Once the subnet exists, the value of this attribute in state is preserved unless nat_gateway_enabled changes."
+}
+
+func (m natGatewaysUseStateUnlessToggledModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+//nolint:gocritic // hugeParam: req signature required by planmodifier.List interface
+func (m natGatewaysUseStateUnlessToggledModifier) PlanModifyList(ctx context.Context,
+	req planmodifier.ListRequest, resp *planmodifier.ListResponse,
+) {
+	if req.State.Raw.IsNull() {
+		return
+	}
+
+	if !req.PlanValue.IsUnknown() {
+		return
+	}
+
+	var planEnabled, stateEnabled types.Bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("nat_gateway_enabled"), &planEnabled)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("nat_gateway_enabled"), &stateEnabled)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if planEnabled.IsUnknown() || !planEnabled.Equal(stateEnabled) {
+		return
+	}
+
+	resp.PlanValue = req.StateValue
 }

@@ -20,6 +20,11 @@ variable "location" {
   default = "us-east1-a"
 }
 
+variable "nat_gateway_enabled" {
+  type    = bool
+  default = false
+}
+
 # Create a VPC network
 resource "crusoe_vpc_network" "my_vpc_network" {
   name = "${var.name_prefix}network"
@@ -32,6 +37,8 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   cidr     = "10.0.0.0/16"
   location = var.location
   network  = crusoe_vpc_network.my_vpc_network.id
+
+  nat_gateway_enabled = var.nat_gateway_enabled
 }
 
 # Create a firewall rule

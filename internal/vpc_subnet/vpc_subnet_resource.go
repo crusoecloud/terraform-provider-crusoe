@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -120,7 +119,7 @@ func (r *vpcSubnetResource) Schema(ctx context.Context, req resource.SchemaReque
 			"nat_gateways": schema.ListNestedAttribute{
 				MarkdownDescription: apiDescNATGateways + " " + common.DevelopmentMessage,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+				PlanModifiers:       []planmodifier.List{natGatewaysUseStateUnlessToggled()},
 				NestedObject: schema.NestedAttributeObject{
 					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 					Attributes: map[string]schema.Attribute{
@@ -237,7 +236,8 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 	patchReq := swagger.VpcSubnetPatchRequest{
 		Name: plan.Name.ValueString(),
 	}
-	if !plan.NATGatewayEnabled.IsUnknown() && !plan.NATGatewayEnabled.IsNull() {
+	natGatewayActionRequested := !plan.NATGatewayEnabled.IsUnknown() && !plan.NATGatewayEnabled.IsNull()
+	if natGatewayActionRequested {
 		switch plan.NATGatewayEnabled.ValueBool() {
 		case true:
 			patchReq.NatGatewayAction = "enable"
@@ -266,6 +266,19 @@ func (r *vpcSubnetResource) Update(ctx context.Context, req resource.UpdateReque
 			fmt.Sprintf("There was an error updating the VPC Subnet: %s.\n\n", common.UnpackAPIError(err)))
 
 		return
+	}
+
+	// The operation result can still show the old NAT gateway list.
+	if natGatewayActionRequested && natGatewayPresent(vpcSubnet) != plan.NATGatewayEnabled.ValueBool() {
+		vpcSubnet, err = awaitNATGatewayState(ctx, r.client.APIClient.VPCSubnetsApi.GetVPCSubnet,
+			plan.ProjectID.ValueString(), plan.ID.ValueString(), plan.NATGatewayEnabled.ValueBool(),
+			natGatewayPollInterval, natGatewayPollTimeout)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update VPC Subnet",
+				fmt.Sprintf("There was an error waiting for the VPC Subnet NAT gateway to reach the requested state: %s.\n\n", common.UnpackAPIError(err)))
+
+			return
+		}
 	}
 
 	vpcSubnetToTerraformResourceModel(ctx, vpcSubnet, &plan, &resp.Diagnostics)
