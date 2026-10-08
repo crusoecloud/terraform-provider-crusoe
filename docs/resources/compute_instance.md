@@ -66,6 +66,7 @@ resource "crusoe_compute_instance" "example" {
 
 ### Optional
 
+- `crusoe_watch_agent_install_mode` (String) Installation mode for the Crusoe Watch Agent. Possible values: `docker`, `native`. Defaults to `docker`.
 - `custom_image` (String) ID of a custom image to use for the new VM. Either `image` or `custom_image` should be supplied, not both.
 - `disks` (Attributes Set) Disks attached to the VM. (see [below for nested schema](#nestedatt--disks))
 - `host_channel_adapters` (Attributes List) Host channel adapters attached to the VM. (see [below for nested schema](#nestedatt--host_channel_adapters))

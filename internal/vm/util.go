@@ -20,6 +20,8 @@ const (
 	StateRunning = "STATE_RUNNING"
 	StateStopped = "STATE_STOPPED"
 	StateShutoff = "STATE_SHUTOFF"
+
+	descCrusoeWatchAgentInstallMode = "Installation mode for the Crusoe Watch Agent. Possible values: `docker`, `native`. Defaults to `docker`."
 )
 
 // apiDesc* — schema descriptions derived from the client-go swagger spec (InstanceV1).
@@ -411,9 +413,13 @@ func vmToTerraformResourceModel(instance *swagger.InstanceV1, state *vmResourceM
 		state.HostChannelAdapters = types.ListNull(vmHostChannelAdapterSchema)
 	}
 
-	// install_crusoe_watch_agent is not returned by the API (create-time-only flag);
-	// preserve the existing state value, defaulting to true when empty (e.g., imports).
+	// install_crusoe_watch_agent and crusoe_watch_agent_install_mode are create-time-only flags not returned
+	// by the API; preserve existing state values, defaulting to the API defaults when empty.
 	if state.InstallCrusoeWatchAgent.IsNull() || state.InstallCrusoeWatchAgent.IsUnknown() {
 		state.InstallCrusoeWatchAgent = types.BoolValue(true)
+	}
+
+	if state.CrusoeWatchAgentInstallMode.IsNull() || state.CrusoeWatchAgentInstallMode.IsUnknown() {
+		state.CrusoeWatchAgentInstallMode = types.StringValue("docker")
 	}
 }

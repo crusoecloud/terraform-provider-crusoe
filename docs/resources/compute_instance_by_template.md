@@ -51,6 +51,7 @@ resource "crusoe_compute_instance_by_template" "example" {
 
 ### Optional
 
+- `crusoe_watch_agent_install_mode` (String) Installation mode for the Crusoe Watch Agent. Possible values: `docker`, `native`. Defaults to `docker`.
 - `install_crusoe_watch_agent` (Boolean) Whether to install the Crusoe Watch Agent on the VM. Defaults to true.
 - `nvlink_domain_id` (String) NVLink domain ID to use for NVLink communication.
 - `project_id` (String)
