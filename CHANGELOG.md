@@ -1,3 +1,13 @@
+## 1.6.0
+
+NEW FEATURES:
+
+- Added service account authentication as an alternative to an access keypair. Set `service_account_client_id` and `service_account_client_secret` in the Crusoe config file, under `[default]` or a profile, or via the `CRUSOE_SERVICE_ACCOUNT_CLIENT_ID` and `CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET` environment variables. The provider obtains and refreshes the OAuth2 access token itself. Configure exactly one method: the provider now fails with a "Missing Crusoe Credentials" error when neither pair is set, an "Incomplete ... Credentials" error naming the missing field when only one field of a pair is set, and a "Conflicting Crusoe Credentials" error when both the keypair and the service account pair are set, rather than silently picking one. `service_account_token_url` and `service_account_audience`, or the matching `CRUSOE_SERVICE_ACCOUNT_TOKEN_URL` and `CRUSOE_SERVICE_ACCOUNT_AUDIENCE` environment variables, point the provider at a non-production token endpoint; most users never need them.
+
+ENHANCEMENTS:
+
+- Added `crusoe_watch_agent_install_mode` to the `crusoe_compute_instance` and `crusoe_compute_instance_by_template` resources. Set it to `native` to install the Crusoe Watch Agent as a systemd service on the VM, or leave it at the default, `docker`, to run the agent in a container. It applies only when `install_crusoe_watch_agent` is true, and changing it forces replacement. Native installation is in development and requires the organization to be enabled for it; where it is not, the agent is installed with Docker, which the provider cannot report because the API does not return the mode. Reach out to support@crusoecloud.com for availability.
+
 ## 1.5.0
 
 ENHANCEMENTS:
