@@ -27,7 +27,7 @@ resource "crusoe_vpc_subnet" "example" {
 
 resource "crusoe_kubernetes_cluster" "example" {
   name      = "my-cluster"
-  version   = "1.31.7-cmk.7"
+  version   = "1.35"
   location  = "us-east1-a"
   subnet_id = crusoe_vpc_subnet.example.id
 }
@@ -40,7 +40,7 @@ resource "crusoe_kubernetes_cluster" "example" {
 
 - `location` (String) Location of the Kubernetes cluster.
 - `name` (String) Name of the Kubernetes cluster.
-- `version` (String) Version of the Crusoe Kubernetes image the cluster runs.
+- `version` (String) Version of the Crusoe Kubernetes image the cluster runs. Specify the minor version, for example `1.35`, and the platform selects the current patch; an exact patch such as `1.35.5` is honored as given. The legacy `1.35.5-cmk.N` spelling is still accepted.
 
 ### Optional
 

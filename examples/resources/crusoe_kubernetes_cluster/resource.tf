@@ -12,7 +12,7 @@ resource "crusoe_vpc_subnet" "example" {
 
 resource "crusoe_kubernetes_cluster" "example" {
   name      = "my-cluster"
-  version   = "1.31.7-cmk.7"
+  version   = "1.35"
   location  = "us-east1-a"
   subnet_id = crusoe_vpc_subnet.example.id
 }

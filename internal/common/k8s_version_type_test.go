@@ -24,8 +24,17 @@ func TestSameK8sVersion(t *testing.T) {
 		{"tarball dropped on resolution", "1.35.5-cmk.22" + tarballSuffix, "1.35.5-cmk.22", true},
 		{"tarball dropped and cmkv2 shortens", "1.35.5-cmk.22" + tarballSuffix, "1.35.5", true},
 
-		// Real differences. The build-component case is the one a naive
-		// "compare upstream semvers" rule would wrongly call equal.
+		// A minor-only spelling asks the platform to pick the patch, so it names
+		// whatever patch of that minor the cluster came back with.
+		{"minor spelling matches the patch the platform chose", "1.35", "1.35.8", true},
+		{"minor spelling against the legacy image key", "1.35", "1.35.5-cmk.22", true},
+
+		// Real differences.
+		{"minor spelling, different minor", "1.35", "1.36.1", false},
+		{"minor spelling, different major", "1.35", "2.35.0", false},
+		{"minor spelling that is only a string prefix", "1.3", "1.35.8", false},
+		// The build-component case is the one a naive "compare upstream semvers"
+		// rule would wrongly call equal.
 		{"different build of one release", "1.35.5-cmk.22", "1.35.5-cmk.23", false},
 		{"different patch", "1.35.5-cmk.22", "1.35.6", false},
 		{"different minor", "1.35.5-cmk.22", "1.36.1", false},

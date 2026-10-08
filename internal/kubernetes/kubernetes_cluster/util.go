@@ -44,6 +44,11 @@ const (
 const (
 	providerDescProjectID = "ID of the project that owns the Kubernetes cluster. " + project.ProviderDescProjectIDFallback
 
+	// providerDescVersionInput describes the spellings the version attribute takes,
+	// which the spec text does not cover.
+	providerDescVersionInput = "Specify the minor version, for example `1.35`, and the platform selects the current patch; " +
+		"an exact patch such as `1.35.5` is honored as given. The legacy `1.35.5-cmk.N` spelling is still accepted."
+
 	// providerDescExtraArgsNote is appended (resource-side only) to the *_extra_args
 	// descriptions to document Crusoe-specific update behavior.
 	providerDescExtraArgsNote = "Changes take effect after a cluster rotation. To clear args, use the Crusoe CLI."

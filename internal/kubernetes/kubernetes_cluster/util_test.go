@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -261,5 +262,44 @@ func Test_dnsNameSurvivesUnrelatedChanges(t *testing.T) {
 	}
 	if len(dnsAttr.PlanModifiers) == 0 {
 		t.Fatal("dns_name has no plan modifiers; it needs UseStateForUnknown to stay known across unrelated changes")
+	}
+}
+
+// Test_versionAcceptsMinorPatchAndLegacySpellings pins the shapes the version
+// attribute takes at plan time: a bare minor (the platform picks the patch), an
+// exact patch, and the legacy image key that released providers already send.
+func Test_versionAcceptsMinorPatchAndLegacySpellings(t *testing.T) {
+	ctx := context.Background()
+
+	resourceSchema := &resource.SchemaResponse{}
+	NewKubernetesClusterResource().Schema(ctx, resource.SchemaRequest{}, resourceSchema)
+	versionAttr, ok := resourceSchema.Schema.Attributes["version"].(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("version attribute is %T, want schema.StringAttribute", resourceSchema.Schema.Attributes["version"])
+	}
+
+	cases := []struct {
+		value string
+		valid bool
+	}{
+		{"1.35", true},
+		{"1.35.5", true},
+		{"1.35.5-cmk.22", true},
+		{"1.35.5-cmk.22-https://example.com/bootstrap.tar.gz", true},
+		{"latest", false},
+		{"1", false},
+		{"v1.35", false},
+		{"1.35.5.2", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.value, func(t *testing.T) {
+			resp := &validator.StringResponse{}
+			for _, v := range versionAttr.Validators {
+				v.ValidateString(ctx, validator.StringRequest{ConfigValue: types.StringValue(tc.value)}, resp)
+			}
+			if got := !resp.Diagnostics.HasError(); got != tc.valid {
+				t.Errorf("version %q accepted = %v, want %v: %v", tc.value, got, tc.valid, resp.Diagnostics)
+			}
+		})
 	}
 }

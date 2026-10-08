@@ -165,6 +165,9 @@ func (v K8sVersion) StringSemanticEquals(_ context.Context, newValuable basetype
 //   - The build component is dropped by a CMKv2 control plane. So
 //     "1.35.5-cmk.22" and "1.35.5" are the same version, but only when the
 //     shorter spelling is exactly the longer one's upstream semver.
+//   - A minor-only spelling asks the platform to choose the patch, so it names
+//     whichever patch of that minor came back. "1.35" and "1.35.8" are the
+//     same version; "1.35" and "1.36.1" are not.
 //
 // Everything else is a real difference. In particular "1.35.5-cmk.22" and
 // "1.35.5-cmk.23" are NOT equal: two builds of one upstream release are
@@ -183,8 +186,21 @@ func SameK8sVersion(a, b string) bool {
 	}
 
 	a, b = withoutTarball(a), withoutTarball(b)
+	if a == b || a == upstreamSemver(b) || b == upstreamSemver(a) {
+		return true
+	}
 
-	return a == b || a == upstreamSemver(b) || b == upstreamSemver(a)
+	return namesMinorOf(a, upstreamSemver(b)) || namesMinorOf(b, upstreamSemver(a))
+}
+
+// namesMinorOf reports whether minor is a "X.Y" spelling and version is an
+// "X.Y.Z" patch of that minor.
+func namesMinorOf(minor, version string) bool {
+	if strings.Count(minor, ".") != 1 || strings.Count(version, ".") != 2 {
+		return false
+	}
+
+	return strings.HasPrefix(version, minor+".")
 }
 
 // withoutTarball drops a bootstrap tarball URL.

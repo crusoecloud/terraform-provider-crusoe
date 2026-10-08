@@ -111,7 +111,7 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			"version": schema.StringAttribute{
 				Required:            true,
 				CustomType:          common.K8sVersionType{},
-				MarkdownDescription: apiDescVersion,
+				MarkdownDescription: apiDescVersion + " " + providerDescVersionInput,
 				PlanModifiers: []planmodifier.String{common.NewImmutableStringModifier(
 					"Kubernetes Version Change Not Supported",
 					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
@@ -119,7 +119,8 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 						"Please contact support@crusoecloud.com for assistance with cluster upgrades.",
 				).WithSemanticEquality(common.SameK8sVersion)}, // in-place upgrades not supported by API
 				Validators: []validator.String{stringvalidator.RegexMatches(
-					regexp.MustCompile(`\d+\.\d+\.\d+-cmk\.\d+.*`), "must be in the format MAJOR.MINOR.BUGFIX-cmk.NUM (e.g 1.2.3-cmk.4)",
+					regexp.MustCompile(`^\d+\.\d+(\.\d+(-cmk\.\d+.*)?)?$`),
+					"must be MAJOR.MINOR (e.g. 1.35), MAJOR.MINOR.PATCH (e.g. 1.35.5), or the legacy MAJOR.MINOR.PATCH-cmk.NUM",
 				)},
 			},
 			"subnet_id": schema.StringAttribute{
