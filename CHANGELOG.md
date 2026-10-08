@@ -1,3 +1,18 @@
+## 1.6.0
+
+NEW FEATURES:
+
+- Added service account authentication as an alternative to an access keypair. Set `service_account_client_id` and `service_account_client_secret` in the Crusoe config file, under `[default]` or a profile, or via the `CRUSOE_SERVICE_ACCOUNT_CLIENT_ID` and `CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET` environment variables. The provider obtains and refreshes the OAuth2 access token itself. Configure exactly one method: the provider now fails with a "Missing Crusoe Credentials" error when neither pair is set, an "Incomplete ... Credentials" error naming the missing field when only one field of a pair is set, and a "Conflicting Crusoe Credentials" error when both the keypair and the service account pair are set, rather than silently picking one. `service_account_token_url` and `service_account_audience`, or the matching `CRUSOE_SERVICE_ACCOUNT_TOKEN_URL` and `CRUSOE_SERVICE_ACCOUNT_AUDIENCE` environment variables, point the provider at a non-production token endpoint; most users never need them.
+
+ENHANCEMENTS:
+
+- Added `crusoe_watch_agent_install_mode` to the `crusoe_compute_instance` and `crusoe_compute_instance_by_template` resources. Set it to `native` to install the Crusoe Watch Agent as a systemd service on the VM, or leave it at the default, `docker`, to run the agent in a container. It applies only when `install_crusoe_watch_agent` is true, and changing it forces replacement. Native installation is in development and requires the organization to be enabled for it; where it is not, the agent is installed with Docker, which the provider cannot report because the API does not return the mode. Reach out to support@crusoecloud.com for availability.
+- `version` on `crusoe_kubernetes_cluster` now accepts a bare minor version such as `1.35`, and the platform selects the current patch. A configured minor matches any patch the API reports within it, so `version = "1.35"` plans no change when the cluster runs `1.35.8` and later `1.35.9`. Exact patch versions such as `1.35.5` and the image format `1.35.5-cmk.N` keep working as before. The validator now rejects trailing characters it previously let through. Using a bare minor requires platform support; where it is not yet available, the API returns a validation error.
+
+BUG FIXES:
+
+- Fixed changing `nat_gateway_enabled` on an existing `crusoe_vpc_subnet` failing with "Provider produced inconsistent result after apply", where a second apply then succeeded. The plan now shows `nat_gateways` as "known after apply" when `nat_gateway_enabled` changes, and keeps it known on other updates so references to the NAT gateway address stay resolvable. The apply now waits, up to five minutes, for the NAT gateway to be attached or removed before recording state.
+
 ## 1.5.0
 
 ENHANCEMENTS:
