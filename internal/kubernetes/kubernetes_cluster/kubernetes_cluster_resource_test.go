@@ -5,9 +5,13 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 func TestKubernetesClusterResource_Metadata(t *testing.T) {
@@ -367,5 +371,66 @@ func TestKubernetesClusterResource_RoutingModeSchema(t *testing.T) {
 	}
 	if len(strAttr.PlanModifiers) == 0 {
 		t.Error("routing_mode should have plan modifiers (RequiresReplace); it cannot be updated in place")
+	}
+}
+
+// runRoutingModePlanModifiers applies routing_mode's plan modifiers in schema order,
+// feeding each one the plan value left by the previous, as the framework does.
+func runRoutingModePlanModifiers(t *testing.T, config, state, plan types.String) planmodifier.StringResponse {
+	t.Helper()
+
+	r := NewKubernetesClusterResource()
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	strAttr, ok := schemaResp.Schema.Attributes["routing_mode"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("routing_mode attribute not found or not StringAttribute")
+	}
+
+	resp := planmodifier.StringResponse{PlanValue: plan}
+	for _, m := range strAttr.PlanModifiers {
+		req := planmodifier.StringRequest{
+			Path:        path.Root("routing_mode"),
+			ConfigValue: config,
+			StateValue:  state,
+			PlanValue:   resp.PlanValue,
+			// Non-null raw state and plan: an update, not a create or destroy.
+			State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, map[string]tftypes.Value{})},
+			Plan:  tfsdk.Plan{Raw: tftypes.NewValue(tftypes.Object{}, map[string]tftypes.Value{})},
+		}
+		m.PlanModifyString(context.Background(), req, &resp)
+	}
+
+	return resp
+}
+
+// An unset routing_mode is marked unknown whenever anything else in the plan
+// changes (e.g. version or *_extra_args). It must keep the stored value rather
+// than force replacement of the cluster.
+func TestKubernetesClusterResource_RoutingModeUnsetKeepsStateWithoutReplace(t *testing.T) {
+	resp := runRoutingModePlanModifiers(t,
+		types.StringNull(),
+		types.StringValue(routingModeOverlay),
+		types.StringUnknown(),
+	)
+
+	if resp.RequiresReplace {
+		t.Error("unset routing_mode should not force replacement when another attribute changes")
+	}
+	if !resp.PlanValue.Equal(types.StringValue(routingModeOverlay)) {
+		t.Errorf("expected planned routing_mode %q from state, got %s", routingModeOverlay, resp.PlanValue)
+	}
+}
+
+func TestKubernetesClusterResource_RoutingModeChangeRequiresReplace(t *testing.T) {
+	resp := runRoutingModePlanModifiers(t,
+		types.StringValue(routingModeNative),
+		types.StringValue(routingModeOverlay),
+		types.StringValue(routingModeNative),
+	)
+
+	if !resp.RequiresReplace {
+		t.Error("changing routing_mode should force replacement")
 	}
 }

@@ -222,7 +222,7 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Optional:            true,
 				Computed:            true,
 				MarkdownDescription: apiDescRoutingMode,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 				Validators: []validator.String{
 					stringvalidator.OneOf(routingModeOverlay, routingModeNative),
 				},
