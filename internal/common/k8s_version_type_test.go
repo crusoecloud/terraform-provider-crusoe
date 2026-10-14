@@ -24,11 +24,6 @@ func TestSameK8sVersion(t *testing.T) {
 		{"tarball dropped on resolution", "1.35.5-cmk.22" + tarballSuffix, "1.35.5-cmk.22", true},
 		{"tarball dropped and cmkv2 shortens", "1.35.5-cmk.22" + tarballSuffix, "1.35.5", true},
 
-		// A minor-only spelling asks the platform to pick the patch, so it names
-		// whatever patch of that minor the cluster came back with.
-		{"minor spelling matches the patch the platform chose", "1.35", "1.35.8", true},
-		{"minor spelling against the legacy image key", "1.35", "1.35.5-cmk.22", true},
-
 		// Real differences.
 		{"minor spelling, different minor", "1.35", "1.36.1", false},
 		{"minor spelling, different major", "1.35", "2.35.0", false},
@@ -53,9 +48,10 @@ func TestSameK8sVersion(t *testing.T) {
 			if got := SameK8sVersion(tt.a, tt.b); got != tt.want {
 				t.Errorf("SameK8sVersion(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
 			}
-			// The relation must be symmetric: the framework may hold either
+			// These rules hold in either order: the framework may hold either
 			// spelling as the prior value depending on whether it is comparing
-			// a plan against a response or state against config.
+			// a plan against a response or state against config. The minor rule
+			// does not, see TestSameK8sVersionMinorIsOneWay.
 			if got := SameK8sVersion(tt.b, tt.a); got != tt.want {
 				t.Errorf("SameK8sVersion(%q, %q) = %v, want %v (not symmetric)", tt.b, tt.a, got, tt.want)
 			}
@@ -63,14 +59,45 @@ func TestSameK8sVersion(t *testing.T) {
 	}
 }
 
+// TestSameK8sVersionMinorIsOneWay pins the one rule that must not hold with the
+// arguments swapped: a requested minor matches any current patch of it, but a
+// requested patch against a current minor is the user pinning a patch, which is
+// a change.
+func TestSameK8sVersionMinorIsOneWay(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		requested, current string
+		want               bool
+	}{
+		{"minor names the patch the platform chose", "1.35", "1.35.8", true},
+		{"minor names the legacy image key", "1.35", "1.35.5-cmk.22", true},
+		{"minor names the legacy image key with a tarball", "1.35", "1.35.5-cmk.22" + tarballSuffix, true},
+		{"patch requested against a minor is a change", "1.35.8", "1.35", false},
+		{"legacy image key requested against a minor is a change", "1.35.5-cmk.22", "1.35", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := SameK8sVersion(tt.requested, tt.current); got != tt.want {
+				t.Errorf("SameK8sVersion(%q, %q) = %v, want %v", tt.requested, tt.current, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestK8sVersionStringSemanticEquals checks the framework-facing entry point,
-// which is what actually preserves the user's spelling.
+// which is what actually preserves the user's spelling. The framework calls it
+// on the API's value, with the user's value as the argument.
 func TestK8sVersionStringSemanticEquals(t *testing.T) {
 	t.Parallel()
 
-	prior := NewK8sVersionValue("1.35.5-cmk.22")
+	reported := NewK8sVersionValue("1.35.5")
 
-	equal, diags := prior.StringSemanticEquals(context.Background(), NewK8sVersionValue("1.35.5"))
+	equal, diags := reported.StringSemanticEquals(context.Background(), NewK8sVersionValue("1.35.5-cmk.22"))
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -78,7 +105,15 @@ func TestK8sVersionStringSemanticEquals(t *testing.T) {
 		t.Error("a cmkv2 response should be semantically equal to the configured display name")
 	}
 
-	equal, diags = prior.StringSemanticEquals(context.Background(), NewK8sVersionValue("1.36.1"))
+	equal, diags = reported.StringSemanticEquals(context.Background(), NewK8sVersionValue("1.35"))
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if !equal {
+		t.Error("a reported patch should be semantically equal to the planned minor")
+	}
+
+	equal, diags = reported.StringSemanticEquals(context.Background(), NewK8sVersionValue("1.36.1"))
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}

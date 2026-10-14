@@ -117,7 +117,10 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 					"In-place Kubernetes version upgrades are not currently supported by the Crusoe Cloud API. "+
 						"Cannot change version from %q to %q. "+
 						"Please contact support@crusoecloud.com for assistance with cluster upgrades.",
-				).WithSemanticEquality(common.SameK8sVersion)}, // in-place upgrades not supported by API
+				).WithSemanticEquality(func(state, plan string) bool {
+					// Argument order matters: the user's value goes first.
+					return common.SameK8sVersion(plan, state)
+				})}, // in-place upgrades not supported by API
 				Validators: []validator.String{stringvalidator.RegexMatches(
 					regexp.MustCompile(`^\d+\.\d+(\.\d+(-cmk\.\d+.*)?)?$`),
 					"must be MAJOR.MINOR (e.g. 1.35), MAJOR.MINOR.PATCH (e.g. 1.35.5), or the legacy MAJOR.MINOR.PATCH-cmk.NUM",

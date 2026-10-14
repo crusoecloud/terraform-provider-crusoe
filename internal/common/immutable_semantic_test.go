@@ -56,3 +56,43 @@ func TestImmutableStringModifierSemanticEquality(t *testing.T) {
 		t.Error("a genuine change must still be refused")
 	}
 }
+
+// TestImmutableStringModifierMinorVersionEdits wires the modifier the way the
+// cluster resource does. Rewriting a config from the running patch to its bare
+// minor is not a change. Rewriting it from a bare minor to a specific patch asks
+// for an upgrade, and the plan must refuse it rather than show no changes.
+func TestImmutableStringModifierMinorVersionEdits(t *testing.T) {
+	t.Parallel()
+
+	modifier := NewImmutableStringModifier("Immutable", "Cannot change from %q to %q.").
+		WithSemanticEquality(func(state, plan string) bool { return SameK8sVersion(plan, state) })
+
+	tests := []struct {
+		name        string
+		state, plan string
+		wantErr     bool
+	}{
+		{"minor spelling of the running image", "1.35.5-cmk.22", "1.35", false},
+		{"minor spelling of the reported patch", "1.35.8", "1.35", false},
+		{"patch upgrade from a minor", "1.35", "1.35.9", true},
+		{"patch downgrade from a minor", "1.35", "1.35.2", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := planmodifier.StringRequest{
+				StateValue:  types.StringValue(tt.state),
+				PlanValue:   types.StringValue(tt.plan),
+				ConfigValue: types.StringValue(tt.plan),
+			}
+			resp := &planmodifier.StringResponse{PlanValue: req.PlanValue}
+			modifier.PlanModifyString(context.Background(), req, resp)
+			if got := resp.Diagnostics.HasError(); got != tt.wantErr {
+				t.Errorf("state %q -> plan %q: refused = %v, want %v: %v",
+					tt.state, tt.plan, got, tt.wantErr, resp.Diagnostics)
+			}
+		})
+	}
+}

@@ -131,26 +131,27 @@ func (v K8sVersion) Equal(o attr.Value) bool {
 	return v.StringValue.Equal(other.StringValue)
 }
 
-// StringSemanticEquals reports whether the receiver (the prior value) and
-// newValue name the same Kubernetes version. Returning true preserves the prior
-// value, which is what keeps a user's spelling in state.
-func (v K8sVersion) StringSemanticEquals(_ context.Context, newValuable basetypes.StringValuable) (
+// StringSemanticEquals reports whether the receiver (the value the API
+// returned) and priorValuable (the planned or stored value) name the same
+// Kubernetes version. Returning true preserves the prior value, which is what
+// keeps a user's spelling in state.
+func (v K8sVersion) StringSemanticEquals(_ context.Context, priorValuable basetypes.StringValuable) (
 	bool, diag.Diagnostics,
 ) {
 	var diags diag.Diagnostics
 
-	newValue, ok := newValuable.(K8sVersion)
+	prior, ok := priorValuable.(K8sVersion)
 	if !ok {
 		diags.AddError(
 			"Semantic equality check error",
 			fmt.Sprintf("Expected a common.K8sVersion value, got %T. Please report this to the provider developers.",
-				newValuable),
+				priorValuable),
 		)
 
 		return false, diags
 	}
 
-	return SameK8sVersion(v.ValueString(), newValue.ValueString()), diags
+	return SameK8sVersion(prior.ValueString(), v.ValueString()), diags
 }
 
 // SameK8sVersion reports whether two Crusoe Kubernetes version strings name the
@@ -167,7 +168,11 @@ func (v K8sVersion) StringSemanticEquals(_ context.Context, newValuable basetype
 //     shorter spelling is exactly the longer one's upstream semver.
 //   - A minor-only spelling asks the platform to choose the patch, so it names
 //     whichever patch of that minor came back. "1.35" and "1.35.8" are the
-//     same version; "1.35" and "1.36.1" are not.
+//     same version; "1.35" and "1.36.1" are not. This holds only when the
+//     bare minor is a, the user's spelling. The API never returns a bare
+//     minor, so a bare minor in b (the version on record) is one the user
+//     wrote earlier, and a patch against it is the user pinning a patch,
+//     which is a change.
 //
 // Everything else is a real difference. In particular "1.35.5-cmk.22" and
 // "1.35.5-cmk.23" are NOT equal: two builds of one upstream release are
@@ -190,7 +195,7 @@ func SameK8sVersion(a, b string) bool {
 		return true
 	}
 
-	return namesMinorOf(a, upstreamSemver(b)) || namesMinorOf(b, upstreamSemver(a))
+	return namesMinorOf(a, upstreamSemver(b))
 }
 
 // namesMinorOf reports whether minor is a "X.Y" spelling and version is an
