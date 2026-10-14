@@ -1,3 +1,10 @@
+## 1.6.1
+
+BUG FIXES:
+
+- Fixed `crusoe_kubernetes_cluster` planning to destroy and recreate the cluster when `routing_mode` was not set in the configuration and any other attribute changed, such as adding `apiserver_extra_args`. The plan showed `routing_mode` going from the API's value to "known after apply", which forced replacement. An unset `routing_mode` now keeps the value already in state, so these changes update the cluster in place. Changing an explicitly configured `routing_mode` still forces replacement.
+- Fixed changing `version` on a `crusoe_kubernetes_cluster` from a bare minor such as `1.35` to a specific patch such as `1.35.9` getting past the check that refuses version changes, even though the cluster cannot be upgraded in place. The plan now fails with "Kubernetes Version Change Not Supported", as it does for any other version change. Rewriting a configured patch version as its bare minor still plans no change.
+
 ## 1.6.0
 
 NEW FEATURES:
