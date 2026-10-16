@@ -46,19 +46,20 @@ func TestSortedInstanceIDs(t *testing.T) {
 // fields sourced from the reference model.
 func Test_nodePoolToResourceModel(t *testing.T) {
 	nodePool := &swagger.KubernetesNodePool{
-		Id:             "np-1",
-		ProjectId:      "proj-1",
-		Count:          3,
-		ImageId:        "1.2.3-cmk.4",
-		Type_:          "a100.1x",
-		ClusterId:      "cluster-1",
-		InstanceIds:    []string{"i-c", "i-a", "i-b"},
-		NvlinkDomainId: "", // absent → must normalize to null
+		Id:                   "np-1",
+		ProjectId:            "proj-1",
+		Count:                3,
+		ImageId:              "1.2.3-cmk.4",
+		Type_:                "a100.1x",
+		ClusterId:            "cluster-1",
+		InstanceIds:          []string{"i-c", "i-a", "i-b"},
+		NvlinkDomainId:       "", // absent → must normalize to null
+		SshPublicKey:         "ssh-ed25519 AAAA api-key",
+		TransportPartitionId: "tp-api",
 	}
 	ref := &kubernetesNodePoolResourceModel{
-		IBPartitionID:        types.StringValue("ibp-1"),
-		TransportPartitionID: types.StringValue("tp-1"),
-		SSHKey:               types.StringValue("ssh-key"),
+		TransportPartitionID: types.StringValue("tp-ref"),
+		SSHKey:               types.StringValue("ssh-ref"),
 		BatchSize:            types.Int64Value(2),
 		BatchPercentage:      types.Int64Null(),
 	}
@@ -83,39 +84,64 @@ func Test_nodePoolToResourceModel(t *testing.T) {
 	if want := []string{"i-a", "i-b", "i-c"}; !reflect.DeepEqual(ids, want) {
 		t.Errorf("instance_ids = %v, want %v (sorted)", ids, want)
 	}
-	// Both halves of the partition alias pair are Terraform-only: the API does not return
-	// them, so each must survive from the reference model unchanged.
-	if got := model.IBPartitionID.ValueString(); got != "ibp-1" {
-		t.Errorf("ib_partition_id = %q, want it preserved from ref", got)
+	// ssh_key and transport_partition_id now come from the API when it returns
+	// them, overriding whatever ref carried.
+	if got := model.SSHKey.ValueString(); got != "ssh-ed25519 AAAA api-key" {
+		t.Errorf("ssh_key = %q, want API value (overrides ref)", got)
 	}
-	if got := model.TransportPartitionID.ValueString(); got != "tp-1" {
-		t.Errorf("transport_partition_id = %q, want it preserved from ref", got)
+	if got := model.TransportPartitionID.ValueString(); got != "tp-api" {
+		t.Errorf("transport_partition_id = %q, want API value (overrides ref)", got)
+	}
+	if !model.IBPartitionID.IsNull() {
+		t.Errorf("ib_partition_id = %v, want null; the alias stays null when ref uses the replacement name", model.IBPartitionID)
 	}
 }
 
-// Test_nodePoolToResourceModel_aliasPairFromRef checks each combination of the partition
-// alias pair through the reference model. The transform must not invent a value for the
-// half the configuration leaves unset, in either direction.
-func Test_nodePoolToResourceModel_aliasPairFromRef(t *testing.T) {
+// Test_nodePoolToResourceModel_aliasPair covers the four combinations of the
+// alias pair against the two API behaviors: v2 pools return
+// transport_partition_id, v1 pools omit it. The API only speaks the replacement
+// name, so a configuration still using the deprecated name must receive the
+// API's value mapped back onto ib_partition_id — flipping to the replacement
+// name on a Read would force replacement on the next plan.
+func Test_nodePoolToResourceModel_aliasPair(t *testing.T) {
 	tests := []struct {
 		name                  string
 		refIB, refTransport   types.String
+		apiTransport          string
 		wantIB, wantTransport types.String
 	}{
 		{
-			name:  "configuration uses the deprecated name",
-			refIB: types.StringValue("ibp-1"), refTransport: types.StringNull(),
-			wantIB: types.StringValue("ibp-1"), wantTransport: types.StringNull(),
+			name:  "v2 API, config uses the deprecated name — alias preserved",
+			refIB: types.StringValue("tp-1"), refTransport: types.StringNull(),
+			apiTransport: "tp-1",
+			wantIB:       types.StringValue("tp-1"), wantTransport: types.StringNull(),
 		},
 		{
-			name:  "configuration uses the replacement name",
+			name:  "v2 API, config uses the replacement name",
 			refIB: types.StringNull(), refTransport: types.StringValue("tp-1"),
-			wantIB: types.StringNull(), wantTransport: types.StringValue("tp-1"),
+			apiTransport: "tp-1",
+			wantIB:       types.StringNull(), wantTransport: types.StringValue("tp-1"),
 		},
 		{
-			name:  "configuration sets neither",
+			name:  "v2 API, fresh import (ref empty) — prefer the replacement name",
 			refIB: types.StringNull(), refTransport: types.StringNull(),
-			wantIB: types.StringNull(), wantTransport: types.StringNull(),
+			apiTransport: "tp-1",
+			wantIB:       types.StringNull(), wantTransport: types.StringValue("tp-1"),
+		},
+		{
+			name:  "v1 API omits the field — ref values survive",
+			refIB: types.StringValue("ibp-1"), refTransport: types.StringNull(),
+			apiTransport: "",
+			wantIB:       types.StringValue("ibp-1"), wantTransport: types.StringNull(),
+		},
+		{
+			// validateAliasPairConfig allows both set to the same value. The API
+			// value must land on both halves so Terraform's post-apply
+			// consistency check sees state matching plan.
+			name:  "config sets both names to the same value — both mirror the API",
+			refIB: types.StringValue("tp-1"), refTransport: types.StringValue("tp-1"),
+			apiTransport: "tp-1",
+			wantIB:       types.StringValue("tp-1"), wantTransport: types.StringValue("tp-1"),
 		},
 	}
 
@@ -129,7 +155,8 @@ func Test_nodePoolToResourceModel_aliasPairFromRef(t *testing.T) {
 			var diags diag.Diagnostics
 			var model kubernetesNodePoolResourceModel
 			nodePoolToResourceModel(context.Background(),
-				&swagger.KubernetesNodePool{Id: "np-1"}, ref, &model, &diags)
+				&swagger.KubernetesNodePool{Id: "np-1", TransportPartitionId: tt.apiTransport},
+				ref, &model, &diags)
 			if diags.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diags)
 			}
@@ -141,6 +168,61 @@ func Test_nodePoolToResourceModel_aliasPairFromRef(t *testing.T) {
 				t.Errorf("transport_partition_id = %v, want %v", model.TransportPartitionID, tt.wantTransport)
 			}
 		})
+	}
+}
+
+// Test_nodePoolToResourceModel_importPopulatesFromAPI pins the fix for the
+// import-forces-replacement bug: with an empty ref (the state ImportState
+// seeds), a v2 pool's GET response must land ssh_key and transport_partition_id
+// in state. Without this, the next plan diffs config against null, flags both
+// as additions, and forces replacement because each has RequiresReplace.
+func Test_nodePoolToResourceModel_importPopulatesFromAPI(t *testing.T) {
+	ref := &kubernetesNodePoolResourceModel{
+		RequestedNodeLabels: types.MapNull(types.StringType),
+	}
+
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolResourceModel
+	nodePoolToResourceModel(context.Background(), &swagger.KubernetesNodePool{
+		Id:                   "np-1",
+		SshPublicKey:         "ssh-ed25519 AAAA test@example.com",
+		TransportPartitionId: "tp-import",
+	}, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if got := model.SSHKey.ValueString(); got != "ssh-ed25519 AAAA test@example.com" {
+		t.Errorf("ssh_key = %q, want it populated from the API after import", got)
+	}
+	if got := model.TransportPartitionID.ValueString(); got != "tp-import" {
+		t.Errorf("transport_partition_id = %q, want it populated from the API after import", got)
+	}
+}
+
+// Test_nodePoolToResourceModel_v1PoolFallsBackToRef is the other half: on a
+// v1-backed pool the API still omits both fields, and the ref value must survive
+// the Read so a routine refresh doesn't null out the standing ssh_key.
+func Test_nodePoolToResourceModel_v1PoolFallsBackToRef(t *testing.T) {
+	ref := &kubernetesNodePoolResourceModel{
+		SSHKey:               types.StringValue("ssh-ref"),
+		TransportPartitionID: types.StringValue("tp-ref"),
+		RequestedNodeLabels:  types.MapNull(types.StringType),
+	}
+
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolResourceModel
+	nodePoolToResourceModel(context.Background(),
+		&swagger.KubernetesNodePool{Id: "np-1"}, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if got := model.SSHKey.ValueString(); got != "ssh-ref" {
+		t.Errorf("ssh_key = %q, want ref value preserved on a v1-backed pool", got)
+	}
+	if got := model.TransportPartitionID.ValueString(); got != "tp-ref" {
+		t.Errorf("transport_partition_id = %q, want ref value preserved on a v1-backed pool", got)
 	}
 }
 

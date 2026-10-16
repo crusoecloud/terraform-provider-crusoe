@@ -362,10 +362,9 @@ func validateNodeTaintDuplicates(taints []swagger.KubernetesNodeTaint) error {
 // particular the instance_ids sort (CCX-4394) and the nvlink_domain_id
 // empty-to-null normalization now live in exactly one place.
 //
-// The Terraform-only fields the API does not return (ib_partition_id,
-// transport_partition_id, ssh_key, requested_node_labels, batch_size,
-// batch_percentage) are taken from ref: the
-// plan in Create/Update, the prior state in Read.
+// The Terraform-only fields the API does not return (requested_node_labels,
+// batch_size, batch_percentage) are taken from ref: the plan in Create/Update,
+// the prior state in Read.
 func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNodePool,
 	ref, model *kubernetesNodePoolResourceModel, diags *diag.Diagnostics,
 ) {
@@ -409,10 +408,45 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 
 	model.Current = currentOrNull(nodePool)
 
-	// Terraform-only fields (not returned by the API) come from the reference model.
-	model.IBPartitionID = ref.IBPartitionID
-	model.TransportPartitionID = ref.TransportPartitionID
-	model.SSHKey = ref.SSHKey
+	// ssh_key: the API returns it on reads, so prefer the API value. Keep the
+	// ref fallback so an empty response (partial object, future divergence)
+	// preserves the standing key instead of nulling it.
+	if nodePool.SshPublicKey != "" {
+		model.SSHKey = types.StringValue(nodePool.SshPublicKey)
+	} else {
+		model.SSHKey = ref.SSHKey
+	}
+
+	// transport_partition_id / ib_partition_id: the API only speaks
+	// transport_partition_id. Map it onto whichever name the configuration uses,
+	// so a config still written against the deprecated ib_partition_id stays
+	// stable across a Read instead of flipping to the replacement name and
+	// forcing replacement. On a fresh import (both ref halves null), prefer the
+	// non-deprecated name. If the API omits the field (partial object, future
+	// divergence), keep the ref values.
+	switch {
+	case nodePool.TransportPartitionId == "":
+		// API omitted the field: keep whatever ref had on both halves.
+		model.IBPartitionID = ref.IBPartitionID
+		model.TransportPartitionID = ref.TransportPartitionID
+	case !ref.IBPartitionID.IsNull() && !ref.TransportPartitionID.IsNull():
+		// Config sets both names to the same value (legal per
+		// validateAliasPairConfig): mirror the API value onto both halves so
+		// the post-apply consistency check sees state matching plan.
+		v := types.StringValue(nodePool.TransportPartitionId)
+		model.IBPartitionID = v
+		model.TransportPartitionID = v
+	case !ref.IBPartitionID.IsNull() && ref.TransportPartitionID.IsNull():
+		// Config uses the deprecated name; map the API value onto it so the
+		// alias stays stable instead of flipping to the replacement.
+		model.IBPartitionID = types.StringValue(nodePool.TransportPartitionId)
+		model.TransportPartitionID = types.StringNull()
+	default:
+		model.IBPartitionID = types.StringNull()
+		model.TransportPartitionID = types.StringValue(nodePool.TransportPartitionId)
+	}
+
+	// Terraform-only fields with no API counterpart.
 	model.BatchSize = ref.BatchSize
 	model.BatchPercentage = ref.BatchPercentage
 	if ref.RequestedNodeLabels.IsUnknown() {
