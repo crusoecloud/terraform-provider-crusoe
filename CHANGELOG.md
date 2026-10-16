@@ -1,3 +1,10 @@
+## 1.6.2
+
+BUG FIXES:
+
+- Fixed importing a `crusoe_kubernetes_node_pool` leaving `ssh_key` and `transport_partition_id` null in state, so the next plan diffed the configuration against null and forced replacement on both. The Read now populates them from the API, and a fresh import settles with no further changes. A fresh import of a pool that was never written in Terraform lands on `transport_partition_id`, the non-deprecated name. A node pool API response that omits either field still falls back to the value in state.
+- Fixed a plan on an existing `crusoe_kubernetes_node_pool` written against the deprecated `ib_partition_id` flipping the attribute to `transport_partition_id` in state and forcing replacement. The Read maps the API's `transport_partition_id` back onto whichever name the configuration uses, so configurations that still carry the deprecated name keep planning no changes. Setting both names to the same partition now also applies cleanly.
+
 ## 1.6.1
 
 BUG FIXES:
