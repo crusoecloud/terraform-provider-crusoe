@@ -81,12 +81,12 @@ run "validate_firewall_rule" {
   }
 
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.source_ports == "1-65535"
-    error_message = "Expected firewall rule source ports to be '1-65535', but got '${crusoe_vpc_firewall_rule.open_fw_rule.source_ports}'."
+    condition     = crusoe_vpc_firewall_rule.open_fw_rule.source_port_ranges[0] == "1-65535"
+    error_message = "Expected firewall rule source ports to be '1-65535', but got '${crusoe_vpc_firewall_rule.open_fw_rule.source_port_ranges[0]}'."
   }
 
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.destination_ports == "3000"
-    error_message = "Expected firewall rule destination ports to be '3000', but got '${crusoe_vpc_firewall_rule.open_fw_rule.destination_ports}'."
+    condition     = crusoe_vpc_firewall_rule.open_fw_rule.destination_port_ranges[0] == "3000"
+    error_message = "Expected firewall rule destination ports to be '3000', but got '${crusoe_vpc_firewall_rule.open_fw_rule.destination_port_ranges[0]}'."
   }
 }

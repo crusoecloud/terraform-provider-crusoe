@@ -43,15 +43,15 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
 
 # Create a firewall rule
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
-  network           = crusoe_vpc_network.my_vpc_network.id
-  name              = "${var.name_prefix}firewall-rule"
-  action            = "allow"
-  direction         = "ingress"
-  protocols         = "tcp"
-  sources           = [{ cidr = "0.0.0.0/0" }]
-  source_ports      = "1-65535"
-  destinations      = [{ resource_id = crusoe_vpc_network.my_vpc_network.id }]
-  destination_ports = "1-65535"
+  network                 = crusoe_vpc_network.my_vpc_network.id
+  name                    = "${var.name_prefix}firewall-rule"
+  action                  = "allow"
+  direction               = "ingress"
+  protocols               = "tcp"
+  sources                 = [{ cidr = "0.0.0.0/0" }]
+  source_port_ranges      = ["1-65535"]
+  destinations            = [{ resource_id = crusoe_vpc_network.my_vpc_network.id }]
+  destination_port_ranges = ["1-65535"]
 
   # It is currently not possible for terraform to create subnets and firewall rules concurrently.
   # This directive should be specified when creating firewall rules and subnets to avoid failures.

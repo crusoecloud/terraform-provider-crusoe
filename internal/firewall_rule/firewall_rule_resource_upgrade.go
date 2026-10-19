@@ -12,14 +12,17 @@ import (
 // firewallRuleResourceModelV0 is the minimal set of attributes that we will need from a prior state to
 // rebuild a firewall rule's state because these fields are not returned by the API.
 //
-// A v0 configuration can only use the combined source/destination fields, since the
-// sources/destinations lists that replaced them did not exist yet. Carrying the two
-// values over keeps the upgraded state on the same fields the configuration uses, so
-// the first plan after the upgrade does not report a move to the new lists.
+// A v0 configuration can only use the combined source/destination fields and the
+// comma-separated port strings, since the lists that replaced them did not exist yet.
+// Carrying those values over keeps the upgraded state on the same fields the
+// configuration uses, so the first plan after the upgrade does not report a move to
+// the new lists.
 type firewallRuleResourceModelV0 struct {
-	ID          types.String `tfsdk:"id"`
-	Source      types.String `tfsdk:"source"`
-	Destination types.String `tfsdk:"destination"`
+	ID               types.String `tfsdk:"id"`
+	Source           types.String `tfsdk:"source"`
+	SourcePorts      types.String `tfsdk:"source_ports"`
+	Destination      types.String `tfsdk:"destination"`
+	DestinationPorts types.String `tfsdk:"destination_ports"`
 }
 
 func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
@@ -33,7 +36,13 @@ func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.
 					"source": schema.StringAttribute{
 						Optional: true,
 					},
+					"source_ports": schema.StringAttribute{
+						Optional: true,
+					},
 					"destination": schema.StringAttribute{
+						Optional: true,
+					},
+					"destination_ports": schema.StringAttribute{
 						Optional: true,
 					},
 				},
@@ -66,9 +75,11 @@ func (r *firewallRuleResource) UpgradeState(context.Context) map[int64]resource.
 				}
 
 				state := firewallRuleResourceModel{
-					ProjectID:   types.StringValue(projectID),
-					Source:      priorStateData.Source,
-					Destination: priorStateData.Destination,
+					ProjectID:        types.StringValue(projectID),
+					Source:           priorStateData.Source,
+					SourcePorts:      priorStateData.SourcePorts,
+					Destination:      priorStateData.Destination,
+					DestinationPorts: priorStateData.DestinationPorts,
 				}
 				firewallRuleToTerraformResourceModel(ctx, firewallRule, &state)
 				resp.Diagnostics.Append(resp.State.Set(ctx, state)...)

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -46,13 +47,23 @@ const (
 	providerDescSource      = "Source of the firewall rule, as a CIDR or IP address. Deprecated in favor of `sources`. " + providerDescSourceConstraint
 	providerDescDestination = "Destination of the firewall rule, as a CIDR or IP address. Deprecated in favor of `destinations`. " + providerDescDestinationConstraint
 
+	// The comma-separated port strings are replaced by the source_port_ranges/
+	// destination_port_ranges lists, which take one port or range per element.
+	providerDescSourcePorts = "Source ports of the firewall rule, as a comma-separated list of ports or port ranges. " +
+		"Deprecated in favor of `source_port_ranges`. " + providerDescSourcePortsConstraint
+	providerDescDestinationPorts = "Destination ports of the firewall rule, as a comma-separated list of ports or port ranges. " +
+		"Deprecated in favor of `destination_port_ranges`. " + providerDescDestinationPortsConstraint
+	providerDescPortWildcard = "Use `*` to match all ports."
+
 	// The source/destination fields are each declared Optional because the framework
 	// cannot mark a field both Optional and Required; the ExactlyOneOf validators
 	// enforce the real "exactly one required" constraints, which these notes document
 	// since tfplugindocs lists the fields under "Optional".
-	providerDescSourceConstraint      = "Exactly one of `source` or `sources` must be set."
-	providerDescDestinationConstraint = "Exactly one of `destination` or `destinations` must be set."
-	providerDescRuleObjectConstraint  = "Exactly one of `cidr` or `resource_id` must be set on each element."
+	providerDescSourceConstraint           = "Exactly one of `source` or `sources` must be set."
+	providerDescDestinationConstraint      = "Exactly one of `destination` or `destinations` must be set."
+	providerDescRuleObjectConstraint       = "Exactly one of `cidr` or `resource_id` must be set on each element."
+	providerDescSourcePortsConstraint      = "Exactly one of `source_ports` or `source_port_ranges` must be set."
+	providerDescDestinationPortsConstraint = "Exactly one of `destination_ports` or `destination_port_ranges` must be set."
 )
 
 // firewallRuleObjectType is the Terraform type of a single sources/destinations
@@ -91,6 +102,26 @@ func ruleObjectNestedAttribute() schema.NestedAttributeObject {
 }
 
 var whitespaceRegex = regexp.MustCompile(`\s*`)
+
+// portRangeRegex matches a single port_ranges element: a port, a port range, or
+// the "*" wildcard. Bounds are left to the API.
+var portRangeRegex = regexp.MustCompile(`^(\*|\d{1,5}(-\d{1,5})?)$`)
+
+// portRangesAttribute is the shared shape of the source_port_ranges and
+// destination_port_ranges lists.
+func portRangesAttribute(description string) schema.ListAttribute {
+	return schema.ListAttribute{
+		Optional:            true,
+		ElementType:         types.StringType,
+		MarkdownDescription: description,
+		Validators: []validator.List{
+			listvalidator.SizeAtLeast(1),
+			listvalidator.NoNullValues(),
+			listvalidator.ValueStringsAre(stringvalidator.RegexMatches(portRangeRegex,
+				"must be a port (e.g. `22`), a port range (e.g. `3000-8080`), or `*`")),
+		},
+	}
+}
 
 // wildcardPortRange is the canonical range the API expands the "*" port
 // wildcard into.
@@ -158,6 +189,12 @@ func preserveListFormat(configured string, apiElems []string, expandWildcard boo
 // isSet reports whether a string attribute has a usable (non-null, non-unknown, non-empty) value.
 func isSet(s types.String) bool {
 	return !s.IsNull() && !s.IsUnknown() && s.ValueString() != ""
+}
+
+// isKnown reports whether a string attribute has a non-null, non-unknown value. Unlike
+// isSet, an empty string counts, which is how a deprecated port string says "all ports".
+func isKnown(s types.String) bool {
+	return !s.IsNull() && !s.IsUnknown()
 }
 
 // isSetList reports whether a list attribute has a usable (non-null, non-unknown, non-empty) value.
@@ -311,6 +348,69 @@ func applyRuleObjectsToState(ctx context.Context, objects []swagger.FirewallRule
 	*list = ruleObjectsToState(ctx, objects, *list)
 }
 
+// portsFromModel converts a configured port_ranges list into the API's port list,
+// falling back to the deprecated comma-separated string when the list is unset. The
+// schema's ExactlyOneOf validators guarantee that exactly one of the two is
+// configured. The "*" wildcard is expanded to the full range the API uses.
+func portsFromModel(ctx context.Context, list types.List, deprecated types.String,
+	diags *diag.Diagnostics,
+) []string {
+	var ports []string
+	if isSetList(list) {
+		diags.Append(list.ElementsAs(ctx, &ports, false)...)
+	} else {
+		ports = stringToSlice(deprecated.ValueString(), ",")
+	}
+
+	out := make([]string, 0, len(ports))
+	for _, p := range ports {
+		p = strings.TrimSpace(p)
+		if p == "*" {
+			p = wildcardPortRange
+		}
+		out = append(out, p)
+	}
+
+	return out
+}
+
+// portRangesToState maps the API's port list onto a port_ranges list, keeping the
+// configured list when it describes the same ports so that "*" vs "1-65535" or a
+// reordered list does not read as a change.
+func portRangesToState(ctx context.Context, apiPorts []string, configured types.List) types.List {
+	if isSetList(configured) {
+		var elems []string
+		diags := configured.ElementsAs(ctx, &elems, false)
+		if !diags.HasError() && slices.Equal(canonicalizeList(elems, true), canonicalizeList(apiPorts, true)) {
+			return configured
+		}
+	}
+
+	list, diags := types.ListValueFrom(ctx, types.StringType, apiPorts)
+	if diags.HasError() {
+		return types.ListNull(types.StringType)
+	}
+
+	return list
+}
+
+// applyPortsToState maps the API's port list back onto whichever of the two
+// mutually-exclusive fields the configuration uses, so the deprecated string and
+// the list never both end up populated. Unlike source/destination, an empty
+// deprecated string is a valid configuration (all ports), so only a null string
+// counts as unset.
+func applyPortsToState(ctx context.Context, apiPorts []string, list *types.List, deprecated *types.String) {
+	if isKnown(*deprecated) {
+		*deprecated = types.StringValue(preserveListFormat(deprecated.ValueString(), apiPorts, true))
+		*list = types.ListNull(types.StringType)
+
+		return
+	}
+
+	*deprecated = types.StringNull()
+	*list = portRangesToState(ctx, apiPorts, *list)
+}
+
 // toFirewallRuleObjects wraps IP or CIDR strings into FirewallRuleObjects.
 func toFirewallRuleObjects(ipsOrCIDRs []string) []swagger.FirewallRuleObject {
 	out := make([]swagger.FirewallRuleObject, 0, len(ipsOrCIDRs))
@@ -351,13 +451,13 @@ func firewallRuleToTerraformResourceModel(ctx context.Context, rule *swagger.Vpc
 	state.Network = types.StringValue(rule.VpcNetworkId)
 	state.Action = types.StringValue(rule.Action)
 	state.Direction = types.StringValue(rule.Direction)
-	// protocols and the port lists are Required attributes the API may return in a
-	// normalized form (e.g. "*"/"" → "1-65535", reordered lists). Preserve the user's
-	// configured representation when it is semantically equal so reads don't produce
-	// spurious diffs and creates/updates don't fail with "inconsistent result after apply".
+	// protocols and the ports may come back from the API in a normalized form (e.g.
+	// "*"/"" → "1-65535", reordered lists). Preserve the user's configured
+	// representation when it is semantically equal so reads don't produce spurious
+	// diffs and creates/updates don't fail with "inconsistent result after apply".
 	state.Protocols = types.StringValue(preserveListFormat(state.Protocols.ValueString(), rule.Protocols, false))
 	applyRuleObjectsToState(ctx, rule.Sources, &state.Sources, &state.Source)
-	state.SourcePorts = types.StringValue(preserveListFormat(state.SourcePorts.ValueString(), rule.SourcePorts, true))
+	applyPortsToState(ctx, rule.SourcePorts, &state.SourcePortRanges, &state.SourcePorts)
 	applyRuleObjectsToState(ctx, rule.Destinations, &state.Destinations, &state.Destination)
-	state.DestinationPorts = types.StringValue(preserveListFormat(state.DestinationPorts.ValueString(), rule.DestinationPorts, true))
+	applyPortsToState(ctx, rule.DestinationPorts, &state.DestinationPortRanges, &state.DestinationPorts)
 }

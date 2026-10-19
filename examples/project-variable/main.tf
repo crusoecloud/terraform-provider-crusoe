@@ -83,14 +83,14 @@ resource "crusoe_storage_disk" "data_disk" {
 # Create a firewall rule
 # This example rule allows all ingress over TCP to port 3000 on our VM
 resource "crusoe_vpc_firewall_rule" "open_fw_rule" {
-  project_id        = var.project_id
-  network           = crusoe_compute_instance.my_vm.network_interfaces[0].network
-  name              = "${var.name_prefix}firewall-rule"
-  action            = "allow"
-  direction         = "ingress"
-  protocols         = "tcp"
-  sources           = [{ cidr = "0.0.0.0/0" }]
-  source_ports      = "1-65535"
-  destinations      = [{ resource_id = crusoe_compute_instance.my_vm.id }]
-  destination_ports = "3000"
+  project_id              = var.project_id
+  network                 = crusoe_compute_instance.my_vm.network_interfaces[0].network
+  name                    = "${var.name_prefix}firewall-rule"
+  action                  = "allow"
+  direction               = "ingress"
+  protocols               = "tcp"
+  sources                 = [{ cidr = "0.0.0.0/0" }]
+  source_port_ranges      = ["1-65535"]
+  destinations            = [{ resource_id = crusoe_compute_instance.my_vm.id }]
+  destination_port_ranges = ["3000"]
 }

@@ -3,7 +3,6 @@ package firewall_rule
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -34,14 +33,20 @@ type firewallRuleResourceModel struct {
 	Protocols types.String `tfsdk:"protocols"`
 	// Sources is the replacement for the deprecated Source field. Exactly one of
 	// the two must be set.
-	Source      types.String `tfsdk:"source"`
-	Sources     types.List   `tfsdk:"sources"`
-	SourcePorts types.String `tfsdk:"source_ports"`
+	Source  types.String `tfsdk:"source"`
+	Sources types.List   `tfsdk:"sources"`
+	// SourcePortRanges is the replacement for the deprecated SourcePorts field.
+	// Exactly one of the two must be set.
+	SourcePorts      types.String `tfsdk:"source_ports"`
+	SourcePortRanges types.List   `tfsdk:"source_port_ranges"`
 	// Destinations is the replacement for the deprecated Destination field. Exactly
 	// one of the two must be set.
-	Destination      types.String `tfsdk:"destination"`
-	Destinations     types.List   `tfsdk:"destinations"`
-	DestinationPorts types.String `tfsdk:"destination_ports"`
+	Destination  types.String `tfsdk:"destination"`
+	Destinations types.List   `tfsdk:"destinations"`
+	// DestinationPortRanges is the replacement for the deprecated DestinationPorts
+	// field. Exactly one of the two must be set.
+	DestinationPorts      types.String `tfsdk:"destination_ports"`
+	DestinationPortRanges types.List   `tfsdk:"destination_port_ranges"`
 }
 
 // firewallRuleObjectModel is a single sources/destinations element, mirroring the
@@ -138,10 +143,19 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				NestedObject: ruleObjectNestedAttribute(),
 			},
 			"source_ports": schema.StringAttribute{
-				Required:    true,
-				Description: apiDescSourcePorts,
-				// TODO: add validator
+				Optional:            true,
+				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.7.0", "source_port_ranges"),
+				MarkdownDescription: providerDescSourcePorts,
+				Validators: []validator.String{
+					// Exactly one of the deprecated field or its replacement must be set.
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("source_ports"),
+						path.MatchRoot("source_port_ranges"),
+					),
+				},
 			},
+			"source_port_ranges": portRangesAttribute(apiDescSourcePorts + " " + providerDescPortWildcard + " " +
+				providerDescSourcePortsConstraint),
 			"destination": schema.StringAttribute{
 				Optional:            true,
 				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.3.0", "destinations"),
@@ -162,10 +176,19 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				NestedObject: ruleObjectNestedAttribute(),
 			},
 			"destination_ports": schema.StringAttribute{
-				Required:    true,
-				Description: apiDescDestinationPorts,
-				// TODO: add validator
+				Optional:            true,
+				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.7.0", "destination_port_ranges"),
+				MarkdownDescription: providerDescDestinationPorts,
+				Validators: []validator.String{
+					// Exactly one of the deprecated field or its replacement must be set.
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("destination_ports"),
+						path.MatchRoot("destination_port_ranges"),
+					),
+				},
 			},
+			"destination_port_ranges": portRangesAttribute(apiDescDestinationPorts + " " + providerDescPortWildcard + " " +
+				providerDescDestinationPortsConstraint),
 		},
 	}
 }
@@ -191,11 +214,10 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	sourcePortsStr := strings.ReplaceAll(plan.SourcePorts.ValueString(), "*", "1-65535")
-	destPortsStr := strings.ReplaceAll(plan.DestinationPorts.ValueString(), "*", "1-65535")
-
 	sources := ruleObjectsFromModel(ctx, plan.Sources, plan.Source, &resp.Diagnostics)
+	sourcePorts := portsFromModel(ctx, plan.SourcePortRanges, plan.SourcePorts, &resp.Diagnostics)
 	destinations := ruleObjectsFromModel(ctx, plan.Destinations, plan.Destination, &resp.Diagnostics)
+	destinationPorts := portsFromModel(ctx, plan.DestinationPortRanges, plan.DestinationPorts, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -207,9 +229,9 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		Protocols:        stringToSlice(plan.Protocols.ValueString(), ","),
 		Direction:        plan.Direction.ValueString(),
 		Sources:          sources,
-		SourcePorts:      stringToSlice(sourcePortsStr, ","),
+		SourcePorts:      sourcePorts,
 		Destinations:     destinations,
-		DestinationPorts: stringToSlice(destPortsStr, ","),
+		DestinationPorts: destinationPorts,
 	}, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
@@ -286,14 +308,14 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	if isSet(plan.Destination) || isSetList(plan.Destinations) {
 		patchReq.Destinations = ruleObjectsFromModel(ctx, plan.Destinations, plan.Destination, &resp.Diagnostics)
 	}
-	if !plan.DestinationPorts.IsNull() && !plan.DestinationPorts.IsUnknown() {
-		patchReq.DestinationPorts = stringToSlice(plan.DestinationPorts.ValueString(), ",")
+	if isKnown(plan.DestinationPorts) || isSetList(plan.DestinationPortRanges) {
+		patchReq.DestinationPorts = portsFromModel(ctx, plan.DestinationPortRanges, plan.DestinationPorts, &resp.Diagnostics)
 	}
 	if isSet(plan.Source) || isSetList(plan.Sources) {
 		patchReq.Sources = ruleObjectsFromModel(ctx, plan.Sources, plan.Source, &resp.Diagnostics)
 	}
-	if !plan.SourcePorts.IsNull() && !plan.SourcePorts.IsUnknown() {
-		patchReq.SourcePorts = stringToSlice(plan.SourcePorts.ValueString(), ",")
+	if isKnown(plan.SourcePorts) || isSetList(plan.SourcePortRanges) {
+		patchReq.SourcePorts = portsFromModel(ctx, plan.SourcePortRanges, plan.SourcePorts, &resp.Diagnostics)
 	}
 	if resp.Diagnostics.HasError() {
 		return

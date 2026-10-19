@@ -11,8 +11,8 @@ resource "crusoe_vpc_firewall_rule" "example" {
   protocols = "tcp"
 
   # Each source and destination sets either a cidr or a resource_id, never both.
-  sources           = [{ cidr = "0.0.0.0/0" }]
-  source_ports      = "1-65535"
-  destinations      = [{ resource_id = crusoe_vpc_network.example.id }]
-  destination_ports = "443"
+  sources                 = [{ cidr = "0.0.0.0/0" }]
+  source_port_ranges      = ["1-65535"]
+  destinations            = [{ resource_id = crusoe_vpc_network.example.id }]
+  destination_port_ranges = ["443"]
 }

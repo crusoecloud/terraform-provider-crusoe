@@ -44,7 +44,7 @@ func firewallRuleSchema(t *testing.T) schema.Schema {
 func TestFirewallRuleResource_DeprecatedFields(t *testing.T) {
 	s := firewallRuleSchema(t)
 
-	for _, name := range []string{"source", "destination"} {
+	for _, name := range []string{"source", "destination", "source_ports", "destination_ports"} {
 		attr, ok := s.Attributes[name].(schema.StringAttribute)
 		if !ok {
 			t.Fatalf("%s attribute not found", name)
@@ -108,6 +108,45 @@ func TestFirewallRuleResource_RuleObjectLists(t *testing.T) {
 		}
 		if !hasExactlyOneOfValidator(cidrAttr.Validators) {
 			t.Errorf("%s.cidr should carry the ExactlyOneOf validator against resource_id", name)
+		}
+	}
+}
+
+// TestFirewallRuleResource_PortRangeLists checks that source_port_ranges/
+// destination_port_ranges are optional string lists that reject empty lists, null
+// elements, and elements that aren't a port, a port range, or "*".
+func TestFirewallRuleResource_PortRangeLists(t *testing.T) {
+	s := firewallRuleSchema(t)
+
+	for _, name := range []string{"source_port_ranges", "destination_port_ranges"} {
+		attr, ok := s.Attributes[name].(schema.ListAttribute)
+		if !ok {
+			t.Fatalf("%s attribute not found or not a ListAttribute", name)
+		}
+		if !attr.Optional || attr.Required || attr.Computed {
+			t.Errorf("%s should be Optional only", name)
+		}
+		if !attr.ElementType.Equal(types.StringType) {
+			t.Errorf("%s elements should be strings, got %v", name, attr.ElementType)
+		}
+		if len(attr.Validators) == 0 {
+			t.Errorf("%s should have validators", name)
+		}
+	}
+}
+
+func TestPortRangeRegex(t *testing.T) {
+	valid := []string{"*", "22", "443", "65535", "3000-8080", "1-65535"}
+	invalid := []string{"", " ", "**", "22,443", "22-", "-22", "3000 - 8080", "abc", "123456", "1-2-3", "22/tcp"}
+
+	for _, v := range valid {
+		if !portRangeRegex.MatchString(v) {
+			t.Errorf("portRangeRegex should match %q", v)
+		}
+	}
+	for _, v := range invalid {
+		if portRangeRegex.MatchString(v) {
+			t.Errorf("portRangeRegex should not match %q", v)
 		}
 	}
 }

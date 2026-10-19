@@ -85,15 +85,15 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
 }
 
 resource "crusoe_vpc_firewall_rule" "my_egress_rule" {
-  name              = "${var.name_prefix}egress-rule"
-  action            = "allow"
-  direction         = "egress"
-  protocols         = "tcp,udp"
-  sources           = [{ cidr = crusoe_vpc_subnet.my_vpc_subnet.cidr }]
-  source_ports      = "1-65535"
-  destinations      = [{ cidr = "0.0.0.0/0" }]
-  destination_ports = "1-65535"
-  network           = crusoe_vpc_network.my_vpc_network.id
+  name                    = "${var.name_prefix}egress-rule"
+  action                  = "allow"
+  direction               = "egress"
+  protocols               = "tcp,udp"
+  sources                 = [{ cidr = crusoe_vpc_subnet.my_vpc_subnet.cidr }]
+  source_port_ranges      = ["1-65535"]
+  destinations            = [{ cidr = "0.0.0.0/0" }]
+  destination_port_ranges = ["1-65535"]
+  network                 = crusoe_vpc_network.my_vpc_network.id
 }
 
 resource "crusoe_kubernetes_cluster" "my_cluster" {

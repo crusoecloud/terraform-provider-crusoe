@@ -177,6 +177,154 @@ func Test_applyRuleObjectsToState(t *testing.T) {
 	}
 }
 
+func portList(t *testing.T, ports ...string) types.List {
+	t.Helper()
+
+	list, diags := types.ListValueFrom(context.Background(), types.StringType, ports)
+	if diags.HasError() {
+		t.Fatalf("failed to build port list: %v", diags)
+	}
+
+	return list
+}
+
+func Test_portsFromModel(t *testing.T) {
+	tests := []struct {
+		name       string
+		list       []string
+		deprecated types.String
+		want       []string
+	}{
+		{
+			name: "list of ports and ranges",
+			list: []string{"22", "3000-8080"},
+			want: []string{"22", "3000-8080"},
+		},
+		{
+			name: "list wildcard expanded",
+			list: []string{"*"},
+			want: []string{wildcardPortRange},
+		},
+		{
+			name:       "list wins over deprecated field",
+			list:       []string{"22"},
+			deprecated: types.StringValue("443"),
+			want:       []string{"22"},
+		},
+		{
+			name:       "falls back to deprecated field",
+			deprecated: types.StringValue("80, 443"),
+			want:       []string{"80", "443"},
+		},
+		{
+			name:       "deprecated wildcard expanded",
+			deprecated: types.StringValue("*"),
+			want:       []string{wildcardPortRange},
+		},
+		{
+			name:       "empty deprecated field sends no ports",
+			deprecated: types.StringValue(""),
+			want:       []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			list := types.ListNull(types.StringType)
+			if tt.list != nil {
+				list = portList(t, tt.list...)
+			}
+			deprecated := tt.deprecated
+			if deprecated.IsNull() {
+				deprecated = types.StringNull()
+			}
+
+			var diags diag.Diagnostics
+			got := portsFromModel(context.Background(), list, deprecated, &diags)
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("portsFromModel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_applyPortsToState(t *testing.T) {
+	tests := []struct {
+		name       string
+		list       []string
+		deprecated types.String
+		apiPorts   []string
+		wantList   []string
+		wantDeprec types.String
+	}{
+		{
+			name:       "deprecated field preserved when api agrees",
+			deprecated: types.StringValue("*"),
+			apiPorts:   []string{wildcardPortRange},
+			wantDeprec: types.StringValue("*"),
+		},
+		{
+			name:       "empty deprecated field stays on the deprecated field",
+			deprecated: types.StringValue(""),
+			apiPorts:   []string{wildcardPortRange},
+			wantDeprec: types.StringValue(""),
+		},
+		{
+			name:       "deprecated field reflects api change",
+			deprecated: types.StringValue("80"),
+			apiPorts:   []string{"443"},
+			wantDeprec: types.StringValue("443"),
+		},
+		{
+			name:     "configured wildcard preserved against expanded range",
+			list:     []string{"*"},
+			apiPorts: []string{wildcardPortRange},
+			wantList: []string{"*"},
+		},
+		{
+			name:     "configured order preserved when api reorders",
+			list:     []string{"80", "443"},
+			apiPorts: []string{"443", "80"},
+			wantList: []string{"80", "443"},
+		},
+		{
+			name:     "configured list replaced on genuine change",
+			list:     []string{"80"},
+			apiPorts: []string{"443", "8080"},
+			wantList: []string{"443", "8080"},
+		},
+		{
+			name:     "import populates list from api",
+			apiPorts: []string{"22", "3000-8080"},
+			wantList: []string{"22", "3000-8080"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			list := types.ListNull(types.StringType)
+			if tt.list != nil {
+				list = portList(t, tt.list...)
+			}
+			deprecated := tt.deprecated
+
+			applyPortsToState(context.Background(), tt.apiPorts, &list, &deprecated)
+
+			wantList := types.ListNull(types.StringType)
+			if tt.wantList != nil {
+				wantList = portList(t, tt.wantList...)
+			}
+			if !list.Equal(wantList) {
+				t.Errorf("list = %v, want %v", list, wantList)
+			}
+			if !deprecated.Equal(tt.wantDeprec) {
+				t.Errorf("deprecated = %v, want %v", deprecated, tt.wantDeprec)
+			}
+		})
+	}
+}
+
 func Test_canonicalCIDR(t *testing.T) {
 	tests := []struct {
 		in   string
@@ -352,6 +500,34 @@ func Test_firewallRuleToTerraformResourceModel_preservesConfiguredFormat(t *test
 	}
 	if !state.Destinations.IsNull() {
 		t.Errorf("destinations = %v, want null while `destination` is configured", state.Destinations)
+	}
+	if !state.SourcePortRanges.IsNull() || !state.DestinationPortRanges.IsNull() {
+		t.Error("source_port_ranges/destination_port_ranges should stay null while the port strings are configured")
+	}
+}
+
+// Test_firewallRuleToTerraformResourceModel_portRanges covers the same transform for
+// the port_ranges lists that replaced the comma-separated port strings.
+func Test_firewallRuleToTerraformResourceModel_portRanges(t *testing.T) {
+	state := &firewallRuleResourceModel{
+		SourcePortRanges:      portList(t, "*"),
+		DestinationPortRanges: portList(t, "22", "3000-8080"),
+	}
+	rule := &swagger.VpcFirewallRule{
+		SourcePorts:      []string{wildcardPortRange},
+		DestinationPorts: []string{"3000-8080", "22"},
+	}
+
+	firewallRuleToTerraformResourceModel(context.Background(), rule, state)
+
+	if want := portList(t, "*"); !state.SourcePortRanges.Equal(want) {
+		t.Errorf("source_port_ranges = %v, want %v (preserved)", state.SourcePortRanges, want)
+	}
+	if want := portList(t, "22", "3000-8080"); !state.DestinationPortRanges.Equal(want) {
+		t.Errorf("destination_port_ranges = %v, want %v (preserved)", state.DestinationPortRanges, want)
+	}
+	if !state.SourcePorts.IsNull() || !state.DestinationPorts.IsNull() {
+		t.Error("deprecated source_ports/destination_ports should stay null when the lists are configured")
 	}
 }
 
