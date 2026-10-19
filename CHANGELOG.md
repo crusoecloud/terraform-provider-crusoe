@@ -1,3 +1,15 @@
+## 1.7.0
+
+ENHANCEMENTS:
+
+- Added `source_port_ranges` and `destination_port_ranges` list attributes to the `crusoe_vpc_firewall_rule` resource, replacing the comma-separated `source_ports` and `destination_ports` strings. Each element is a single port such as `22`, a port range such as `3000-8080`, or `*` for all ports. Empty lists and malformed elements such as `"22,443"` are rejected at plan time.
+
+DEPRECATIONS:
+
+- `crusoe_vpc_firewall_rule`: `source_ports` and `destination_ports` are deprecated in favor of `source_port_ranges` and `destination_port_ranges`. Existing configurations keep working, and existing state reads without a plan diff. Exactly one of `source_ports` or `source_port_ranges` must be set, and exactly one of `destination_ports` or `destination_port_ranges`.
+
+All deprecated attributes remain functional and will be removed in the next major version.
+
 ## 1.6.2
 
 BUG FIXES:
