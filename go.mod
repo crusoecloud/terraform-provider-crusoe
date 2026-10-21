@@ -4,6 +4,13 @@ go 1.23.0
 
 toolchain go1.23.8
 
+// TEMPORARY: drop this replace before merging. It points client-go at a local
+// stand-in branch (npv2-node-pool-generation, commit 0132125: v1.0.19 plus
+// KubernetesNodePool.Generation) until a released client-go carries the
+// node pool generation field. Then run
+// `go get github.com/crusoecloud/client-go@<that version>` and `go mod tidy`.
+replace github.com/crusoecloud/client-go => /Users/nchaler/Library/Caches/claude-worktrees/client-go-generation
+
 require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/antihax/optional v1.0.0
