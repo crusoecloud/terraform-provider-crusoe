@@ -63,6 +63,8 @@ const (
 
 	apiDescConsentMode = "Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`."
 
+	apiDescGeneration = "Generation of the node pool."
+
 	apiDescTaintKey    = "Taint key. Follows the Kubernetes qualified-name format: an optional DNS subdomain prefix (up to 253 characters) followed by a `/`, then a name segment (up to 63 characters). Allowed characters: alphanumerics, `-`, `_`, and `.`. Must start and end with an alphanumeric character. Keys beginning with `crusoe.ai/` are reserved for internal use."
 	apiDescTaintValue  = "Taint value. May be empty. Follows the same format rules as a Kubernetes label value: up to 63 characters, alphanumerics and `-`, `_`, `.`."
 	apiDescTaintEffect = "Taint effect, controlling how pods are treated on matching nodes. `NoSchedule`: new pods are not scheduled unless they tolerate. `PreferNoSchedule`: new pods avoid the node if possible. `NoExecute`: new pods are not scheduled and existing non-tolerating pods are evicted."
@@ -83,14 +85,19 @@ const (
 		"If both this and batch_size are omitted, existing nodes will not be updated, " +
 		"but new nodes will use the new configuration."
 
-	// providerDescLimitedAvailability marks the fields not every node pool
-	// carries. Which node pools support them depends on the cluster and is not
-	// something a customer can read off their own configuration, so the text
-	// points at support rather than naming an internal cluster generation.
-	// Setting one where it is unsupported is refused by the API, and reads omit
-	// it, so it is null rather than defaulted.
+	// providerDescLimitedAvailability marks the fields only a generation 2 node
+	// pool carries. An existing pool's generation is readable through the
+	// node_pool_generation attribute, but the generation a new pool will be
+	// created at depends on the cluster and the organization, which a customer
+	// cannot read off their own configuration, so the text points at support
+	// rather than at a generation number. Setting one where it is unsupported is
+	// refused by the API, and reads omit it, so it is null rather than defaulted.
 	providerDescLimitedAvailability = "Supported only on some clusters; null on node pools where it is " +
 		"not supported. " + common.DevelopmentSupportMessage
+
+	providerDescGeneration = "`1` is the original node pool implementation and `2` is Node Pools v2. " +
+		"The platform may migrate a node pool from `1` to `2`; a node pool never moves back to `1`. " +
+		"Null when the API does not report it."
 
 	providerDescConsentModeDefault = "Newly created node pools default to `propose`. " +
 		"A node pool that predates this setting starts at `off`, so that remediation does not begin " +
@@ -407,6 +414,7 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	model.Health = health
 
 	model.Current = currentOrNull(nodePool)
+	model.NodePoolGeneration = generationOrNull(nodePool.NodePoolGeneration)
 
 	// ssh_key: the API returns it on reads, so prefer the API value. Keep the
 	// ref fallback so an empty response (partial object, future divergence)
@@ -456,6 +464,40 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	}
 }
 
+// nodePoolToDataSourceModel maps an API node pool onto the data source model.
+// project_id is the project the lookup ran in, which the caller resolved.
+func nodePoolToDataSourceModel(ctx context.Context, nodePool *swagger.KubernetesNodePool, projectID string,
+	model *kubernetesNodePoolDataSourceModel, diags *diag.Diagnostics,
+) {
+	var d diag.Diagnostics
+
+	model.ID = types.StringValue(nodePool.Id)
+	model.ProjectID = types.StringValue(projectID)
+	model.ImageID = types.StringValue(nodePool.ImageId)
+	model.Type = types.StringValue(nodePool.Type_)
+	model.InstanceCount = types.Int64Value(nodePool.Count)
+	model.ClusterID = types.StringValue(nodePool.ClusterId)
+	model.SubnetID = types.StringValue(nodePool.SubnetId)
+	model.NodeLabels, d = common.StringMapToTFMap(nodePool.NodeLabels)
+	diags.Append(d...)
+	model.NodeTaints, d = nodeTaintsToTFSet(ctx, nodePool.NodeTaints)
+	diags.Append(d...)
+	model.InstanceIDs, d = common.StringSliceToTFList(sortedInstanceIDs(nodePool.InstanceIds))
+	diags.Append(d...)
+	model.State = types.StringValue(nodePool.State)
+	model.Name = types.StringValue(nodePool.Name)
+	model.EphemeralStorageForContainerd = types.BoolValue(nodePool.EphemeralStorageForContainerd)
+	model.NvlinkDomainID = stringOrNull(nodePool.NvlinkDomainId)
+	model.PublicIPType = types.StringValue(nodePool.PublicIpType)
+	model.ConsentMode = stringOrNull(nodePool.ConsentMode)
+	model.UpdateSettings, d = updateSettingsToTFObject(nodePool.UpdateSettings)
+	diags.Append(d...)
+	model.Health, d = healthToTFObject(ctx, nodePool.Health)
+	diags.Append(d...)
+	model.Current = currentOrNull(nodePool)
+	model.NodePoolGeneration = generationOrNull(nodePool.NodePoolGeneration)
+}
+
 // stringOrNull maps an empty API string to a null value, matching how the nullable
 // nvlink_domain_id attribute is represented in Terraform state.
 func stringOrNull(s string) types.String {
@@ -493,6 +535,10 @@ const (
 // it is a real mode the backend rejects as "not yet available", so accepting it
 // here would only let a configuration fail on every apply.
 var consentModeValues = []string{"auto", "propose", "off"}
+
+// generationNodePoolsV2 is the generation the API reports for a node pool held
+// by Node Pools v2. Generation 1 is the original node pool implementation.
+const generationNodePoolsV2 = 2
 
 func updateSettingsAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
@@ -612,21 +658,40 @@ func healthToTFObject(ctx context.Context, health *swagger.KubernetesNodePoolHea
 	return healthObject, diags
 }
 
+// generationOrNull renders the node pool's generation. The API omits the field
+// when it does not know the generation, and the generated client decodes that
+// omission as 0, which is not a generation, so 0 becomes null. Other values pass
+// through unchanged, including any generation newer than 2.
+func generationOrNull(generation int32) types.Int64 {
+	if generation == 0 {
+		return types.Int64Null()
+	}
+
+	return types.Int64Value(int64(generation))
+}
+
 // currentOrNull renders the pool's ready node count, preserving the absence the
 // API contract depends on: the spec says an omitted `current` means the serving
 // backend does not compute it, while zero "means the pool genuinely has no ready
 // nodes". The generated client models the field as a plain int64, so decoding
 // collapses those two into 0 and the distinction has to be recovered here.
 //
-// update_settings is the discriminator, because it is modelled as a pointer and
-// so survives decoding: a backend that derives read-time fields serves it
-// always, and one that does not never serves it. The narrow claim this rests on
-// is not "the pool is v2" but "this response carried derived read fields at
-// all" — if a backend ever computes `current` without also serving
-// update_settings, this would null a real count, and the fix then is to have the
+// Only a generation 2 node pool is served by the backend that computes
+// `current`, so a reported generation decides it. When the API does not report
+// a generation, update_settings is the fallback discriminator, because it is
+// modelled as a pointer and so survives decoding: a backend that derives
+// read-time fields serves it always, and one that does not never serves it.
+// That fallback rests on the narrower claim "this response carried derived read
+// fields at all" — if a backend ever computes `current` without also serving
+// update_settings, it would null a real count, and the fix then is to have the
 // spec model `current` as nullable rather than to widen the guess.
 func currentOrNull(nodePool *swagger.KubernetesNodePool) types.Int64 {
-	if nodePool.UpdateSettings == nil {
+	computed := nodePool.UpdateSettings != nil
+	if nodePool.NodePoolGeneration != 0 {
+		computed = nodePool.NodePoolGeneration == generationNodePoolsV2
+	}
+
+	if !computed {
 		return types.Int64Null()
 	}
 

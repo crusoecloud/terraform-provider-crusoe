@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -64,6 +65,7 @@ type kubernetesNodePoolResourceModel struct {
 	UpdateSettings                types.Object      `tfsdk:"update_settings"`
 	Health                        types.Object      `tfsdk:"health"`
 	Current                       types.Int64       `tfsdk:"current"`
+	NodePoolGeneration            types.Int64       `tfsdk:"node_pool_generation"`
 }
 
 func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -290,6 +292,14 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			"current": schema.Int64Attribute{
 				Computed:            true,
 				MarkdownDescription: apiDescCurrent + " " + providerDescLimitedAvailability,
+			},
+			// generation changes only when the platform migrates the pool, which
+			// the Read before every plan picks up, so carrying it forward keeps it
+			// from showing as "known after apply" on every update.
+			"node_pool_generation": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: apiDescGeneration + " " + providerDescGeneration,
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 		},
 		Blocks: map[string]schema.Block{
