@@ -1,8 +1,12 @@
-## 1.7.1
+## 1.7.2
 
 SECURITY:
 
 - Built the provider with Go 1.27.3, which no longer trusts the compromised eMudhra intermediate certificate authorities (CVE-2026-111943). Earlier releases were built with Go 1.23.8 and, on Linux, could accept forged TLS certificates when the system trust store had not been updated.
+
+UPGRADE NOTES:
+
+- Windows on 32-bit ARM (`windows_arm`) is no longer published: Go 1.26 removed that platform. All other platforms, including `windows_arm64`, are unchanged.
 
 ## 1.7.0
 
