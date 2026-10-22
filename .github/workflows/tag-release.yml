@@ -52,7 +52,10 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
         with:
-          go-version-file: 'go.mod'
+          # Release binaries need Go >= 1.26.10 / 1.27.3, which distrust the
+          # compromised eMudhra CAs (CVE-2026-111943). go.mod stays on 1.23
+          # because golangci-lint v1 can't lint a newer target.
+          go-version: '1.27.3'
           cache: true
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@72b6676b71ab476b77e676928516f6982eef7a41 # v5.3.0

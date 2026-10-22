@@ -1,3 +1,9 @@
+## 1.7.1
+
+SECURITY:
+
+- Built the provider with Go 1.27.3, which no longer trusts the compromised eMudhra intermediate certificate authorities (CVE-2026-111943). Earlier releases were built with Go 1.23.8 and, on Linux, could accept forged TLS certificates when the system trust store had not been updated.
+
 ## 1.7.0
 
 ENHANCEMENTS:
