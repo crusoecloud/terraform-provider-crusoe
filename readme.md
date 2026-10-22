@@ -205,6 +205,7 @@ Only include categories that have entries. Use dash-prefixed bullets. Keep descr
 
 - `ENHANCEMENTS:` - Smaller features added to an existing resource or data source, such as a new attribute.
 - `BUG FIXES:` - Any bugs that were fixed.
+- `SECURITY:` - Fixes for vulnerabilities in the provider or its build, such as a CVE fixed by a Go toolchain or dependency bump. Name the CVE.
 - `NEW FEATURES:` - Major new improvements such as a new resource or data source.
 - `UPGRADE NOTES:` - Breaking or incompatible changes and how to handle them.
 
