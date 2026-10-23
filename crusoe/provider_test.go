@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 )
 
 func TestProviderSchema(t *testing.T) {
@@ -196,5 +198,26 @@ func TestProjectResolution_UUIDDetection(t *testing.T) {
 			t.Errorf("UUID detection for %q (%s): got isUUID=%v, want %v",
 				tc.input, tc.comment, gotIsUUID, tc.isUUID)
 		}
+	}
+}
+
+func TestIdentityEmail(t *testing.T) {
+	tests := []struct {
+		name string
+		user *swagger.UserResponse
+		want string
+	}{
+		{name: "nil response", user: nil, want: "unknown"},
+		{name: "nil identity", user: &swagger.UserResponse{}, want: "unknown"},
+		{name: "empty email", user: &swagger.UserResponse{Identity: &swagger.Identity{}}, want: "unknown"},
+		{name: "email set", user: &swagger.UserResponse{Identity: &swagger.Identity{Email: "user@example.com"}}, want: "user@example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := identityEmail(tt.user); got != tt.want {
+				t.Errorf("identityEmail() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

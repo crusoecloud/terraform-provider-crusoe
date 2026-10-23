@@ -281,7 +281,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 				"Failed to auth user",
 				fmt.Sprintf("The provider failed to get the users identity for config profile %q. \n\nError: %s \n\nCheck config in ~/.crusoe/config or verify the profile in the provider block.", clientConfig.ProfileName, err.Error()))
 		} else {
-			userId = user.Identity.Email
+			userId = identityEmail(&user)
 		}
 
 		if clientConfig.DefaultProject == "" {
@@ -308,6 +308,17 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	resp.DataSourceData = client
 	resp.ResourceData = client
+}
+
+// identityEmail returns the email of the authenticated user, or "unknown" when the
+// identity response carries no identity (e.g. an unexpected response body), so a
+// malformed response yields a diagnostic instead of a nil-pointer panic.
+func identityEmail(user *swagger.UserResponse) string {
+	if user == nil || user.Identity == nil || user.Identity.Email == "" {
+		return "unknown"
+	}
+
+	return user.Identity.Email
 }
 
 func getDefaultProject(ctx context.Context, projectsApiService *swagger.ProjectsApiService) (projectId, projectName string, err error) {
