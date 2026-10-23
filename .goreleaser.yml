@@ -34,7 +34,6 @@ builds:
       goarch: s390x
     - goos: freebsd
       goarch: s390x
-    # Go 1.26 removed the windows/arm (32-bit) port.
     - goos: windows
       goarch: arm
     - goos: windows
