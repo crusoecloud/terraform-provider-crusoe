@@ -8,7 +8,7 @@ before:
 builds:
 - env:
     # goreleaser does not work with CGO, it could also complicate
-    # usage by users in CI/CD systems like Terraform Cloud where
+    # usage by users in CI/CD systems like HCP Terraform where
     # they are unable to install libraries.
     - CGO_ENABLED=0
   mod_timestamp: '{{ .CommitTimestamp }}'
@@ -26,15 +26,23 @@ builds:
     - '386'
     - arm
     - arm64
+    - s390x
   ignore:
     - goos: darwin
       goarch: '386'
+    - goos: darwin
+      goarch: s390x
+    - goos: freebsd
+      goarch: s390x
     # Go 1.26 removed the windows/arm (32-bit) port.
     - goos: windows
       goarch: arm
+    - goos: windows
+      goarch: s390x
   binary: '{{ .ProjectName }}_v{{ .Version }}'
 archives:
-- format: zip
+- formats:
+  - zip
   name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 checksum:
   extra_files:
