@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -84,6 +85,10 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 				Computed:            true,
 				Optional:            true,
 				MarkdownDescription: providerDescProjectID,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(), // cannot be updated in place
+				},
 			},
 			"location": schema.StringAttribute{
 				Required:            true,
@@ -105,26 +110,53 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 			},
 			"upstream_registry": schema.SingleNestedAttribute{
 				Optional: true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.RequiresReplaceIf(
+						requiresReplaceIfAddedOrRemoved,
+						"Adding or removing the upstream registry requires replacement.",
+						"Adding or removing the upstream registry requires replacement.",
+					),
+				},
 				Attributes: map[string]schema.Attribute{
 					"provider": schema.StringAttribute{
 						Required:            true,
 						MarkdownDescription: apiDescUpstreamProvider,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 					},
 					"url": schema.StringAttribute{
 						Required:            true,
 						MarkdownDescription: apiDescUpstreamURL,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
 					},
+					// Credentials are the only attributes that can be updated in place.
 					"upstream_registry_credentials": schema.SingleNestedAttribute{
 						Optional: true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.RequiresReplaceIf(
+								requiresReplaceIfCredentialsCleared,
+								"Removing or emptying the upstream registry credentials requires replacement.",
+								"Removing or emptying the upstream registry credentials requires replacement.",
+							),
+						},
 						Attributes: map[string]schema.Attribute{
+							// An empty value is left out of the request body, so the API
+							// never receives it. Reject it instead of recording a value the
+							// repository does not have; omit the whole block for an upstream
+							// registry that needs no credentials.
 							"username": schema.StringAttribute{
 								Required:            true,
 								MarkdownDescription: apiDescUpstreamCredsUsername,
+								Validators: []validator.String{
+									stringvalidator.LengthAtLeast(1),
+								},
 							},
 							"password": schema.StringAttribute{
 								Required:            true,
 								Sensitive:           true,
 								MarkdownDescription: apiDescUpstreamCredsPassword,
+								Validators: []validator.String{
+									stringvalidator.LengthAtLeast(1),
+								},
 							},
 						},
 					},
@@ -153,25 +185,10 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 
 			return
 		}
-		provider := plan.UpstreamRegistry.Provider.ValueString()
-		url := plan.UpstreamRegistry.Url.ValueString()
-		inputRegistryCreds := plan.UpstreamRegistry.UpstreamRegistryCrdentials
-		var registryCreds *swagger.UpstreamRegistryCredentials
-		if inputRegistryCreds != nil {
-			username := inputRegistryCreds.Username.ValueString()
-			password := inputRegistryCreds.Password.ValueString()
-			if username != "" || password != "" {
-				registryCreds = &swagger.UpstreamRegistryCredentials{
-					Password: password,
-					Username: username,
-				}
-			}
-		}
-
 		upstreamRegistry = &swagger.UpstreamRegistry{
-			Provider:                    provider,
-			Url:                         url,
-			UpstreamRegistryCredentials: registryCreds,
+			Provider:                    plan.UpstreamRegistry.Provider.ValueString(),
+			Url:                         plan.UpstreamRegistry.Url.ValueString(),
+			UpstreamRegistryCredentials: upstreamRegistryCredentialsFromModel(plan.UpstreamRegistry),
 		}
 	}
 
@@ -241,12 +258,75 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 	response.Diagnostics.Append(diags...)
 }
 
+// Update changes the upstream registry credentials in place. Every other attribute
+// requires replacement, so the credentials are the only thing an update can change.
+//
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	response.Diagnostics.AddError(
-		"Updating Repository Not Supported",
-		"Updating an existing repository is not currently supported. To change its configuration, the repository must be destroyed and recreated.",
-	)
+	var plan repositoryResourceModel
+	if err := common.GetResourceModel(ctx, request.Plan, &plan, &response.Diagnostics); err != nil {
+		return
+	}
+
+	var state repositoryResourceModel
+	if err := common.GetResourceModel(ctx, request.State, &state, &response.Diagnostics); err != nil {
+		return
+	}
+
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
+
+	planCredentials := upstreamRegistryCredentialsFromModel(plan.UpstreamRegistry)
+	stateCredentials := upstreamRegistryCredentialsFromModel(state.UpstreamRegistry)
+	if planCredentials == nil && plan.UpstreamRegistry != nil && plan.UpstreamRegistry.UpstreamRegistryCrdentials != nil {
+		// Schema validators reject empty values, so an apply never reaches this.
+		// State cannot stand in for the check either: a freshly imported repository
+		// carries no credentials in state whether or not it has them, because the
+		// API never returns the password.
+		response.Diagnostics.AddError(
+			"Empty Upstream Registry Credentials Not Supported",
+			"The upstream registry credentials of a repository cannot be set to empty values: an empty "+
+				"value is left out of the request, so the repository would keep the credentials it has. "+
+				"Omit the upstream_registry_credentials block for an upstream registry that needs no "+
+				"credentials, or destroy and recreate the repository.",
+		)
+
+		return
+	}
+
+	if credentialsCleared(stateCredentials, planCredentials) {
+		// requiresReplaceIfCredentialsCleared plans a replacement for this, so an
+		// update never reaches it. Refuse rather than report a success that only
+		// changed state: an empty value is left out of the request body, so the
+		// repository would keep the credentials it has.
+		response.Diagnostics.AddError(
+			"Removing Upstream Registry Credentials Not Supported",
+			"Removing a username or password from the upstream registry credentials of an existing "+
+				"repository is not supported. To remove them, the repository must be destroyed and recreated.",
+		)
+
+		return
+	}
+
+	if planCredentials != nil && !upstreamRegistryCredentialsEqual(planCredentials, stateCredentials) {
+		opts := &swagger.CcrApiUpdateCcrRepositoryCredentialsOpts{
+			Body: optional.NewInterface(*planCredentials),
+		}
+		httpResp, err := r.client.APIClient.CcrApi.UpdateCcrRepositoryCredentials(ctx, projectID, state.Name.ValueString(), opts)
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
+		if err != nil {
+			response.Diagnostics.AddError("Failed to update repository",
+				fmt.Sprintf("Error updating the repository upstream registry credentials: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+	}
+
+	plan.ProjectID = types.StringValue(projectID)
+
+	diags := response.State.Set(ctx, &plan)
+	response.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
