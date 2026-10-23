@@ -1,7 +1,7 @@
 # Set any default go build tags
 BUILDTAGS :=
 
-GOLANGCI_VERSION = v1.62.0
+GOLANGCI_VERSION = v2.15.0
 TFPLUGINDOCS_VERSION = v0.18.0
 GO_ACC_VERSION = latest
 GOTESTSUM_VERSION = v1.12.3
@@ -18,7 +18,7 @@ dev: build-deps test lint docs
 
 .PHONY: build-deps
 build-deps:
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_VERSION)
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 	@go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@$(TFPLUGINDOCS_VERSION)
 
 .PHONY: ci
@@ -47,7 +47,7 @@ test-ci: ## Runs the go tests with additional options for a CI environment
 
 .PHONY: precommit
 precommit: test
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_VERSION)
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 	@golangci-lint run --fix
 
 .PHONY: lint
@@ -60,7 +60,7 @@ lint:
 lint-ci: ## Verifies `golangci-lint` passes and outputs in CI-friendly format
 	@echo "==> $@"
 	@golangci-lint version
-	@golangci-lint run ./... --out-format code-climate --timeout 20m0s > golangci-lint.json
+	@golangci-lint run ./... --output.code-climate.path=golangci-lint.json --timeout 20m0s
 
 .PHONY: docs
 docs: build-deps

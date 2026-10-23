@@ -73,7 +73,7 @@ var (
 	ErrUnableToGetOpRes = errors.New("failed to get result of operation")
 
 	// fallback error presented to the user in unexpected situations
-	errUnexpected = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.")
+	errUnexpected = errors.New("An unexpected error occurred. Please try again, and if the problem persists, contact support@crusoecloud.com.") //nolint:staticcheck // ST1005: shown verbatim to users as a full sentence
 
 	// error messages
 	errBadMapCast  = errors.New("failed to cast tf map value to string")
@@ -246,7 +246,7 @@ func opResultToError(res interface{}) (expectedErr, unexpectedErr error) {
 		return nil, fmt.Errorf("op result type not error as expected: %w", err)
 	}
 
-	//nolint:goerr113 //This function is designed to return dynamic errors
+	//nolint:err113 //This function is designed to return dynamic errors
 	return fmt.Errorf("%s", resultError.Message), nil
 }
 
@@ -284,7 +284,7 @@ func UnpackAPIError(original error) error {
 		errorMsg = fmt.Sprintf("%s. Error ID: %s.", errorMsg, model.ErrorId)
 	}
 
-	//nolint:goerr113 // error is dynamic
+	//nolint:err113 // error is dynamic
 	return fmt.Errorf("%s", errorMsg)
 }
 

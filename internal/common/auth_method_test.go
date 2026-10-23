@@ -79,7 +79,7 @@ func TestResolveAuthMethod(t *testing.T) {
 		},
 		{
 			name: "service account with only token_url overridden",
-			cfg: Config{
+			cfg: Config{ //nolint:gosec // G101: fake credentials in a test
 				ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret",
 				ServiceAccountTokenURL: "https://auth.dev.crusoe.ai/oauth2/token",
 				ServiceAccountAudience: defaultServiceAccountAudience,
@@ -97,7 +97,7 @@ func TestResolveAuthMethod(t *testing.T) {
 		},
 		{
 			name:       "service account with token_url and audience both overridden together",
-			cfg:        Config{ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret", ServiceAccountTokenURL: "https://auth.dev.crusoe.ai/oauth2/token", ServiceAccountAudience: "https://api.dev.crusoe.ai"},
+			cfg:        Config{ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret", ServiceAccountTokenURL: "https://auth.dev.crusoe.ai/oauth2/token", ServiceAccountAudience: "https://api.dev.crusoe.ai"}, //nolint:gosec // G101: fake credentials in a test
 			wantMethod: AuthMethodServiceAccount,
 		},
 		{
