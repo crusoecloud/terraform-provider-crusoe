@@ -315,7 +315,7 @@ func (r *instanceTemplateResource) Create(ctx context.Context, req resource.Crea
 		StartupScript:           plan.StartupScript.ValueString(),
 		ShutdownScript:          plan.ShutdownScript.ValueString(),
 		SubnetId:                plan.Subnet.ValueString(),
-		IbPartitionId:           plan.IBPartition.ValueString(),
+		IbPartitionId:           plan.IBPartition.ValueString(), //nolint:staticcheck // SA1019: deprecated ib_partition_id is still accepted for backwards compatibility
 		TransportPartitionId:    plan.TransportPartitionID.ValueString(),
 		Disks:                   disksToCreate,
 		SharedVolumeAttachments: sharedVolumes,

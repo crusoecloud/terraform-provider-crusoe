@@ -7,11 +7,11 @@
 # or run commands ad hoc with:  mise exec -- make build
 
 [tools]
-# Matches the `toolchain go1.23.8` directive in go.mod and CI (go-version "1.23").
-go = "1.23.8"
+# Matches the `toolchain` directive in go.mod, which CI and the release workflow follow.
+go = "1.27.3"
 
 # Matches GOLANGCI_VERSION in the Makefile and the CI golangci-lint action.
-golangci-lint = "1.62.0"
+golangci-lint = "2.15.0"
 
 # Matches the terraform version currently in use locally.
 terraform = "1.15.6"

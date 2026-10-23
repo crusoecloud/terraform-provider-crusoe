@@ -365,7 +365,7 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 	asyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.CreateNodePool(ctx, swagger.KubernetesNodePoolPostRequest{
 		ClusterId:                     plan.ClusterID.ValueString(),
 		Count:                         plan.InstanceCount.ValueInt64(),
-		IbPartitionId:                 plan.IBPartitionID.ValueString(),
+		IbPartitionId:                 plan.IBPartitionID.ValueString(), //nolint:staticcheck // SA1019: deprecated ib_partition_id is still accepted for backwards compatibility
 		TransportPartitionId:          plan.TransportPartitionID.ValueString(),
 		Name:                          plan.Name.ValueString(),
 		NodeLabels:                    nodeLabels,

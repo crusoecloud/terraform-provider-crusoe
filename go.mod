@@ -2,7 +2,7 @@ module github.com/crusoecloud/terraform-provider-crusoe
 
 go 1.23.0
 
-toolchain go1.23.8
+toolchain go1.27.3
 
 require (
 	github.com/BurntSushi/toml v1.5.0

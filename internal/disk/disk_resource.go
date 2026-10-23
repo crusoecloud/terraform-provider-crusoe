@@ -72,7 +72,7 @@ func (r *diskResource) Metadata(ctx context.Context, req resource.MetadataReques
 	resp.TypeName = req.ProviderTypeName + "_storage_disk"
 }
 
-//nolint:gocritic,gomnd // Implements Terraform defined interface
+//nolint:gocritic,mnd // Implements Terraform defined interface
 func (r *diskResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version: 1,
