@@ -40,6 +40,7 @@ data "crusoe_kubernetes_cluster" "example" {
 ### Read-Only
 
 - `apiserver_extra_args` (Map of String) Extra arguments passed to the kube-apiserver control plane component.
+- `control_plane_generation` (Number) Generation of the control plane. Null when the API does not report it.
 - `controller_manager_extra_args` (Map of String) Extra arguments passed to the kube-controller-manager control plane component.
 - `dns_name` (String) DNS name of the cluster.
 - `nodepool_ids` (List of String) IDs of the node pools within the Kubernetes cluster.

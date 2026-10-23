@@ -28,6 +28,8 @@ const (
 	apiDescPrivate               = "Whether the cluster is private (without a public IP)."
 	apiDescRoutingMode           = "How pod traffic is routed for the cluster. Possible values: `overlay`, `native`. An unset value is treated as `overlay`. In native mode, `cluster_cidr` is the VPC prefix reservation's range."
 
+	apiDescControlPlaneGeneration = "Generation of the control plane."
+
 	apiDescApiserverExtraArgs         = "Extra arguments passed to the kube-apiserver control plane component."
 	apiDescSchedulerExtraArgs         = "Extra arguments passed to the kube-scheduler control plane component."
 	apiDescControllerManagerExtraArgs = "Extra arguments passed to the kube-controller-manager control plane component."
@@ -48,6 +50,11 @@ const (
 	// which the spec text does not cover.
 	providerDescVersionInput = "Specify the minor version, for example `1.35`, and the platform selects the current patch; " +
 		"an exact patch such as `1.35.5` is honored as given. The legacy `1.35.5-cmk.N` spelling is still accepted."
+
+	// providerDescGeneration completes the control_plane_generation description:
+	// the generated client decodes an omitted generation as 0, which is mapped to
+	// null rather than reported as a generation.
+	providerDescGeneration = "Null when the API does not report it."
 
 	// providerDescExtraArgsNote is appended (resource-side only) to the *_extra_args
 	// descriptions to document Crusoe-specific update behavior.
@@ -85,6 +92,7 @@ func clusterToResourceModel(cluster *swagger.KubernetesCluster, ref, model *kube
 	model.DNSName = types.StringValue(cluster.DnsName)
 	model.Private = types.BoolValue(cluster.Private)
 	model.RoutingMode = types.StringValue(cluster.RoutingMode)
+	model.ControlPlaneGeneration = common.GenerationOrNull(cluster.ControlPlaneGeneration)
 
 	addOns, d := common.StringSliceToTFList(cluster.AddOns)
 	diags.Append(d...)

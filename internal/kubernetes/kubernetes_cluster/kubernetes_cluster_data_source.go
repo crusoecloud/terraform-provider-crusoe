@@ -44,6 +44,7 @@ type kubernetesClusterDataSourceModel struct {
 	ApiserverExtraArgs         types.Map         `tfsdk:"apiserver_extra_args"`
 	SchedulerExtraArgs         types.Map         `tfsdk:"scheduler_extra_args"`
 	ControllerManagerExtraArgs types.Map         `tfsdk:"controller_manager_extra_args"`
+	ControlPlaneGeneration     types.Int64       `tfsdk:"control_plane_generation"`
 }
 
 func (ds *kubernetesClusterDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -152,6 +153,10 @@ func (ds *kubernetesClusterDataSource) Schema(_ context.Context, _ datasource.Sc
 				Computed:            true,
 				MarkdownDescription: apiDescControllerManagerExtraArgs,
 			},
+			"control_plane_generation": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: apiDescControlPlaneGeneration + " " + providerDescGeneration,
+			},
 		},
 	}
 }
@@ -209,6 +214,7 @@ func (ds *kubernetesClusterDataSource) Read(ctx context.Context, req datasource.
 	resp.Diagnostics.Append(diags...)
 	state.ControllerManagerExtraArgs, diags = stringMapToTFMap(kubernetesCluster.ControllerManagerExtraArgs)
 	resp.Diagnostics.Append(diags...)
+	state.ControlPlaneGeneration = common.GenerationOrNull(kubernetesCluster.ControlPlaneGeneration)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

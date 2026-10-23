@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -726,5 +727,85 @@ func TestHealthIssuesSortIsTotal(t *testing.T) {
 	// The same two issues in either API order must render identically.
 	if a, b := render("alpha", "beta"), render("beta", "alpha"); !reflect.DeepEqual(a, b) {
 		t.Errorf("API order changed the rendered order: %v vs %v", a, b)
+	}
+}
+
+// TestGenerationConversion covers both mappings of the node pool generation. The
+// API omits generation when it does not know it, which the generated client
+// decodes as 0; 0 is not a generation, so it must reach state as null rather than
+// as a number a configuration could compare against.
+func TestGenerationConversion(t *testing.T) {
+	tests := []struct {
+		name       string
+		generation int32
+		want       types.Int64
+	}{
+		{name: "generation 1", generation: 1, want: types.Int64Value(1)},
+		{name: "generation 2", generation: 2, want: types.Int64Value(2)},
+		{name: "absent", generation: 0, want: types.Int64Null()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			nodePool := &swagger.KubernetesNodePool{Id: "np-1", NodePoolGeneration: tt.generation}
+
+			var diags diag.Diagnostics
+			var resourceModel kubernetesNodePoolResourceModel
+			ref := &kubernetesNodePoolResourceModel{RequestedNodeLabels: types.MapNull(types.StringType)}
+			nodePoolToResourceModel(ctx, nodePool, ref, &resourceModel, &diags)
+
+			var dataSourceModel kubernetesNodePoolDataSourceModel
+			nodePoolToDataSourceModel(ctx, nodePool, "proj-1", &dataSourceModel, &diags)
+			if diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+
+			if !resourceModel.NodePoolGeneration.Equal(tt.want) {
+				t.Errorf("resource generation = %v, want %v", resourceModel.NodePoolGeneration, tt.want)
+			}
+			if !dataSourceModel.NodePoolGeneration.Equal(tt.want) {
+				t.Errorf("data source generation = %v, want %v", dataSourceModel.NodePoolGeneration, tt.want)
+			}
+		})
+	}
+}
+
+// TestGenerationSchema checks that generation is read-only on both schemas and
+// that the resource carries it across updates. Without UseStateForUnknown every
+// update would plan generation as "known after apply" although nothing changes
+// it.
+func TestGenerationSchema(t *testing.T) {
+	ctx := context.Background()
+
+	resourceSchema := &resource.SchemaResponse{}
+	NewKubernetesNodePoolResource().Schema(ctx, resource.SchemaRequest{}, resourceSchema)
+	resourceAttr, ok := resourceSchema.Schema.Attributes["node_pool_generation"].(schema.Int64Attribute)
+	if !ok {
+		t.Fatalf("resource node_pool_generation is %T, want schema.Int64Attribute", resourceSchema.Schema.Attributes["node_pool_generation"])
+	}
+	if !resourceAttr.Computed || resourceAttr.Optional || resourceAttr.Required {
+		t.Errorf("resource generation: computed=%v optional=%v required=%v, want computed only",
+			resourceAttr.Computed, resourceAttr.Optional, resourceAttr.Required)
+	}
+	if len(resourceAttr.PlanModifiers) != 1 {
+		t.Errorf("resource generation has %d plan modifiers, want UseStateForUnknown only",
+			len(resourceAttr.PlanModifiers))
+	}
+	if resourceAttr.MarkdownDescription == "" {
+		t.Error("resource generation has no description")
+	}
+
+	dataSourceSchema := &datasource.SchemaResponse{}
+	NewKubernetesNodePoolDataSource().Schema(ctx, datasource.SchemaRequest{}, dataSourceSchema)
+	dataSourceAttr, found := dataSourceSchema.Schema.Attributes["node_pool_generation"]
+	if !found {
+		t.Fatal("data source has no node_pool_generation attribute")
+	}
+	if !dataSourceAttr.IsComputed() || dataSourceAttr.IsOptional() || dataSourceAttr.IsRequired() {
+		t.Error("data source generation should be computed only")
+	}
+	if dataSourceAttr.GetMarkdownDescription() != resourceAttr.MarkdownDescription {
+		t.Error("resource and data source generation descriptions differ")
 	}
 }

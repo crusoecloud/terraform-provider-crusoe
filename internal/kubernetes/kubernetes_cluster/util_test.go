@@ -109,6 +109,15 @@ func Test_clusterToResourceModel(t *testing.T) {
 	if got := model.RoutingMode.ValueString(); got != routingModeNative {
 		t.Errorf("routing_mode = %q, want %q (API is the source of truth)", got, routingModeNative)
 	}
+	if !model.ControlPlaneGeneration.IsNull() {
+		t.Errorf("control_plane_generation = %v, want null (API omitted it)", model.ControlPlaneGeneration)
+	}
+
+	cluster.ControlPlaneGeneration = 2
+	clusterToResourceModel(cluster, ref, &model, &diags)
+	if got := model.ControlPlaneGeneration; !got.Equal(types.Int64Value(2)) {
+		t.Errorf("control_plane_generation = %v, want 2", got)
+	}
 
 	var ids []string
 	if d := model.NodePoolIds.ElementsAs(context.Background(), &ids, false); d.HasError() {
@@ -301,5 +310,42 @@ func Test_versionAcceptsMinorPatchAndLegacySpellings(t *testing.T) {
 				t.Errorf("version %q accepted = %v, want %v: %v", tc.value, got, tc.valid, resp.Diagnostics)
 			}
 		})
+	}
+}
+
+// Test_controlPlaneGenerationSchema checks that control_plane_generation is
+// read-only on both schemas and that the resource carries it across updates.
+// Without UseStateForUnknown every update would plan it as "known after apply"
+// although nothing in the configuration changes it.
+func Test_controlPlaneGenerationSchema(t *testing.T) {
+	ctx := context.Background()
+
+	resourceSchema := &resource.SchemaResponse{}
+	NewKubernetesClusterResource().Schema(ctx, resource.SchemaRequest{}, resourceSchema)
+	resourceAttr, ok := resourceSchema.Schema.Attributes["control_plane_generation"].(schema.Int64Attribute)
+	if !ok {
+		t.Fatalf("resource control_plane_generation is %T, want schema.Int64Attribute",
+			resourceSchema.Schema.Attributes["control_plane_generation"])
+	}
+	if !resourceAttr.Computed || resourceAttr.Optional || resourceAttr.Required {
+		t.Errorf("resource control_plane_generation: computed=%v optional=%v required=%v, want computed only",
+			resourceAttr.Computed, resourceAttr.Optional, resourceAttr.Required)
+	}
+	if len(resourceAttr.PlanModifiers) != 1 {
+		t.Errorf("resource control_plane_generation has %d plan modifiers, want UseStateForUnknown only",
+			len(resourceAttr.PlanModifiers))
+	}
+
+	dataSourceSchema := &datasource.SchemaResponse{}
+	NewKubernetesClusterDataSource().Schema(ctx, datasource.SchemaRequest{}, dataSourceSchema)
+	dataSourceAttr, found := dataSourceSchema.Schema.Attributes["control_plane_generation"]
+	if !found {
+		t.Fatal("data source has no control_plane_generation attribute")
+	}
+	if !dataSourceAttr.IsComputed() || dataSourceAttr.IsOptional() || dataSourceAttr.IsRequired() {
+		t.Error("data source control_plane_generation should be computed only")
+	}
+	if dataSourceAttr.GetMarkdownDescription() != resourceAttr.MarkdownDescription {
+		t.Error("resource and data source control_plane_generation descriptions differ")
 	}
 }

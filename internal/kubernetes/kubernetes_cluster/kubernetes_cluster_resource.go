@@ -66,6 +66,7 @@ type kubernetesClusterResourceModel struct {
 	ApiserverExtraArgs         types.Map         `tfsdk:"apiserver_extra_args"`
 	SchedulerExtraArgs         types.Map         `tfsdk:"scheduler_extra_args"`
 	ControllerManagerExtraArgs types.Map         `tfsdk:"controller_manager_extra_args"`
+	ControlPlaneGeneration     types.Int64       `tfsdk:"control_plane_generation"`
 }
 
 func (r *kubernetesClusterResource) Configure(_ context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -244,6 +245,14 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Optional:            true,
 				ElementType:         types.StringType,
 				MarkdownDescription: apiDescControllerManagerExtraArgs + " " + providerDescExtraArgsNote,
+			},
+			// The generation changes only when the platform migrates the control
+			// plane, which the Read before every plan picks up, so carrying it
+			// forward keeps it from showing as "known after apply" on every update.
+			"control_plane_generation": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: apiDescControlPlaneGeneration + " " + providerDescGeneration,
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 		},
 	}

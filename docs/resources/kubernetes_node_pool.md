@@ -76,6 +76,7 @@ resource "crusoe_kubernetes_node_pool" "example" {
 - `health` (Attributes) Issues currently detected on the node pool. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--health))
 - `id` (String) ID of the node pool.
 - `instance_ids` (List of String) IDs of the instances within the node pool.
+- `node_pool_generation` (Number) Generation of the node pool. Null when the API does not report it.
 - `state` (String) Current state of the node pool.
 
 <a id="nestedblock--node_taints"></a>

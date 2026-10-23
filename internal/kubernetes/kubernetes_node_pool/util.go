@@ -63,6 +63,8 @@ const (
 
 	apiDescConsentMode = "Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`."
 
+	apiDescGeneration = "Generation of the node pool."
+
 	apiDescTaintKey    = "Taint key. Follows the Kubernetes qualified-name format: an optional DNS subdomain prefix (up to 253 characters) followed by a `/`, then a name segment (up to 63 characters). Allowed characters: alphanumerics, `-`, `_`, and `.`. Must start and end with an alphanumeric character. Keys beginning with `crusoe.ai/` are reserved for internal use."
 	apiDescTaintValue  = "Taint value. May be empty. Follows the same format rules as a Kubernetes label value: up to 63 characters, alphanumerics and `-`, `_`, `.`."
 	apiDescTaintEffect = "Taint effect, controlling how pods are treated on matching nodes. `NoSchedule`: new pods are not scheduled unless they tolerate. `PreferNoSchedule`: new pods avoid the node if possible. `NoExecute`: new pods are not scheduled and existing non-tolerating pods are evicted."
@@ -91,6 +93,8 @@ const (
 	// it, so it is null rather than defaulted.
 	providerDescLimitedAvailability = "Supported only on some clusters; null on node pools where it is " +
 		"not supported. " + common.DevelopmentSupportMessage
+
+	providerDescGeneration = "Null when the API does not report it."
 
 	providerDescConsentModeDefault = "Newly created node pools default to `propose`. " +
 		"A node pool that predates this setting starts at `off`, so that remediation does not begin " +
@@ -407,6 +411,7 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	model.Health = health
 
 	model.Current = currentOrNull(nodePool)
+	model.NodePoolGeneration = common.GenerationOrNull(nodePool.NodePoolGeneration)
 
 	// ssh_key: the API returns it on reads, so prefer the API value. Keep the
 	// ref fallback so an empty response (partial object, future divergence)
@@ -454,6 +459,40 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	} else {
 		model.RequestedNodeLabels = ref.RequestedNodeLabels
 	}
+}
+
+// nodePoolToDataSourceModel maps an API node pool onto the data source model.
+// project_id is the project the lookup ran in, which the caller resolved.
+func nodePoolToDataSourceModel(ctx context.Context, nodePool *swagger.KubernetesNodePool, projectID string,
+	model *kubernetesNodePoolDataSourceModel, diags *diag.Diagnostics,
+) {
+	var d diag.Diagnostics
+
+	model.ID = types.StringValue(nodePool.Id)
+	model.ProjectID = types.StringValue(projectID)
+	model.ImageID = types.StringValue(nodePool.ImageId)
+	model.Type = types.StringValue(nodePool.Type_)
+	model.InstanceCount = types.Int64Value(nodePool.Count)
+	model.ClusterID = types.StringValue(nodePool.ClusterId)
+	model.SubnetID = types.StringValue(nodePool.SubnetId)
+	model.NodeLabels, d = common.StringMapToTFMap(nodePool.NodeLabels)
+	diags.Append(d...)
+	model.NodeTaints, d = nodeTaintsToTFSet(ctx, nodePool.NodeTaints)
+	diags.Append(d...)
+	model.InstanceIDs, d = common.StringSliceToTFList(sortedInstanceIDs(nodePool.InstanceIds))
+	diags.Append(d...)
+	model.State = types.StringValue(nodePool.State)
+	model.Name = types.StringValue(nodePool.Name)
+	model.EphemeralStorageForContainerd = types.BoolValue(nodePool.EphemeralStorageForContainerd)
+	model.NvlinkDomainID = stringOrNull(nodePool.NvlinkDomainId)
+	model.PublicIPType = types.StringValue(nodePool.PublicIpType)
+	model.ConsentMode = stringOrNull(nodePool.ConsentMode)
+	model.UpdateSettings, d = updateSettingsToTFObject(nodePool.UpdateSettings)
+	diags.Append(d...)
+	model.Health, d = healthToTFObject(ctx, nodePool.Health)
+	diags.Append(d...)
+	model.Current = currentOrNull(nodePool)
+	model.NodePoolGeneration = common.GenerationOrNull(nodePool.NodePoolGeneration)
 }
 
 // stringOrNull maps an empty API string to a null value, matching how the nullable

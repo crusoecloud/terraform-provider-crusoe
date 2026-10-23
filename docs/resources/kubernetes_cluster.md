@@ -64,6 +64,7 @@ resource "crusoe_kubernetes_cluster" "example" {
 
 ### Read-Only
 
+- `control_plane_generation` (Number) Generation of the control plane. Null when the API does not report it.
 - `dns_name` (String) DNS name of the cluster.
 - `id` (String) ID of the Kubernetes cluster.
 - `nodepool_ids` (List of String) IDs of the node pools within the Kubernetes cluster.

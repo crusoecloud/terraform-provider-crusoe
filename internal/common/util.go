@@ -493,6 +493,19 @@ func StringerSliceToTFList[T fmt.Stringer](s []T) (types.List, diag.Diagnostics)
 	return types.ListValue(types.StringType, tfList)
 }
 
+// GenerationOrNull renders a generation the API reports, such as a cluster's
+// control_plane_generation or a node pool's node_pool_generation. The API omits
+// the field when it does not know the generation, and the generated client
+// decodes that omission as 0, which is not a generation, so 0 becomes null.
+// Other values pass through unchanged.
+func GenerationOrNull(generation int32) types.Int64 {
+	if generation == 0 {
+		return types.Int64Null()
+	}
+
+	return types.Int64Value(int64(generation))
+}
+
 func StringSliceToTFList(s []string) (types.List, diag.Diagnostics) {
 	tfList := make([]attr.Value, len(s))
 	for i, val := range s {

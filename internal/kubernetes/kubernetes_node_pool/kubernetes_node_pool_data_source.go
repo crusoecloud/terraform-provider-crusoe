@@ -44,6 +44,7 @@ type kubernetesNodePoolDataSourceModel struct {
 	UpdateSettings                types.Object `tfsdk:"update_settings"`
 	Health                        types.Object `tfsdk:"health"`
 	Current                       types.Int64  `tfsdk:"current"`
+	NodePoolGeneration            types.Int64  `tfsdk:"node_pool_generation"`
 }
 
 func (e *kubernetesNodePoolDataSource) Metadata(_ context.Context,
@@ -185,6 +186,10 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 				Computed:            true,
 				MarkdownDescription: apiDescCurrent + " " + providerDescLimitedAvailability,
 			},
+			"node_pool_generation": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: apiDescGeneration + " " + providerDescGeneration,
+			},
 		},
 	}
 }
@@ -232,30 +237,7 @@ func (ds *kubernetesNodePoolDataSource) Read(ctx context.Context, req datasource
 		return
 	}
 
-	state.ID = types.StringValue(kubernetesNodePool.Id)
-	state.ProjectID = types.StringValue(projectID)
-	state.ImageID = types.StringValue(kubernetesNodePool.ImageId)
-	state.Type = types.StringValue(kubernetesNodePool.Type_)
-	state.InstanceCount = types.Int64Value(kubernetesNodePool.Count)
-	state.ClusterID = types.StringValue(kubernetesNodePool.ClusterId)
-	state.SubnetID = types.StringValue(kubernetesNodePool.SubnetId)
-	state.NodeLabels, diags = common.StringMapToTFMap(kubernetesNodePool.NodeLabels)
-	resp.Diagnostics.Append(diags...)
-	state.NodeTaints, diags = nodeTaintsToTFSet(ctx, kubernetesNodePool.NodeTaints)
-	resp.Diagnostics.Append(diags...)
-	state.InstanceIDs, diags = common.StringSliceToTFList(sortedInstanceIDs(kubernetesNodePool.InstanceIds))
-	resp.Diagnostics.Append(diags...)
-	state.State = types.StringValue(kubernetesNodePool.State)
-	state.Name = types.StringValue(kubernetesNodePool.Name)
-	state.EphemeralStorageForContainerd = types.BoolValue(kubernetesNodePool.EphemeralStorageForContainerd)
-	state.NvlinkDomainID = stringOrNull(kubernetesNodePool.NvlinkDomainId)
-	state.PublicIPType = types.StringValue(kubernetesNodePool.PublicIpType)
-	state.ConsentMode = stringOrNull(kubernetesNodePool.ConsentMode)
-	state.UpdateSettings, diags = updateSettingsToTFObject(kubernetesNodePool.UpdateSettings)
-	resp.Diagnostics.Append(diags...)
-	state.Health, diags = healthToTFObject(ctx, kubernetesNodePool.Health)
-	resp.Diagnostics.Append(diags...)
-	state.Current = currentOrNull(&kubernetesNodePool)
+	nodePoolToDataSourceModel(ctx, &kubernetesNodePool, projectID, &state, &resp.Diagnostics)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

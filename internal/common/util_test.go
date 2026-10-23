@@ -7,7 +7,31 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	tfResource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// TestGenerationOrNull pins the mapping of an API generation onto state. 0 is
+// how the generated client decodes an omitted generation, so it must reach state
+// as null rather than as a number a configuration could compare against.
+func TestGenerationOrNull(t *testing.T) {
+	tests := []struct {
+		name       string
+		generation int32
+		want       types.Int64
+	}{
+		{name: "generation 1", generation: 1, want: types.Int64Value(1)},
+		{name: "generation 2", generation: 2, want: types.Int64Value(2)},
+		{name: "absent", generation: 0, want: types.Int64Null()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GenerationOrNull(tt.generation); !got.Equal(tt.want) {
+				t.Errorf("GenerationOrNull(%d) = %v, want %v", tt.generation, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestStringSliceToTFList(t *testing.T) {
 	tests := []struct {
