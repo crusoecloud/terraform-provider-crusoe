@@ -7,7 +7,7 @@
 # or run commands ad hoc with:  mise exec -- make build
 
 [tools]
-# Matches the `toolchain` directive in go.mod, which CI and the release workflow follow.
+# Matches the `go` directive in go.mod, which CI and the release workflow follow.
 go = "1.27.3"
 
 # Matches GOLANGCI_VERSION in the Makefile and the CI golangci-lint action.

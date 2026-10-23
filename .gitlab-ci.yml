@@ -4,8 +4,8 @@ include:
 
 variables:
   CI_IMAGE: registry.gitlab.com/crusoeenergy/tools/go-ci-1.26
-  # The go-ci images (official golang base) set GOTOOLCHAIN=local, which would
-  # ignore go.mod's `toolchain` and build with the image's Go. auto downloads it.
+  # The go-ci images (official golang base) set GOTOOLCHAIN=local, which can't
+  # fetch the Go version go.mod requires. auto downloads it.
   GOTOOLCHAIN: auto
 
 test_and_lint:
