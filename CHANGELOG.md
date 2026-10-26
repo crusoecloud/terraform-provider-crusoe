@@ -1,3 +1,14 @@
+## 1.8.0
+
+ENHANCEMENTS:
+
+- Added the computed `control_plane_generation` attribute to the `crusoe_kubernetes_cluster` resource and data source, and `node_pool_generation` to the `crusoe_kubernetes_node_pool` resource and data source. Each reports the generation of the control plane or node pool, which changes only when the platform migrates it, and is null when the API does not report one.
+- The provider is now also published for Linux on IBM Z (`linux_s390x`).
+
+BUG FIXES:
+
+- Fixed the provider panicking during configuration when the Crusoe API returned an identity response without a user identity. Configuration now continues, and an error about resolving the default project names the user as `unknown`.
+
 ## 1.7.2
 
 SECURITY:
