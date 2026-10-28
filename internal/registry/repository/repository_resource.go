@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -21,7 +22,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource = &repositoryResource{}
+	_ resource.Resource                 = &repositoryResource{}
+	_ resource.ResourceWithUpgradeState = &repositoryResource{}
 )
 
 type repositoryResource struct {
@@ -43,8 +45,9 @@ type upstreamRegistryResourceModel struct {
 }
 
 type upstreamRegistryCredentialsResourceModel struct {
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
+	Username           types.String `tfsdk:"username"`
+	Password           types.String `tfsdk:"password"`
+	CredentialsVersion types.Int64  `tfsdk:"credentials_version"`
 }
 
 func NewRegistryRepositoryResource() resource.Resource {
@@ -76,14 +79,19 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 	resp.Schema = schema.Schema{
 		// DO NOT lower or remove, or Terraform rejects existing state as "managed
 		// by a newer provider version" and breaks upgrades. This resource was
-		// born at Version 2 (its very first release); no state upgrader exists
-		// or is needed.
-		Version: 2,
+		// born at Version 2; Version 3 made the upstream credentials write-only (see UpgradeState).
+		Version:             3,
+		MarkdownDescription: providerDescResource,
 		Attributes: map[string]schema.Attribute{
 			"project_id": schema.StringAttribute{
 				Computed:            true,
 				Optional:            true,
 				MarkdownDescription: providerDescProjectID,
+				// UseStateForUnknown must run first so an unset (computed) project_id doesn't plan as a change and force a replace.
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"location": schema.StringAttribute{
 				Required:            true,
@@ -104,27 +112,37 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 				},
 			},
 			"upstream_registry": schema.SingleNestedAttribute{
-				Optional: true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Object{requiresReplaceIfUpstreamAddedOrRemoved()},
 				Attributes: map[string]schema.Attribute{
 					"provider": schema.StringAttribute{
 						Required:            true,
 						MarkdownDescription: apiDescUpstreamProvider,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 					},
 					"url": schema.StringAttribute{
 						Required:            true,
 						MarkdownDescription: apiDescUpstreamURL,
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 					},
 					"upstream_registry_credentials": schema.SingleNestedAttribute{
-						Optional: true,
+						Optional:      true,
+						PlanModifiers: []planmodifier.Object{requiresReplaceIfCredentialsRemoved()},
 						Attributes: map[string]schema.Attribute{
 							"username": schema.StringAttribute{
 								Required:            true,
-								MarkdownDescription: apiDescUpstreamCredsUsername,
+								WriteOnly:           true,
+								MarkdownDescription: providerDescUpstreamCredsUsername,
 							},
 							"password": schema.StringAttribute{
 								Required:            true,
 								Sensitive:           true,
-								MarkdownDescription: apiDescUpstreamCredsPassword,
+								WriteOnly:           true,
+								MarkdownDescription: providerDescUpstreamCredsPassword,
+							},
+							"credentials_version": schema.Int64Attribute{
+								Optional:            true,
+								MarkdownDescription: providerDescUpstreamCredsVersion,
 							},
 						},
 					},
@@ -134,12 +152,67 @@ func (r *repositoryResource) Schema(ctx context.Context, _ resource.SchemaReques
 	}
 }
 
+// Child RequiresReplace modifiers don't run when the whole block goes to or from null, so the block replaces itself.
+func requiresReplaceIfUpstreamAddedOrRemoved() planmodifier.Object {
+	return objectplanmodifier.RequiresReplaceIf(
+		func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+			resp.RequiresReplace = req.StateValue.IsNull() != req.PlanValue.IsNull()
+		},
+		"Adding or removing the upstream registry requires replacing the repository.",
+		"Adding or removing the upstream registry requires replacing the repository.",
+	)
+}
+
+// The credentials API can only rotate, and a private upstream can't run anonymously, so removal replaces.
+func requiresReplaceIfCredentialsRemoved() planmodifier.Object {
+	return objectplanmodifier.RequiresReplaceIf(
+		func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+			resp.RequiresReplace = !req.StateValue.IsNull() && req.PlanValue.IsNull()
+		},
+		"Removing upstream registry credentials requires replacing the repository.",
+		"Removing upstream registry credentials requires replacing the repository.",
+	)
+}
+
+// upstreamCredentials takes a config-sourced upstream_registry, the only place write-only values are non-null.
+func upstreamCredentials(registry *upstreamRegistryResourceModel) *swagger.UpstreamRegistryCredentials {
+	if registry == nil || registry.UpstreamRegistryCrdentials == nil {
+		return nil
+	}
+
+	creds := registry.UpstreamRegistryCrdentials
+	if creds.Username.ValueString() == "" && creds.Password.ValueString() == "" {
+		return nil
+	}
+
+	return &swagger.UpstreamRegistryCredentials{
+		Username: creds.Username.ValueString(),
+		Password: creds.Password.ValueString(),
+	}
+}
+
+// Write-only credentials are never in plan or state, so credentials_version is the only change signal.
+func credentialsChanged(state, plan *upstreamRegistryResourceModel) bool {
+	if plan == nil || plan.UpstreamRegistryCrdentials == nil {
+		return false
+	}
+	if state == nil || state.UpstreamRegistryCrdentials == nil {
+		return true
+	}
+
+	return !plan.UpstreamRegistryCrdentials.CredentialsVersion.Equal(state.UpstreamRegistryCrdentials.CredentialsVersion)
+}
+
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 	var plan repositoryResourceModel
-	diags := request.Plan.Get(ctx, &plan)
-	response.Diagnostics.Append(diags...)
-	if response.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, request.Plan, &plan, &response.Diagnostics); err != nil {
+		return
+	}
+
+	// Write-only credentials are null in the plan; only the config carries them.
+	var config repositoryResourceModel
+	if err := common.GetResourceModel(ctx, request.Config, &config, &response.Diagnostics); err != nil {
 		return
 	}
 
@@ -153,25 +226,10 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 
 			return
 		}
-		provider := plan.UpstreamRegistry.Provider.ValueString()
-		url := plan.UpstreamRegistry.Url.ValueString()
-		inputRegistryCreds := plan.UpstreamRegistry.UpstreamRegistryCrdentials
-		var registryCreds *swagger.UpstreamRegistryCredentials
-		if inputRegistryCreds != nil {
-			username := inputRegistryCreds.Username.ValueString()
-			password := inputRegistryCreds.Password.ValueString()
-			if username != "" || password != "" {
-				registryCreds = &swagger.UpstreamRegistryCredentials{
-					Password: password,
-					Username: username,
-				}
-			}
-		}
-
 		upstreamRegistry = &swagger.UpstreamRegistry{
-			Provider:                    provider,
-			Url:                         url,
-			UpstreamRegistryCredentials: registryCreds,
+			Provider:                    plan.UpstreamRegistry.Provider.ValueString(),
+			Url:                         plan.UpstreamRegistry.Url.ValueString(),
+			UpstreamRegistryCredentials: upstreamCredentials(config.UpstreamRegistry),
 		}
 	}
 
@@ -200,16 +258,14 @@ func (r *repositoryResource) Create(ctx context.Context, request resource.Create
 	state := repositoryResourceModel{UpstreamRegistry: plan.UpstreamRegistry}
 	repositoryToResourceModel(&repository, &state, projectID)
 
-	diags = response.State.Set(ctx, &state)
+	diags := response.State.Set(ctx, &state)
 	response.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 	var stored repositoryResourceModel
-	diags := request.State.Get(ctx, &stored)
-	response.Diagnostics.Append(diags...)
-	if response.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, request.State, &stored, &response.Diagnostics); err != nil {
 		return
 	}
 
@@ -237,24 +293,82 @@ func (r *repositoryResource) Read(ctx context.Context, request resource.ReadRequ
 	// stored carries prior-state credentials, which repositoryToResourceModel preserves.
 	repositoryToResourceModel(&repository, &stored, projectID)
 
-	diags = response.State.Set(ctx, &stored)
+	diags := response.State.Set(ctx, &stored)
 	response.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	response.Diagnostics.AddError(
-		"Updating Repository Not Supported",
-		"Updating an existing repository is not currently supported. To change its configuration, the repository must be destroyed and recreated.",
-	)
+	var plan repositoryResourceModel
+	if err := common.GetResourceModel(ctx, request.Plan, &plan, &response.Diagnostics); err != nil {
+		return
+	}
+
+	var state repositoryResourceModel
+	if err := common.GetResourceModel(ctx, request.State, &state, &response.Diagnostics); err != nil {
+		return
+	}
+
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
+
+	// Rotating upstream credentials is the only in-place update; every other change, including removing credentials, replaces.
+	if credentialsChanged(state.UpstreamRegistry, plan.UpstreamRegistry) {
+		// Write-only credentials are null in plan and state; only the config carries them.
+		var config repositoryResourceModel
+		if err := common.GetResourceModel(ctx, request.Config, &config, &response.Diagnostics); err != nil {
+			return
+		}
+
+		creds := upstreamCredentials(config.UpstreamRegistry)
+		if creds == nil {
+			response.Diagnostics.AddError("Failed to update repository credentials",
+				"upstream_registry_credentials is missing from the configuration.")
+
+			return
+		}
+
+		opts := &swagger.CcrApiUpdateCcrRepositoryCredentialsOpts{
+			Body: optional.NewInterface(*creds),
+		}
+		httpResp, err := r.client.APIClient.CcrApi.UpdateCcrRepositoryCredentials(ctx, projectID, state.Name.ValueString(), opts)
+		if httpResp != nil {
+			defer httpResp.Body.Close()
+		}
+		if err != nil {
+			response.Diagnostics.AddError("Failed to update repository credentials",
+				fmt.Sprintf("Error updating upstream registry credentials: %s", common.UnpackAPIError(err)))
+
+			return
+		}
+	}
+
+	// Re-read the repository to pick up any server-side changes.
+	getOpts := &swagger.CcrApiGetCcrRepositoryOpts{
+		Location: optional.NewString(plan.Location.ValueString()),
+	}
+	repository, httpResp, err := r.client.APIClient.CcrApi.GetCcrRepository(ctx, projectID, state.Name.ValueString(), getOpts)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
+	if err != nil {
+		response.Diagnostics.AddError("Failed to read repository after update",
+			fmt.Sprintf("Error reading the repository: %s", common.UnpackAPIError(err)))
+
+		return
+	}
+
+	// Seed credentials from the plan; repositoryToResourceModel preserves them.
+	newState := repositoryResourceModel{UpstreamRegistry: plan.UpstreamRegistry}
+	repositoryToResourceModel(&repository, &newState, projectID)
+
+	diags := response.State.Set(ctx, &newState)
+	response.Diagnostics.Append(diags...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
 func (r *repositoryResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 	var stored repositoryResourceModel
-	diags := request.State.Get(ctx, &stored)
-	response.Diagnostics.Append(diags...)
-	if response.Diagnostics.HasError() {
+	if err := common.GetResourceModel(ctx, request.State, &stored, &response.Diagnostics); err != nil {
 		return
 	}
 

@@ -3,12 +3,21 @@
 page_title: "crusoe_registry_repository Resource - terraform-provider-crusoe"
 subcategory: ""
 description: |-
-  
+  Manages a Crusoe Container Registry repository.
+  A pull-through-cache repository whose upstream is a private AWS ECR registry (https://<account>.dkr.ecr.<region>.amazonaws.com, provider aws-ecr) requires upstream_registry_credentials when it is created. A repository created without them cannot be given credentials later and must be recreated with credentials.
+  Credentials are rotated in place: change credentials_version to send the configured username and password. Adding or removing the upstream_registry block, removing the credentials, or changing provider, url, name, location, mode or project_id, replaces the repository.
+  username and password are write-only: they are never stored in the Terraform plan or state, and setting them requires Terraform 1.11 or later.
 ---
 
 # crusoe_registry_repository (Resource)
 
+Manages a Crusoe Container Registry repository.
 
+A `pull-through-cache` repository whose upstream is a private AWS ECR registry (`https://<account>.dkr.ecr.<region>.amazonaws.com`, provider `aws-ecr`) requires `upstream_registry_credentials` when it is created. A repository created without them cannot be given credentials later and must be recreated with credentials.
+
+Credentials are rotated in place: change `credentials_version` to send the configured `username` and `password`. Adding or removing the `upstream_registry` block, removing the credentials, or changing `provider`, `url`, `name`, `location`, `mode` or `project_id`, replaces the repository.
+
+`username` and `password` are write-only: they are never stored in the Terraform plan or state, and setting them requires Terraform 1.11 or later.
 
 ## Example Usage
 
@@ -21,6 +30,38 @@ resource "crusoe_registry_repository" "example" {
   upstream_registry = {
     provider = "docker-hub"
     url      = "https://hub.docker.com"
+  }
+}
+
+# A pull-through cache of a private AWS ECR registry. Credentials are required when the
+# repository is created; a repository created without them must be recreated to add them.
+variable "ecr_access_key_id" {
+  type      = string
+  ephemeral = true
+}
+
+variable "ecr_secret_access_key" {
+  type      = string
+  sensitive = true
+  ephemeral = true
+}
+
+resource "crusoe_registry_repository" "private_ecr" {
+  location = "us-southcentral1-a"
+  name     = "my-private-ecr-cache"
+  mode     = "pull-through-cache"
+
+  upstream_registry = {
+    provider = "aws-ecr"
+    url      = "https://123456789012.dkr.ecr.us-east-1.amazonaws.com"
+
+    # username and password are write-only: never stored in plan or state.
+    upstream_registry_credentials = {
+      username = var.ecr_access_key_id # IAM access key ID
+      password = var.ecr_secret_access_key
+      # Increment to send new credentials in place.
+      credentials_version = 1
+    }
   }
 }
 ```
@@ -56,8 +97,12 @@ Optional:
 
 Required:
 
-- `password` (String, Sensitive) Password used to authenticate to the upstream registry.
-- `username` (String) Username used to authenticate to the upstream registry.
+- `password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Password used to authenticate to the upstream registry. Write-only: never stored in the Terraform plan or state; requires Terraform 1.11 or later. A changed value is sent only when `credentials_version` changes.
+- `username` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Username used to authenticate to the upstream registry. Write-only: never stored in the Terraform plan or state; requires Terraform 1.11 or later. A changed value is sent only when `credentials_version` changes.
+
+Optional:
+
+- `credentials_version` (Number) Version of the upstream credentials. Change this value (for example, increment it) to send the configured `username` and `password` and rotate them in place.
 
 ## Import
 

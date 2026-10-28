@@ -17,15 +17,34 @@ const (
 	apiDescURL              = "URL at which the repository can be accessed."
 	apiDescUpstreamProvider = "Provider of the upstream registry."
 	apiDescUpstreamURL      = "Base URL of the upstream registry that the repository caches images from."
-	//nolint:gosec // G101: This is a description string, not actual credentials
-	apiDescUpstreamCredsUsername = "Username used to authenticate to the upstream registry."
-	//nolint:gosec // G101: This is a description string, not actual credentials
-	apiDescUpstreamCredsPassword = "Password used to authenticate to the upstream registry."
 )
 
 // providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
 const (
 	providerDescProjectID = "ID of the project the repository belongs to. " + project.ProviderDescProjectIDFallback
+
+	providerDescResource = "Manages a Crusoe Container Registry repository.\n\n" +
+		"A `pull-through-cache` repository whose upstream is a private AWS ECR registry " +
+		"(`https://<account>.dkr.ecr.<region>.amazonaws.com`, provider `aws-ecr`) requires " +
+		"`upstream_registry_credentials` when it is created. A repository created without them cannot be given " +
+		"credentials later and must be recreated with credentials.\n\n" +
+		"Credentials are rotated in place: change `credentials_version` to send the configured `username` and " +
+		"`password`. Adding or removing the `upstream_registry` block, removing the credentials, or changing " +
+		"`provider`, `url`, `name`, `location`, `mode` or `project_id`, replaces the repository.\n\n" +
+		"`username` and `password` are write-only: they are never stored in the Terraform plan or state, and " +
+		"setting them requires Terraform 1.11 or later."
+
+	//nolint:gosec // G101: This is a description string, not actual credentials
+	providerDescUpstreamCredsUsername = "Username used to authenticate to the upstream registry. Write-only: " +
+		"never stored in the Terraform plan or state; requires Terraform 1.11 or later. A changed value is sent " +
+		"only when `credentials_version` changes."
+	//nolint:gosec // G101: This is a description string, not actual credentials
+	providerDescUpstreamCredsPassword = "Password used to authenticate to the upstream registry. Write-only: " +
+		"never stored in the Terraform plan or state; requires Terraform 1.11 or later. A changed value is sent " +
+		"only when `credentials_version` changes."
+	//nolint:gosec // G101: This is a description string, not actual credentials
+	providerDescUpstreamCredsVersion = "Version of the upstream credentials. Change this value (for example, " +
+		"increment it) to send the configured `username` and `password` and rotate them in place."
 )
 
 // repositoryToResourceModel maps the API-owned fields of a repository onto model:
