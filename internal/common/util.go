@@ -38,9 +38,9 @@ const (
 	colorReset       = "\033[0m"
 	metadataFile     = "/.crusoe/.metadata"
 
-	// serviceAccountHTTPTimeout bounds requests made through ctxWithRetryTransport's client,
+	// tokenFetchHTTPTimeout bounds requests made through ctxWithRetryTransport's client,
 	// since injecting our own HTTP client pre-empts client-go's default timeout.
-	serviceAccountHTTPTimeout = 30 * time.Second
+	tokenFetchHTTPTimeout     = 30 * time.Second
 	DevelopmentSupportMessage = "Reach out to support@crusoecloud.com with any questions."
 	DevelopmentMessage        = "This feature is currently in development. " + DevelopmentSupportMessage
 	onlyUserReadPerms         = 0o600
@@ -110,15 +110,15 @@ func ctxWithRetryTransport(ctx context.Context) context.Context {
 
 	return context.WithValue(ctx, oauth2.HTTPClient, &http.Client{
 		Transport: buildRetryClient().StandardClient().Transport,
-		Timeout:   serviceAccountHTTPTimeout,
+		Timeout:   tokenFetchHTTPTimeout,
 	})
 }
 
-// NewServiceAccountAPIClient builds a Crusoe API client authenticated via OAuth2
+// NewClientSecretAPIClient builds a Crusoe API client authenticated via OAuth2
 // client_credentials against tokenURL, requesting audience on every token. Token fetch/refresh
 // is automatic via client-go's auth/v1 transport; both it and every API request go through
-// ctxWithRetryTransport's retry transport, bounded by serviceAccountHTTPTimeout.
-func NewServiceAccountAPIClient(ctx context.Context, host, clientID, clientSecret, tokenURL, audience string) (
+// ctxWithRetryTransport's retry transport, bounded by tokenFetchHTTPTimeout.
+func NewClientSecretAPIClient(ctx context.Context, host, clientID, clientSecret, tokenURL, audience string) (
 	*swagger.APIClient, error,
 ) {
 	cfg, err := authv1.NewServiceAccountConfig(ctxWithRetryTransport(ctx), clientID, clientSecret, tokenURL, audience)

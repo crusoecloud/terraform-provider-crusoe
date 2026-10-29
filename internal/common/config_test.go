@@ -30,10 +30,10 @@ func clearCrusoeEnvVars(t *testing.T) {
 		"CRUSOE_ACCESS_KEY_ID",
 		"CRUSOE_SECRET_KEY",
 		"CRUSOE_API_ENDPOINT",
-		"CRUSOE_SERVICE_ACCOUNT_CLIENT_ID",
-		"CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET",
-		"CRUSOE_SERVICE_ACCOUNT_TOKEN_URL",
-		"CRUSOE_SERVICE_ACCOUNT_AUDIENCE",
+		"CRUSOE_CLIENT_ID",
+		"CRUSOE_CLIENT_SECRET",
+		"CRUSOE_TOKEN_URL",
+		"CRUSOE_AUDIENCE",
 	}
 
 	saved := make(map[string]string)
@@ -258,7 +258,7 @@ api_endpoint = "https://profile-endpoint/v1"
 		}
 	})
 
-	t.Run("partial override - only access key from env", func(t *testing.T) {
+	t.Run("incomplete env override doesn't combine with profile - profile wins whole", func(t *testing.T) {
 		clearCrusoeEnvVars(t)
 		os.Setenv("CRUSOE_ACCESS_KEY_ID", "env-access-key")
 		configPath := writeTempConfig(t, configContent)
@@ -268,16 +268,64 @@ api_endpoint = "https://profile-endpoint/v1"
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if config.AccessKeyID != "env-access-key" {
-			t.Errorf("AccessKeyID: got %q, want %q", config.AccessKeyID, "env-access-key")
+		if config.AccessKeyID != "profile-access-key" {
+			t.Errorf("AccessKeyID: got %q, want the profile's whole pair %q", config.AccessKeyID, "profile-access-key")
 		}
 		if config.SecretKey != "profile-secret-key" {
-			t.Errorf("SecretKey should come from profile: got %q, want %q", config.SecretKey, "profile-secret-key")
+			t.Errorf("SecretKey: got %q, want %q", config.SecretKey, "profile-secret-key")
 		}
 		if config.ApiEndpoint != "https://profile-endpoint/v1" {
-			t.Errorf("ApiEndpoint should come from profile: got %q, want %q", config.ApiEndpoint, "https://profile-endpoint/v1")
+			t.Errorf("ApiEndpoint should still come from profile: got %q, want %q", config.ApiEndpoint, "https://profile-endpoint/v1")
 		}
 	})
+}
+
+// Guards against stitching fields from two different tiers into a false-complete pair: a
+// profile's incomplete client-secret pair must not combine with env's incomplete API-key pair
+// into something ResolveAuthMethod would wrongly treat as a valid API key.
+func TestIncompleteTiersDoNotAssembleIntoACompletePair(t *testing.T) {
+	clearCrusoeEnvVars(t)
+	os.Setenv("CRUSOE_ACCESS_KEY_ID", "env-access-key")
+	configPath := writeTempConfig(t, `
+[default]
+client_id = "profile-client-id"
+`)
+
+	config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if isCompleteAPIKey(config) || isCompleteClientSecret(config) {
+		t.Fatalf("expected no complete credential pair, got %+v", config)
+	}
+}
+
+// Guards against TokenURL/Audience leaking in from a tier other than the one that won.
+func TestAncillaryFieldsStayWithTheWinningCredentialTier(t *testing.T) {
+	clearCrusoeEnvVars(t)
+	os.Setenv("CRUSOE_TOKEN_URL", "https://auth.stray-env.example.com/oauth2/token")
+	os.Setenv("CRUSOE_AUDIENCE", "https://stray-env.example.com")
+	configPath := writeTempConfig(t, `
+[default]
+client_id = "profile-client-id"
+client_secret = "profile-client-secret"
+`)
+
+	config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if config.ClientID != "profile-client-id" || config.ClientSecret != "profile-client-secret" {
+		t.Fatalf("expected the profile's complete client-secret pair to win, got %+v", config)
+	}
+	if config.TokenURL != defaultTokenURL {
+		t.Errorf("TokenURL: got %q, want the default %q, not the stray env var", config.TokenURL, defaultTokenURL)
+	}
+	if config.Audience != defaultAudience {
+		t.Errorf("Audience: got %q, want the default %q, not the stray env var", config.Audience, defaultAudience)
+	}
 }
 
 func TestMigrateEndpoint(t *testing.T) {
@@ -703,8 +751,8 @@ func TestServiceAccountConfig_FromProfile(t *testing.T) {
 	clearCrusoeEnvVars(t)
 	configPath := writeTempConfig(t, `
 [default]
-service_account_client_id = "profile-client-id"
-service_account_client_secret = "profile-client-secret"
+client_id = "profile-client-id"
+client_secret = "profile-client-secret"
 `)
 
 	config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
@@ -712,17 +760,17 @@ service_account_client_secret = "profile-client-secret"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if config.ServiceAccountClientID != "profile-client-id" {
-		t.Errorf("ServiceAccountClientID: got %q, want %q", config.ServiceAccountClientID, "profile-client-id")
+	if config.ClientID != "profile-client-id" {
+		t.Errorf("ClientID: got %q, want %q", config.ClientID, "profile-client-id")
 	}
-	if config.ServiceAccountClientSecret != "profile-client-secret" {
-		t.Errorf("ServiceAccountClientSecret: got %q, want %q", config.ServiceAccountClientSecret, "profile-client-secret")
+	if config.ClientSecret != "profile-client-secret" {
+		t.Errorf("ClientSecret: got %q, want %q", config.ClientSecret, "profile-client-secret")
 	}
-	if config.ServiceAccountTokenURL != defaultServiceAccountTokenURL {
-		t.Errorf("ServiceAccountTokenURL: got %q, want default %q", config.ServiceAccountTokenURL, defaultServiceAccountTokenURL)
+	if config.TokenURL != defaultTokenURL {
+		t.Errorf("TokenURL: got %q, want default %q", config.TokenURL, defaultTokenURL)
 	}
-	if config.ServiceAccountAudience != defaultServiceAccountAudience {
-		t.Errorf("ServiceAccountAudience: got %q, want default %q", config.ServiceAccountAudience, defaultServiceAccountAudience)
+	if config.Audience != defaultAudience {
+		t.Errorf("Audience: got %q, want default %q", config.Audience, defaultAudience)
 	}
 }
 
@@ -730,31 +778,31 @@ func TestServiceAccountConfig_EnvOverridesProfile(t *testing.T) {
 	clearCrusoeEnvVars(t)
 	configPath := writeTempConfig(t, `
 [default]
-service_account_client_id = "profile-client-id"
-service_account_client_secret = "profile-client-secret"
+client_id = "profile-client-id"
+client_secret = "profile-client-secret"
 `)
 
-	os.Setenv("CRUSOE_SERVICE_ACCOUNT_CLIENT_ID", "env-client-id")
-	os.Setenv("CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET", "env-client-secret")
-	os.Setenv("CRUSOE_SERVICE_ACCOUNT_TOKEN_URL", "https://example.com/oauth2/token")
-	os.Setenv("CRUSOE_SERVICE_ACCOUNT_AUDIENCE", "https://example.com")
+	os.Setenv("CRUSOE_CLIENT_ID", "env-client-id")
+	os.Setenv("CRUSOE_CLIENT_SECRET", "env-client-secret")
+	os.Setenv("CRUSOE_TOKEN_URL", "https://example.com/oauth2/token")
+	os.Setenv("CRUSOE_AUDIENCE", "https://example.com")
 
 	config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if config.ServiceAccountClientID != "env-client-id" {
-		t.Errorf("ServiceAccountClientID should come from env: got %q, want %q", config.ServiceAccountClientID, "env-client-id")
+	if config.ClientID != "env-client-id" {
+		t.Errorf("ClientID should come from env: got %q, want %q", config.ClientID, "env-client-id")
 	}
-	if config.ServiceAccountClientSecret != "env-client-secret" {
-		t.Errorf("ServiceAccountClientSecret should come from env: got %q, want %q", config.ServiceAccountClientSecret, "env-client-secret")
+	if config.ClientSecret != "env-client-secret" {
+		t.Errorf("ClientSecret should come from env: got %q, want %q", config.ClientSecret, "env-client-secret")
 	}
-	if config.ServiceAccountTokenURL != "https://example.com/oauth2/token" {
-		t.Errorf("ServiceAccountTokenURL should come from env: got %q, want %q", config.ServiceAccountTokenURL, "https://example.com/oauth2/token")
+	if config.TokenURL != "https://example.com/oauth2/token" {
+		t.Errorf("TokenURL should come from env: got %q, want %q", config.TokenURL, "https://example.com/oauth2/token")
 	}
-	if config.ServiceAccountAudience != "https://example.com" {
-		t.Errorf("ServiceAccountAudience should come from env: got %q, want %q", config.ServiceAccountAudience, "https://example.com")
+	if config.Audience != "https://example.com" {
+		t.Errorf("Audience should come from env: got %q, want %q", config.Audience, "https://example.com")
 	}
 }
 
@@ -771,9 +819,9 @@ secret_key = "secret"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if config.ServiceAccountTokenURL != "https://auth.crusoe.ai/oauth2/token" {
-		t.Errorf("ServiceAccountTokenURL default: got %q, want %q",
-			config.ServiceAccountTokenURL, "https://auth.crusoe.ai/oauth2/token")
+	if config.TokenURL != "https://auth.crusoe.ai/oauth2/token" {
+		t.Errorf("TokenURL default: got %q, want %q",
+			config.TokenURL, "https://auth.crusoe.ai/oauth2/token")
 	}
 }
 
@@ -790,8 +838,8 @@ secret_key = "secret"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if config.ServiceAccountAudience != "https://api.crusoe.ai" {
-		t.Errorf("ServiceAccountAudience default: got %q, want %q", config.ServiceAccountAudience, "https://api.crusoe.ai")
+	if config.Audience != "https://api.crusoe.ai" {
+		t.Errorf("Audience default: got %q, want %q", config.Audience, "https://api.crusoe.ai")
 	}
 }
 
@@ -799,10 +847,10 @@ func TestServiceAccountConfig_AudienceFromProfile(t *testing.T) {
 	clearCrusoeEnvVars(t)
 	configPath := writeTempConfig(t, `
 [default]
-service_account_client_id = "profile-client-id"
-service_account_client_secret = "profile-client-secret"
-service_account_token_url = "https://auth.crusoe.xyz/oauth2/token"
-service_account_audience = "https://api.crusoe.xyz"
+client_id = "profile-client-id"
+client_secret = "profile-client-secret"
+token_url = "https://auth.crusoe.xyz/oauth2/token"
+audience = "https://api.crusoe.xyz"
 `)
 
 	config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
@@ -810,12 +858,12 @@ service_account_audience = "https://api.crusoe.xyz"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if config.ServiceAccountTokenURL != "https://auth.crusoe.xyz/oauth2/token" {
-		t.Errorf("ServiceAccountTokenURL should come from profile: got %q, want %q",
-			config.ServiceAccountTokenURL, "https://auth.crusoe.xyz/oauth2/token")
+	if config.TokenURL != "https://auth.crusoe.xyz/oauth2/token" {
+		t.Errorf("TokenURL should come from profile: got %q, want %q",
+			config.TokenURL, "https://auth.crusoe.xyz/oauth2/token")
 	}
-	if config.ServiceAccountAudience != "https://api.crusoe.xyz" {
-		t.Errorf("ServiceAccountAudience should come from profile: got %q, want %q",
-			config.ServiceAccountAudience, "https://api.crusoe.xyz")
+	if config.Audience != "https://api.crusoe.xyz" {
+		t.Errorf("Audience should come from profile: got %q, want %q",
+			config.Audience, "https://api.crusoe.xyz")
 	}
 }

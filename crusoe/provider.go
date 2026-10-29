@@ -182,7 +182,7 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 				path.Root("profile"),
 				"Conflicting Crusoe Credentials",
 				"Both an API key (access_key_id/secret_key) and service account credentials "+
-					"(service_account_client_id/service_account_client_secret) are configured. The provider "+
+					"(client_id/client_secret) are configured. The provider "+
 					"cannot determine which identity to authenticate as, and will not silently pick one. "+
 					"Unset one credential pair in ~/.crusoe/config or the corresponding CRUSOE_* environment variables.",
 			)
@@ -194,13 +194,23 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 					"Set both values in ~/.crusoe/config, via the CRUSOE_ACCESS_KEY_ID/CRUSOE_SECRET_KEY environment "+
 					"variables, or specify a profile in the provider block.",
 			)
-		case errors.Is(authErr, common.ErrIncompleteServiceAccountCredentials):
+		case errors.Is(authErr, common.ErrIncompleteClientSecretCredentials):
 			resp.Diagnostics.AddAttributeError(
 				path.Root("profile"),
 				"Incomplete Crusoe Service Account Credentials",
-				"Only one of service_account_client_id/service_account_client_secret is set; both are required "+
-					"together. Set both values in ~/.crusoe/config, via the CRUSOE_SERVICE_ACCOUNT_CLIENT_ID/"+
-					"CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET environment variables, or specify a profile in the provider block.",
+				"Only one of client_id/client_secret is set; both are required "+
+					"together. Set both values in ~/.crusoe/config, via the CRUSOE_CLIENT_ID/"+
+					"CRUSOE_CLIENT_SECRET environment variables, or specify a profile in the provider block.",
+			)
+		case errors.Is(authErr, common.ErrMismatchedClientSecretEnvironment):
+			resp.Diagnostics.AddAttributeError(
+				path.Root("profile"),
+				"Mismatched Crusoe Service Account Environment",
+				"Only one of token_url/audience is overridden from its default. Both default to Crusoe's "+
+					"production values independently, so overriding just one would silently leave the other "+
+					"pointed at production, minting a token with the wrong audience for that token endpoint. "+
+					"Set both token_url and audience together in ~/.crusoe/config, or via the CRUSOE_TOKEN_URL/"+
+					"CRUSOE_AUDIENCE environment variables.",
 			)
 		default: // common.ErrMissingCredentials
 			resp.Diagnostics.AddAttributeError(
@@ -209,8 +219,8 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 				"The provider cannot create the Crusoe API client because no credentials were found. Configure one "+
 					"of the following in ~/.crusoe/config (optionally under a profile), or via environment variables:\n\n"+
 					"  - API key: access_key_id + secret_key (or CRUSOE_ACCESS_KEY_ID + CRUSOE_SECRET_KEY)\n"+
-					"  - Service account: service_account_client_id + service_account_client_secret "+
-					"(or CRUSOE_SERVICE_ACCOUNT_CLIENT_ID + CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET)\n\n"+
+					"  - Service account: client_id + client_secret "+
+					"(or CRUSOE_CLIENT_ID + CRUSOE_CLIENT_SECRET)\n\n"+
 					"You can also specify a profile in the provider block. If already set, ensure the values are not empty.",
 			)
 		}
@@ -220,17 +230,17 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	// Create an API client and make it available during DataSource and Resource type Configure methods.
 	var apiClient *swagger.APIClient
-	if authMethod == common.AuthMethodServiceAccount {
+	if authMethod == common.AuthMethodClientSecret {
 		// context.Background(), not ctx: the token source reuses whatever context it's built
 		// with for every future refresh, but ctx is cancelled once Configure returns while
 		// apiClient outlives it.
-		apiClient, err = common.NewServiceAccountAPIClient(
+		apiClient, err = common.NewClientSecretAPIClient(
 			context.Background(),
 			clientConfig.ApiEndpoint,
-			clientConfig.ServiceAccountClientID,
-			clientConfig.ServiceAccountClientSecret,
-			clientConfig.ServiceAccountTokenURL,
-			clientConfig.ServiceAccountAudience,
+			clientConfig.ClientID,
+			clientConfig.ClientSecret,
+			clientConfig.TokenURL,
+			clientConfig.Audience,
 		)
 		if err != nil {
 			resp.Diagnostics.AddAttributeError(

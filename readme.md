@@ -43,18 +43,18 @@ As an alternative to an access keypair, you can authenticate as a [service accou
 Sample Config File:
 ```toml
 [default]
-service_account_client_id="MY_CLIENT_ID"
-service_account_client_secret="MY_CLIENT_SECRET"
+client_id="MY_CLIENT_ID"
+client_secret="MY_CLIENT_SECRET"
 ```
 
-Like `access_key_id`/`secret_key`, these can also be set per-profile, or via the `CRUSOE_SERVICE_ACCOUNT_CLIENT_ID` and `CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET` environment variables (which take precedence over the config file, following the same precedence rules as the API key credentials above).
+Like `access_key_id`/`secret_key`, these can also be set per-profile, or via the `CRUSOE_CLIENT_ID` and `CRUSOE_CLIENT_SECRET` environment variables (which take precedence over the config file, following the same precedence rules as the API key credentials above).
 
-The provider automatically fetches and refreshes the OAuth2 access token as needed against Crusoe's token endpoint (`https://auth.crusoe.ai/oauth2/token` by default) — no manual token management is required. Every token request also carries an `audience` (`https://api.crusoe.ai` by default), since the API rejects a service-account token whose `aud` claim doesn't match. To point at a different token endpoint or audience (e.g. for a non-production environment), set `service_account_token_url`/`service_account_audience` in the config file or the `CRUSOE_SERVICE_ACCOUNT_TOKEN_URL`/`CRUSOE_SERVICE_ACCOUNT_AUDIENCE` environment variables; the vast majority of users should never need this, and if you set one you almost always need to set the other too.
+The provider automatically fetches and refreshes the OAuth2 access token as needed against Crusoe's token endpoint (`https://auth.crusoe.ai/oauth2/token` by default) — no manual token management is required. Every token request also carries an `audience` (`https://api.crusoe.ai` by default), since the API rejects a service-account token whose `aud` claim doesn't match. To point at a different token endpoint or audience (e.g. for a non-production environment), set `token_url`/`audience` in the config file or the `CRUSOE_TOKEN_URL`/`CRUSOE_AUDIENCE` environment variables; the vast majority of users should never need this, and if you set one you almost always need to set the other too.
 
-**Configure exactly one authentication method.** You must set either the API key pair (`access_key_id` + `secret_key`) or the service account pair (`service_account_client_id` + `service_account_client_secret`) — not both, and not just one field of a pair:
+**Configure exactly one authentication method.** You must set either the API key pair (`access_key_id` + `secret_key`) or the service account pair (`client_id` + `client_secret`) — not both, and not just one field of a pair:
 
 - If neither pair is fully configured, the provider fails with a "Missing Crusoe Credentials" error.
-- If only one field of a pair is set (e.g. `service_account_client_id` without `service_account_client_secret`), the provider fails with an "Incomplete ... Credentials" error naming the missing field.
+- If only one field of a pair is set (e.g. `client_id` without `client_secret`), the provider fails with an "Incomplete ... Credentials" error naming the missing field.
 - If both pairs are fully configured at the same time, the provider fails with a "Conflicting Crusoe Credentials" error rather than silently preferring one — this avoids accidentally authenticating as the wrong identity.
 
 ## Provider Configuration

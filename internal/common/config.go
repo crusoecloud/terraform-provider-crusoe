@@ -12,17 +12,15 @@ const (
 
 	defaultApiEndpoint = "https://api.cloud.crusoe.ai/v1"
 
-	// defaultServiceAccountTokenURL is Crusoe's Hydra OAuth2 token endpoint for the
-	// client_credentials grant. Overridable via service_account_token_url /
-	// CRUSOE_SERVICE_ACCOUNT_TOKEN_URL.
-	defaultServiceAccountTokenURL = "https://auth.crusoe.ai/oauth2/token" //nolint:gosec // G101: URL constant, not a credential
+	// defaultTokenURL is Crusoe's Hydra OAuth2 token endpoint for the
+	// client_credentials grant. Overridable via token_url / CRUSOE_TOKEN_URL.
+	defaultTokenURL = "https://auth.crusoe.ai/oauth2/token" //nolint:gosec // G101: URL constant, not a credential
 
-	// defaultServiceAccountAudience is the "audience" requested alongside every service account
+	// defaultAudience is the "audience" requested alongside every client-secret
 	// token. Hydra treats the registered audience as an allowlist, not something it stamps onto
 	// the token automatically, so this must be sent explicitly or the token's aud claim comes
-	// back empty and the API rejects it. Overridable via service_account_audience /
-	// CRUSOE_SERVICE_ACCOUNT_AUDIENCE.
-	defaultServiceAccountAudience = "https://api.crusoe.ai"
+	// back empty and the API rejects it. Overridable via audience / CRUSOE_AUDIENCE.
+	defaultAudience = "https://api.crusoe.ai"
 )
 
 // Config holds options that can be set via ~/.crusoe/config and env variables.
@@ -34,18 +32,18 @@ type Config struct {
 	ApiEndpoint      string `toml:"api_endpoint"`
 	DefaultProject   string `toml:"default_project"`
 
-	// ServiceAccountClientID and ServiceAccountClientSecret authenticate via OAuth2
+	// ClientID and ClientSecret authenticate via OAuth2
 	// client_credentials, as an alternative to AccessKeyID/SecretKey. See ResolveAuthMethod.
-	ServiceAccountClientID     string `toml:"service_account_client_id"`
-	ServiceAccountClientSecret string `toml:"service_account_client_secret"`
+	ClientID     string `toml:"client_id"`
+	ClientSecret string `toml:"client_secret"`
 
-	// ServiceAccountTokenURL is the OAuth2 token endpoint for the client_credentials exchange.
+	// TokenURL is the OAuth2 token endpoint for the client_credentials exchange.
 	// Defaults to Crusoe's production Hydra endpoint.
-	ServiceAccountTokenURL string `toml:"service_account_token_url"`
+	TokenURL string `toml:"token_url"`
 
-	// ServiceAccountAudience is the "audience" requested on the token request. Defaults to
+	// Audience is the "audience" requested on the token request. Defaults to
 	// prod's audience; must match the target environment's auth-gateway.
-	ServiceAccountAudience string `toml:"service_account_audience"`
+	Audience string `toml:"audience"`
 }
 
 // ConfigOptions allows overriding config defaults from the provider block.
@@ -78,6 +76,18 @@ func migrateEndpoint(endpoint string) string {
 	return ""
 }
 
+// envConfigFromEnviron reads every CRUSOE_* credential env var into a Config, via the same
+// authCandidates table ResolveAuthMethod uses - so a new method added there doesn't require a
+// matching edit here.
+func envConfigFromEnviron() *Config {
+	cfg := &Config{}
+	for _, c := range authCandidates {
+		c.fromEnv(cfg)
+	}
+
+	return cfg
+}
+
 // GetConfig populates a config struct based on default values, the user's Crusoe config file, and environment variables.
 // This is a convenience wrapper for GetConfigWithOptions with no options.
 func GetConfig() (*Config, error) {
@@ -102,9 +112,9 @@ func GetConfig() (*Config, error) {
 //  3. default_project from selected profile
 func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 	config := Config{
-		ApiEndpoint:            defaultApiEndpoint,
-		ServiceAccountTokenURL: defaultServiceAccountTokenURL,
-		ServiceAccountAudience: defaultServiceAccountAudience,
+		ApiEndpoint: defaultApiEndpoint,
+		TokenURL:    defaultTokenURL,
+		Audience:    defaultAudience,
 	}
 
 	// A home-dir lookup failure falls through like a missing config file - env vars alone are a
@@ -151,12 +161,6 @@ func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 			continue
 		}
 		var profileConfig Config
-		if accessKey, ok := valMap["access_key_id"].(string); ok {
-			profileConfig.AccessKeyID = accessKey
-		}
-		if secretKey, ok := valMap["secret_key"].(string); ok {
-			profileConfig.SecretKey = secretKey
-		}
 		if sshKey, ok := valMap["ssh_public_key_file"].(string); ok {
 			profileConfig.SSHPublicKeyFile = sshKey
 		}
@@ -166,17 +170,8 @@ func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 		if defaultProject, ok := valMap["default_project"].(string); ok {
 			profileConfig.DefaultProject = defaultProject
 		}
-		if clientID, ok := valMap["service_account_client_id"].(string); ok {
-			profileConfig.ServiceAccountClientID = clientID
-		}
-		if clientSecret, ok := valMap["service_account_client_secret"].(string); ok {
-			profileConfig.ServiceAccountClientSecret = clientSecret
-		}
-		if tokenURL, ok := valMap["service_account_token_url"].(string); ok {
-			profileConfig.ServiceAccountTokenURL = tokenURL
-		}
-		if audience, ok := valMap["service_account_audience"].(string); ok {
-			profileConfig.ServiceAccountAudience = audience
+		for _, c := range authCandidates {
+			c.fromProfile(&profileConfig, valMap)
 		}
 		profilesMap[key] = profileConfig
 	}
@@ -194,59 +189,31 @@ func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 	}
 
 	config.ProfileName = profileName
+	profileConfig := profilesMap[profileName]
 
-	if profileConfig, ok := profilesMap[profileName]; ok {
-		if profileConfig.AccessKeyID != "" {
-			config.AccessKeyID = profileConfig.AccessKeyID
-		}
-		if profileConfig.SecretKey != "" {
-			config.SecretKey = profileConfig.SecretKey
-		}
-		if profileConfig.SSHPublicKeyFile != "" {
-			config.SSHPublicKeyFile = profileConfig.SSHPublicKeyFile
-		}
-		if profileConfig.DefaultProject != "" {
-			config.DefaultProject = profileConfig.DefaultProject
-		}
-		if profileConfig.ApiEndpoint != "" {
-			config.ApiEndpoint = profileConfig.ApiEndpoint
-		}
-		if profileConfig.ServiceAccountClientID != "" {
-			config.ServiceAccountClientID = profileConfig.ServiceAccountClientID
-		}
-		if profileConfig.ServiceAccountClientSecret != "" {
-			config.ServiceAccountClientSecret = profileConfig.ServiceAccountClientSecret
-		}
-		if profileConfig.ServiceAccountTokenURL != "" {
-			config.ServiceAccountTokenURL = profileConfig.ServiceAccountTokenURL
-		}
-		if profileConfig.ServiceAccountAudience != "" {
-			config.ServiceAccountAudience = profileConfig.ServiceAccountAudience
-		}
+	if profileConfig.SSHPublicKeyFile != "" {
+		config.SSHPublicKeyFile = profileConfig.SSHPublicKeyFile
+	}
+	if profileConfig.DefaultProject != "" {
+		config.DefaultProject = profileConfig.DefaultProject
+	}
+	if profileConfig.ApiEndpoint != "" {
+		config.ApiEndpoint = profileConfig.ApiEndpoint
 	}
 
-	// Environment variables for credentials and API endpoint (always override profile)
-	if accessKey := os.Getenv("CRUSOE_ACCESS_KEY_ID"); accessKey != "" {
-		config.AccessKeyID = accessKey
-	}
-	if secretKey := os.Getenv("CRUSOE_SECRET_KEY"); secretKey != "" {
-		config.SecretKey = secretKey
-	}
 	if apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT"); apiEndpoint != "" {
 		config.ApiEndpoint = apiEndpoint
 	}
-	if clientID := os.Getenv("CRUSOE_SERVICE_ACCOUNT_CLIENT_ID"); clientID != "" {
-		config.ServiceAccountClientID = clientID
-	}
-	if clientSecret := os.Getenv("CRUSOE_SERVICE_ACCOUNT_CLIENT_SECRET"); clientSecret != "" {
-		config.ServiceAccountClientSecret = clientSecret
-	}
-	if tokenURL := os.Getenv("CRUSOE_SERVICE_ACCOUNT_TOKEN_URL"); tokenURL != "" {
-		config.ServiceAccountTokenURL = tokenURL
-	}
-	if audience := os.Getenv("CRUSOE_SERVICE_ACCOUNT_AUDIENCE"); audience != "" {
-		config.ServiceAccountAudience = audience
-	}
+
+	// The winning tier supplies both the credential pair and its own ancillary fields
+	// (TokenURL/Audience) together - never mixed with a different tier's, so one identity's
+	// secret is never silently paired with a different tier's token endpoint or audience, and a
+	// stray env var from an unrelated tool can't stitch together a false-complete pair with a
+	// profile's fields (or vice versa).
+	envConfig := envConfigFromEnviron()
+	winner := pickCredentialTier(envConfig, &profileConfig)
+	applyCredential(&config, winner)
+	mergeAncillary(&config, winner)
 
 	if newEndpoint := migrateEndpoint(config.ApiEndpoint); newEndpoint != "" {
 		config.ApiEndpoint = newEndpoint

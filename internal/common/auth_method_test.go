@@ -19,8 +19,8 @@ func TestResolveAuthMethod(t *testing.T) {
 		},
 		{
 			name:       "only service account configured",
-			cfg:        Config{ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret"},
-			wantMethod: AuthMethodServiceAccount,
+			cfg:        Config{ClientID: "client-id", ClientSecret: "client-secret"},
+			wantMethod: AuthMethodClientSecret,
 		},
 		{
 			name:    "nothing configured",
@@ -29,7 +29,7 @@ func TestResolveAuthMethod(t *testing.T) {
 		},
 		{
 			name:    "both fully configured is ambiguous",
-			cfg:     Config{AccessKeyID: "key", SecretKey: "secret", ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret"},
+			cfg:     Config{AccessKeyID: "key", SecretKey: "secret", ClientID: "client-id", ClientSecret: "client-secret"},
 			wantErr: ErrConflictingCredentials,
 		},
 		{
@@ -43,76 +43,76 @@ func TestResolveAuthMethod(t *testing.T) {
 			wantErr: ErrIncompleteAPIKeyCredentials,
 		},
 		{
-			name:    "only service_account_client_id set, missing secret",
-			cfg:     Config{ServiceAccountClientID: "client-id"},
-			wantErr: ErrIncompleteServiceAccountCredentials,
+			name:    "only client_id set, missing secret",
+			cfg:     Config{ClientID: "client-id"},
+			wantErr: ErrIncompleteClientSecretCredentials,
 		},
 		{
-			name:    "only service_account_client_secret set, missing id",
-			cfg:     Config{ServiceAccountClientSecret: "client-secret"},
-			wantErr: ErrIncompleteServiceAccountCredentials,
+			name:    "only client_secret set, missing id",
+			cfg:     Config{ClientSecret: "client-secret"},
+			wantErr: ErrIncompleteClientSecretCredentials,
 		},
 		{
 			name: "partial API key plus partial service account is reported as incomplete API key first",
 			// This documents current precedence: a partial API key pair is checked before a
 			// partial service account pair, so this combination surfaces the API key error.
-			cfg:     Config{AccessKeyID: "key", ServiceAccountClientID: "client-id"},
+			cfg:     Config{AccessKeyID: "key", ClientID: "client-id"},
 			wantErr: ErrIncompleteAPIKeyCredentials,
 		},
 		{
 			name:       "complete service account plus unrelated empty API key fields",
-			cfg:        Config{ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret", AccessKeyID: "", SecretKey: ""},
-			wantMethod: AuthMethodServiceAccount,
+			cfg:        Config{ClientID: "client-id", ClientSecret: "client-secret", AccessKeyID: "", SecretKey: ""},
+			wantMethod: AuthMethodClientSecret,
 		},
 		{
 			name: "complete API key plus partial service account is reported as incomplete SA",
 			// The likely real-world case of a user migrating from API key to service account
 			// auth and not fully cleaning up the new pair yet.
-			cfg:     Config{AccessKeyID: "key", SecretKey: "secret", ServiceAccountClientID: "client-id"},
-			wantErr: ErrIncompleteServiceAccountCredentials,
+			cfg:     Config{AccessKeyID: "key", SecretKey: "secret", ClientID: "client-id"},
+			wantErr: ErrIncompleteClientSecretCredentials,
 		},
 		{
 			name: "complete service account plus partial API key is reported as incomplete API key",
 			// The mirror case: migrating from service account to API key auth.
-			cfg:     Config{ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret", AccessKeyID: "key"},
+			cfg:     Config{ClientID: "client-id", ClientSecret: "client-secret", AccessKeyID: "key"},
 			wantErr: ErrIncompleteAPIKeyCredentials,
 		},
 		{
 			name: "service account with only token_url overridden",
 			cfg: Config{ //nolint:gosec // G101: fake credentials in a test
-				ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret",
-				ServiceAccountTokenURL: "https://auth.dev.crusoe.ai/oauth2/token",
-				ServiceAccountAudience: defaultServiceAccountAudience,
+				ClientID: "client-id", ClientSecret: "client-secret",
+				TokenURL: "https://auth.dev.crusoe.ai/oauth2/token",
+				Audience: defaultAudience,
 			},
-			wantErr: ErrMismatchedServiceAccountEnvironment,
+			wantErr: ErrMismatchedClientSecretEnvironment,
 		},
 		{
 			name: "service account with only audience overridden",
 			cfg: Config{
-				ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret",
-				ServiceAccountTokenURL: defaultServiceAccountTokenURL,
-				ServiceAccountAudience: "https://api.dev.crusoe.ai",
+				ClientID: "client-id", ClientSecret: "client-secret",
+				TokenURL: defaultTokenURL,
+				Audience: "https://api.dev.crusoe.ai",
 			},
-			wantErr: ErrMismatchedServiceAccountEnvironment,
+			wantErr: ErrMismatchedClientSecretEnvironment,
 		},
 		{
 			name:       "service account with token_url and audience both overridden together",
-			cfg:        Config{ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret", ServiceAccountTokenURL: "https://auth.dev.crusoe.ai/oauth2/token", ServiceAccountAudience: "https://api.dev.crusoe.ai"}, //nolint:gosec // G101: fake credentials in a test
-			wantMethod: AuthMethodServiceAccount,
+			cfg:        Config{ClientID: "client-id", ClientSecret: "client-secret", TokenURL: "https://auth.dev.crusoe.ai/oauth2/token", Audience: "https://api.dev.crusoe.ai"}, //nolint:gosec // G101: fake credentials in a test
+			wantMethod: AuthMethodClientSecret,
 		},
 		{
 			name:       "service account with token_url and audience both left unset",
-			cfg:        Config{ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret"},
-			wantMethod: AuthMethodServiceAccount,
+			cfg:        Config{ClientID: "client-id", ClientSecret: "client-secret"},
+			wantMethod: AuthMethodClientSecret,
 		},
 		{
 			name: "service account with token_url and audience both explicitly set to their defaults",
 			cfg: Config{
-				ServiceAccountClientID: "client-id", ServiceAccountClientSecret: "client-secret",
-				ServiceAccountTokenURL: defaultServiceAccountTokenURL,
-				ServiceAccountAudience: defaultServiceAccountAudience,
+				ClientID: "client-id", ClientSecret: "client-secret",
+				TokenURL: defaultTokenURL,
+				Audience: defaultAudience,
 			},
-			wantMethod: AuthMethodServiceAccount,
+			wantMethod: AuthMethodClientSecret,
 		},
 	}
 
