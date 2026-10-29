@@ -2,14 +2,16 @@ package load_balancer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -18,54 +20,43 @@ import (
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
-	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
+
+const maxPort = 65535
+
+var errMissingCreateResult = errors.New("create operation returned no load balancer ID")
 
 type loadBalancerResource struct {
 	client *common.CrusoeClient
 }
 
 type loadBalancerResourceModel struct {
-	ID                types.String `tfsdk:"id"`
-	ProjectID         types.String `tfsdk:"project_id"`
-	Name              types.String `tfsdk:"name"`
-	NetworkInterfaces types.List   `tfsdk:"network_interfaces"`
-	Destinations      types.List   `tfsdk:"destinations"`
-	Location          types.String `tfsdk:"location"`
-	Protocols         types.List   `tfsdk:"protocols"`
-	Algorithm         types.String `tfsdk:"algorithm"`
-	Type              types.String `tfsdk:"type"`
-	IPs               types.List   `tfsdk:"ips"`
-	HealthCheck       types.Object `tfsdk:"health_check"`
+	ID                     types.String `tfsdk:"id"`
+	ProjectID              types.String `tfsdk:"project_id"`
+	Name                   types.String `tfsdk:"name"`
+	Location               types.String `tfsdk:"location"`
+	VPCID                  types.String `tfsdk:"vpc_id"`
+	Protocol               types.String `tfsdk:"protocol"`
+	VIP                    types.String `tfsdk:"vip"`
+	ListenPortsAndBackends types.Set    `tfsdk:"listen_ports_and_backends"`
+	HealthCheckOptions     types.Object `tfsdk:"health_check_options"`
 }
 
-type loadBalancerNetworkTargetModel struct {
-	Cidr       types.String `tfsdk:"cidr"`
-	ResourceID types.String `tfsdk:"resource_id"`
+type listenPortAndBackendResourceModel struct {
+	ListenPort types.Int64 `tfsdk:"listen_port"`
+	Backends   types.Set   `tfsdk:"backends"`
 }
 
-type loadBalancerNetworkInterfaceModel struct {
-	Network types.String `tfsdk:"network"`
-	Subnet  types.String `tfsdk:"subnet"`
-}
-
-type loadBalancerIPAddressModel struct {
-	PrivateIPv4 types.Object                        `tfsdk:"private_ipv4"`
-	PublicIpv4  loadBalancerPublicIPv4ResourceModel `tfsdk:"public_ipv4"`
-}
-
-type loadBalancerPublicIPv4ResourceModel struct {
-	ID      types.String `tfsdk:"id"`
-	Address types.String `tfsdk:"address"`
-	Type    types.String `tfsdk:"type"`
+type backendResourceModel struct {
+	IP   types.String `tfsdk:"ip"`
+	Port types.Int64  `tfsdk:"port"`
 }
 
 type healthCheckOptionsResourceModel struct {
-	Timeout      types.String `tfsdk:"timeout"`
-	Port         types.String `tfsdk:"port"`
-	Interval     types.String `tfsdk:"interval"`
-	SuccessCount types.String `tfsdk:"success_count"`
-	FailureCount types.String `tfsdk:"failure_count"`
+	Timeout      types.Int64 `tfsdk:"timeout"`
+	Interval     types.Int64 `tfsdk:"interval"`
+	SuccessCount types.Int64 `tfsdk:"success_count"`
+	FailureCount types.Int64 `tfsdk:"failure_count"`
 }
 
 func NewLoadBalancerResource() resource.Resource {
@@ -97,12 +88,12 @@ func (r *loadBalancerResource) Metadata(ctx context.Context, req resource.Metada
 func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: common.DevelopmentMessage,
-		Version:             1,
+		Version:             2,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: apiDescID,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
 				Optional:            true,
@@ -110,145 +101,93 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: providerDescProjectID,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
-					stringplanmodifier.RequiresReplace(), // cannot be updated in place
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: apiDescName,
-			},
-			"network_interfaces": schema.ListNestedAttribute{
-				Required:            true,
-				MarkdownDescription: apiDescNetworkInterfaces,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"network": schema.StringAttribute{
-							Computed:            true,
-							Optional:            true,
-							MarkdownDescription: apiDescNetwork,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-						},
-						"subnet": schema.StringAttribute{
-							Computed:            true,
-							Optional:            true,
-							MarkdownDescription: apiDescSubnet,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-						},
-					},
-				},
-			},
-			"destinations": schema.ListNestedAttribute{
-				Required:            true,
-				MarkdownDescription: apiDescDestinations,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"cidr": schema.StringAttribute{
-							Computed:            true,
-							Optional:            true,
-							MarkdownDescription: apiDescCidr,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},                                                   // maintain across updates
-							Validators:          []validator.String{validators.RegexValidator{RegexPattern: "^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/32)?$"}}, // load balancers only support the /32 mask
-						},
-						"resource_id": schema.StringAttribute{
-							Computed:            true,
-							Optional:            true,
-							MarkdownDescription: apiDescResourceID,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-						},
-					},
-				},
+				// ExternalLoadBalancerPatchRequest cannot carry a name, so renames replace.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"location": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: apiDescLocation,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"protocols": schema.ListAttribute{
-				ElementType:         types.StringType,
+			"vpc_id": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: apiDescProtocols,
+				MarkdownDescription: apiDescVPCID,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"algorithm": schema.StringAttribute{
+			"protocol": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: apiDescAlgorithm,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Validators:          []validator.String{stringvalidator.OneOf("random")},         // we currently only support random
+				MarkdownDescription: apiDescProtocol + " " + providerDescProtocol,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{stringvalidator.OneOf("tcp", "udp")},
 			},
-			"type": schema.StringAttribute{
-				Optional:            true,
+			"vip": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: apiDescType,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}, // cannot be updated in place
+				MarkdownDescription: apiDescVIP,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"ips": schema.ListNestedAttribute{
-				Computed:            true,
-				MarkdownDescription: apiDescIPs,
-				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()}, // maintain across updates
+			// A set because the API returns these in arbitrary order.
+			"listen_ports_and_backends": schema.SetNestedAttribute{
+				Required:            true,
+				MarkdownDescription: apiDescListenPortsAndBackends,
 				NestedObject: schema.NestedAttributeObject{
-					PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 					Attributes: map[string]schema.Attribute{
-						"public_ipv4": schema.SingleNestedAttribute{
-							Computed: true,
-							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{
-									Computed:            true,
-									MarkdownDescription: apiDescPublicIPv4ID,
-									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-								},
-								"address": schema.StringAttribute{
-									Computed:            true,
-									MarkdownDescription: apiDescPublicIPv4Address,
-									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-								},
-								"type": schema.StringAttribute{
-									Computed:            true,
-									MarkdownDescription: apiDescPublicIPv4Type,
-								},
-							},
-							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+						"listen_port": schema.Int64Attribute{
+							Required:            true,
+							MarkdownDescription: apiDescListenPort,
+							Validators:          []validator.Int64{int64validator.Between(1, maxPort)},
 						},
-						"private_ipv4": schema.SingleNestedAttribute{
-							Computed: true,
-							Attributes: map[string]schema.Attribute{
-								"address": schema.StringAttribute{
-									Computed:            true,
-									MarkdownDescription: apiDescPrivateIPv4Address,
+						"backends": schema.SetNestedAttribute{
+							Required:            true,
+							MarkdownDescription: apiDescBackends,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"ip": schema.StringAttribute{
+										Required:            true,
+										MarkdownDescription: apiDescBackendIP + " " + providerDescBackendIP,
+									},
+									"port": schema.Int64Attribute{
+										Required:            true,
+										MarkdownDescription: apiDescBackendPort,
+										Validators:          []validator.Int64{int64validator.Between(1, maxPort)},
+									},
 								},
 							},
-							PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
 						},
 					},
 				},
 			},
-			"health_check": schema.SingleNestedAttribute{
-				Optional:      true,
-				Computed:      true,
-				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()}, // maintain across updates
+			"health_check_options": schema.SingleNestedAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: providerDescHealthCheckOptions,
+				PlanModifiers:       []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 				Attributes: map[string]schema.Attribute{
-					"timeout": schema.StringAttribute{
-						Computed:            true,
+					"timeout": schema.Int64Attribute{
+						Required:            true,
 						MarkdownDescription: apiDescHealthCheckTimeout,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Validators:          []validator.Int64{int64validator.AtLeast(1)},
 					},
-					"port": schema.StringAttribute{
-						Computed:            true,
-						MarkdownDescription: apiDescHealthCheckPort,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-					},
-					"interval": schema.StringAttribute{
-						Computed:            true,
+					"interval": schema.Int64Attribute{
+						Required:            true,
 						MarkdownDescription: apiDescHealthCheckInterval,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Validators:          []validator.Int64{int64validator.AtLeast(1)},
 					},
-					"success_count": schema.StringAttribute{
-						Computed:            true,
+					"success_count": schema.Int64Attribute{
+						Required:            true,
 						MarkdownDescription: apiDescHealthCheckSuccessCount,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Validators:          []validator.Int64{int64validator.AtLeast(1)},
 					},
-					"failure_count": schema.StringAttribute{
-						Computed:            true,
+					"failure_count": schema.Int64Attribute{
+						Required:            true,
 						MarkdownDescription: apiDescHealthCheckFailureCount,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+						Validators:          []validator.Int64{int64validator.AtLeast(1)},
 					},
 				},
 			},
@@ -259,13 +198,37 @@ func (r *loadBalancerResource) Schema(ctx context.Context, req resource.SchemaRe
 func (r *loadBalancerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resourceID, projectID, errMsg := common.ParseResourceIdentifiers(req, r.client, "load_balancer_id")
 	if errMsg != "" {
-		resp.Diagnostics.AddError("Failed to import Load Balancer", errMsg)
+		resp.Diagnostics.AddError("Failed to import load balancer", errMsg)
 
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), resourceID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), projectID)...)
+}
+
+// readInto fetches the load balancer and maps it into state. Returns false if the resource is
+// gone, so callers can drop it from state.
+func (r *loadBalancerResource) readInto(ctx context.Context, projectID, loadBalancerID string,
+	state *loadBalancerResourceModel, diags *diag.Diagnostics,
+) (found bool) {
+	loadBalancer, httpResp, err := r.client.APIClient.LoadBalancersApi.GetExternalLoadBalancer(ctx, projectID, loadBalancerID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
+	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+		return false
+	}
+	if err != nil {
+		diags.AddError("Failed to get load balancer",
+			fmt.Sprintf("Fetching load balancer failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
+
+		return false
+	}
+
+	loadBalancerToResourceModel(ctx, &loadBalancer, state, diags)
+
+	return true
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -275,65 +238,21 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	postReq := swagger.LoadBalancersPostRequest{
-		Algorithm: plan.Algorithm.ValueString(),
-		Location:  plan.Location.ValueString(),
-		Name:      plan.Name.ValueString(),
+	postReq := swagger.ExternalLoadBalancerPostRequest{
+		Name:                   plan.Name.ValueString(),
+		Location:               plan.Location.ValueString(),
+		Protocol:               plan.Protocol.ValueString(),
+		VpcId:                  plan.VPCID.ValueString(),
+		ListenPortsAndBackends: listenPortsAndBackendsToSwagger(ctx, plan.ListenPortsAndBackends, &resp.Diagnostics),
+		HealthCheckOptions:     healthCheckOptionsToSwagger(ctx, plan.HealthCheckOptions, &resp.Diagnostics),
 	}
-
-	// network interfaces
-	tNetworkInterfaces := make([]loadBalancerNetworkInterfaceModel, 0, len(plan.NetworkInterfaces.Elements()))
-	diags := plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
-	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	networkInterfaces := make([]swagger.LoadBalancerNetworkInterface, 0, len(tNetworkInterfaces))
-	for _, n := range tNetworkInterfaces {
-		networkInterfaces = append(networkInterfaces, swagger.LoadBalancerNetworkInterface{
-			Network: n.Network.ValueString(),
-			Subnet:  n.Subnet.ValueString(),
-		})
-	}
-	postReq.NetworkInterfaces = networkInterfaces
-
-	// destinations
-	tDestinations := make([]loadBalancerNetworkTargetModel, 0, len(plan.Destinations.Elements()))
-	diags = plan.Destinations.ElementsAs(ctx, &tDestinations, true)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	destinations := make([]swagger.NetworkTarget, 0, len(tDestinations))
-	for _, d := range tDestinations {
-		destinations = append(destinations, swagger.NetworkTarget{
-			Cidr:       d.Cidr.ValueString(),
-			ResourceId: d.ResourceID.ValueString(),
-		})
-	}
-	postReq.Destinations = destinations
-
-	// health check
-	postReq.HealthCheck = healthCheckToSwagger(ctx, plan.HealthCheck, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// protocols
-	protocols := make([]string, 0, len(plan.Protocols.Elements()))
-	diags = plan.Protocols.ElementsAs(ctx, &protocols, true)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	postReq.Protocols = protocols
-
-	// project id
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
-	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.CreateLoadBalancer(ctx, postReq, projectID)
+	dataResp, httpResp, err := r.client.APIClient.LoadBalancersApi.CreateExternalLoadBalancer(ctx, postReq, projectID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
@@ -344,19 +263,32 @@ func (r *loadBalancerResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](
-		ctx, dataResp.Operation, projectID, r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation)
+	created, _, err := common.AwaitOperationAndResolve[swagger.ExternalLoadBalancer](
+		ctx, dataResp.Operation, projectID, r.client.APIClient.LoadBalancerOperationsApi.GetExternalLoadBalancerOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create load balancer",
 			fmt.Sprintf("There was an error creating a load balancer: %s", common.UnpackAPIError(err)))
 
 		return
 	}
+	if created == nil || created.Id == "" {
+		resp.Diagnostics.AddError("Failed to create load balancer", errMissingCreateResult.Error())
 
-	loadBalancerUpdateTerraformState(ctx, loadBalancer, &plan)
-	plan.ProjectID = types.StringValue(projectID)
+		return
+	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	// The operation result omits location and vip, so state is mapped from a follow-up read.
+	found := r.readInto(ctx, projectID, created.Id, &plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.Diagnostics.AddError("Failed to create load balancer", "Load balancer was not found after creation.")
+
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -368,26 +300,13 @@ func (r *loadBalancerResource) Read(ctx context.Context, req resource.ReadReques
 
 	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
 
-	loadBalancer, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.GetLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
-	if httpResp != nil {
-		defer httpResp.Body.Close()
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to get load balancer",
-			fmt.Sprintf("Fetching load balancer failed: %s\n\nIf the problem persists, contact support@crusoecloud.com", common.UnpackAPIError(err)))
+	if !r.readInto(ctx, projectID, state.ID.ValueString(), &state, &resp.Diagnostics) {
+		if !resp.Diagnostics.HasError() {
+			resp.State.RemoveResource(ctx)
+		}
 
 		return
 	}
-
-	if httpResp.StatusCode == http.StatusNotFound {
-		// Load balancer has most likely been deleted out of band, so we update Terraform state to match
-		resp.State.RemoveResource(ctx)
-
-		return
-	}
-
-	state.ProjectID = types.StringValue(projectID)
-	loadBalancerUpdateTerraformState(ctx, &loadBalancer, &state)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -404,51 +323,31 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	patchReq := swagger.LoadBalancersPatchRequestV1{}
-	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
-		patchReq.Name = plan.Name.ValueString()
+	patchReq := swagger.ExternalLoadBalancerPatchRequest{
+		ListenPortsAndBackends: listenPortsAndBackendsToSwagger(ctx, plan.ListenPortsAndBackends, &resp.Diagnostics),
+		HealthCheckOptions:     healthCheckOptionsToSwagger(ctx, plan.HealthCheckOptions, &resp.Diagnostics),
 	}
-
-	if !plan.Destinations.IsNull() && !plan.Destinations.IsUnknown() {
-		tDestinations := make([]loadBalancerNetworkTargetModel, 0, len(plan.Destinations.Elements()))
-		diags := plan.Destinations.ElementsAs(ctx, &tDestinations, true)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-		destinations := make([]swagger.NetworkTarget, 0, len(tDestinations))
-		for _, d := range tDestinations {
-			destinations = append(destinations, swagger.NetworkTarget{
-				Cidr:       d.Cidr.ValueString(),
-				ResourceId: d.ResourceID.ValueString(),
-			})
-		}
-		patchReq.Destinations = destinations
-	}
-
-	patchReq.HealthCheck = healthCheckToSwagger(ctx, plan.HealthCheck, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.PatchLoadBalancer(ctx,
-		patchReq,
-		plan.ProjectID.ValueString(),
-		plan.ID.ValueString(),
-	)
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
+	loadBalancerID := state.ID.ValueString()
+
+	dataResp, httpResp, err := r.client.APIClient.LoadBalancersApi.UpdateExternalLoadBalancer(ctx, patchReq, projectID, loadBalancerID)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update load balancer",
-			fmt.Sprintf("There was an error starting an update load balancer operation: %s.\n\n", common.UnpackAPIError(err)))
+			fmt.Sprintf("There was an error starting an update load balancer operation: %s", common.UnpackAPIError(err)))
 
 		return
 	}
 
-	loadBalancer, _, err := common.AwaitOperationAndResolve[swagger.LoadBalancer](ctx, dataResp.Operation, plan.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
-	})
+	// The update operation carries an empty result, so state is mapped from a follow-up read.
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, projectID,
+		r.client.APIClient.LoadBalancerOperationsApi.GetExternalLoadBalancerOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update load balancer",
 			fmt.Sprintf("There was an error updating the load balancer: %s.\n\n", common.UnpackAPIError(err)))
@@ -456,9 +355,15 @@ func (r *loadBalancerResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	loadBalancerUpdateTerraformState(ctx, loadBalancer, &plan)
+	if !r.readInto(ctx, projectID, loadBalancerID, &plan, &resp.Diagnostics) || resp.Diagnostics.HasError() {
+		if !resp.Diagnostics.HasError() {
+			resp.Diagnostics.AddError("Failed to update load balancer", "Load balancer was not found after update.")
+		}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -468,7 +373,9 @@ func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	dataResp, httpResp, err := r.client.APIClient.InternalLoadBalancersApi.DeleteLoadBalancer(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
+	projectID := common.GetProjectIDOrFallback(r.client, state.ProjectID.ValueString())
+
+	dataResp, httpResp, err := r.client.APIClient.LoadBalancersApi.DeleteExternalLoadBalancer(ctx, projectID, state.ID.ValueString())
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
@@ -479,13 +386,10 @@ func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	_, err = common.AwaitOperation(ctx, dataResp.Operation, state.ProjectID.ValueString(), func(ctx context.Context, projectID string, opID string) (swagger.Operation, *http.Response, error) {
-		return r.client.APIClient.InternalLoadBalancerOperationsApi.GetNetworkingLoadBalancersOperation(ctx, projectID, opID)
-	})
+	_, err = common.AwaitOperation(ctx, dataResp.Operation, projectID,
+		r.client.APIClient.LoadBalancerOperationsApi.GetExternalLoadBalancerOperation)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to delete load balancer",
 			fmt.Sprintf("There was an error deleting a load balancer: %s", common.UnpackAPIError(err)))
-
-		return
 	}
 }

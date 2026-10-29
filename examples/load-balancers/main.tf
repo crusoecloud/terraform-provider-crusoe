@@ -67,32 +67,23 @@ resource "crusoe_compute_instance" "my_vms" {
   ssh_key = local.my_ssh_key
 }
 
-# Create a subnet for the load balancer
-resource "crusoe_vpc_subnet" "my_lb_subnet" {
-  name       = "${var.name_prefix}lb-subnet"
-  cidr       = "10.1.0.0/18"
-  location   = var.vm.location
-  network    = crusoe_vpc_network.my_vpc_network.id
-  depends_on = [crusoe_vpc_subnet.my_vm_subnet]
-}
-
-# Create a load balancer in the new subnet
+# Create a load balancer fronting the VMs. An external load balancer attaches to the
+# VPC network, and its backends are the private IPs of existing VMs.
 resource "crusoe_load_balancer" "my_load_balancer" {
-  name      = "${var.name_prefix}lb"
-  algorithm = "random"
-  destinations = [
+  name     = "${var.name_prefix}lb"
+  location = var.vm.location
+  protocol = "tcp"
+  vpc_id   = crusoe_vpc_network.my_vpc_network.id
+
+  listen_ports_and_backends = [
     {
-      resource_id = crusoe_compute_instance.my_vms[0].id
-    },
-    {
-      resource_id = crusoe_compute_instance.my_vms[1].id
-    }
-  ]
-  location  = var.vm.location
-  protocols = ["tcp"]
-  network_interfaces = [
-    {
-      subnet = crusoe_vpc_subnet.my_lb_subnet.id
+      listen_port = 80
+      backends = [
+        for vm in crusoe_compute_instance.my_vms : {
+          ip   = vm.network_interfaces[0].private_ipv4.address
+          port = 80
+        }
+      ]
     }
   ]
 }

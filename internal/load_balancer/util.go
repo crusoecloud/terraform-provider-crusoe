@@ -2,6 +2,7 @@ package load_balancer
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -12,92 +13,216 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
 )
 
-// apiDesc* — schema descriptions derived from the client-go swagger spec (LoadBalancer,
-// plus the nested LoadBalancerNetworkInterface, NetworkTarget, HealthCheckOptions,
-// PublicIpv4Address, and PrivateIpv4Address models).
+// apiDesc* — schema descriptions derived from the client-go swagger spec (ExternalLoadBalancer,
+// plus the nested ListenPortAndBackend, Backend, and HealthCheckOptionsExternalLB models).
 const (
-	apiDescID           = "ID of the load balancer."
-	apiDescName         = "Name of the load balancer."
-	apiDescLocation     = "Location of the load balancer."
-	apiDescAlgorithm    = "Load balancing algorithm used to distribute traffic across destinations (for example, `random`)."
-	apiDescType         = "Type of the load balancer (for example, `internal_ipv4`)."
-	apiDescProtocols    = "Network protocols the load balancer handles. Possible values: `tcp`, `udp`."
-	apiDescDestinations = "Backend targets the load balancer forwards traffic to, given as CIDR blocks or resource IDs."
-	apiDescIPs          = "IP addresses assigned to the load balancer."
+	apiDescID       = "ID of the External Load Balancer."
+	apiDescName     = "Name of the External Load Balancer."
+	apiDescLocation = "Location of the External Load Balancer."
+	apiDescProtocol = "Protocol of the External Load Balancer."
+	apiDescVIP      = "Virtual IP (VIP) of the External Load Balancer."
+	apiDescVPCID    = "ID of the VPC network this External Load Balancer belongs to."
 
-	// network_interfaces + nested (LoadBalancerNetworkInterface). The json tags are
-	// literally `network`/`subnet`, but the spec describes each as an ID.
-	apiDescNetworkInterfaces = "Network interfaces the load balancer is attached to."
-	apiDescNetwork           = "ID of the VPC network for the interface."
-	apiDescSubnet            = "ID of the subnet for the interface."
+	apiDescListenPortsAndBackends = "Listen ports and backends configuration."
+	apiDescListenPort             = "Port on which the load balancer listens."
+	apiDescBackends               = "List of backend configurations."
+	apiDescBackendIP              = "IP address of the backend server."
+	apiDescBackendPort            = "Port on which the backend server listens."
 
-	// destinations nested (NetworkTarget).
-	apiDescCidr       = "CIDR block, or an IP address that is converted to a CIDR. Mutually exclusive with resource_id."
-	apiDescResourceID = "ID of a backend resource. Mutually exclusive with cidr."
-
-	// ips nested public_ipv4 (PublicIpv4Address) and private_ipv4 (PrivateIpv4Address)
-	// leaf attributes.
-	apiDescPublicIPv4Address  = "Public IPv4 address."
-	apiDescPublicIPv4ID       = "ID of the public IPv4 address."
-	apiDescPublicIPv4Type     = "Allocation type of the public IPv4 address (for example, `dynamic`)."
-	apiDescPrivateIPv4Address = "Private IPv4 address."
-
-	// health_check nested (HealthCheckOptions).
-	apiDescHealthCheckTimeout      = "Timeout for a health check response, in seconds."
-	apiDescHealthCheckPort         = "Port on which to perform health checks."
-	apiDescHealthCheckInterval     = "Interval between health checks, in seconds."
-	apiDescHealthCheckSuccessCount = "Number of successful checks required to consider a backend healthy."
-	apiDescHealthCheckFailureCount = "Number of allowed failures before considering a backend unhealthy."
+	apiDescHealthCheckTimeout      = "Timeout for health check responses (in seconds)."
+	apiDescHealthCheckInterval     = "Interval between health checks (in seconds)."
+	apiDescHealthCheckSuccessCount = "Number of successful checks required to consider the backend healthy."
+	apiDescHealthCheckFailureCount = "Number of allowed failures before considering the backend unhealthy."
 )
 
 // providerDesc* — provider-specific schema descriptions (Terraform-side; not from the spec).
 const (
-	// The LoadBalancer read model has no project_id property, so the base text is
-	// provider-authored here rather than sourced from the spec.
-	providerDescProjectID     = "ID of the project the load balancer belongs to. " + project.ProviderDescProjectIDFallback
-	providerDescLoadBalancers = "List of load balancers in the project."
+	providerDescProjectID = "ID of the project the External Load Balancer belongs to. " +
+		project.ProviderDescProjectIDFallback
+	providerDescProtocol           = "Possible values: `tcp`, `udp`."
+	providerDescHealthCheckOptions = "Populated by the API when not specified."
+	providerDescBackendIP          = "Must be the private IP of an existing VM in the project."
 )
 
-var loadBalancerNetworkInterfaceSchema = types.ObjectType{
+const protocolPrefix = "LOAD_BALANCER_PROTOCOL_"
+
+var backendObjectType = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"network": types.StringType,
-		"subnet":  types.StringType,
+		"ip":   types.StringType,
+		"port": types.Int64Type,
 	},
 }
 
-var loadBalancerNetworkTargetSchema = types.ObjectType{
+var listenPortAndBackendObjectType = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"cidr":        types.StringType,
-		"resource_id": types.StringType,
+		"listen_port": types.Int64Type,
+		"backends":    types.SetType{ElemType: backendObjectType},
 	},
 }
 
-var loadBalancerIPAddressSchema = types.ObjectType{
+var healthCheckOptionsObjectType = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"private_ipv4": types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"address": types.StringType,
-			},
-		},
-		"public_ipv4": types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"id":      types.StringType,
-				"address": types.StringType,
-				"type":    types.StringType,
-			},
-		},
+		"timeout":       types.Int64Type,
+		"interval":      types.Int64Type,
+		"success_count": types.Int64Type,
+		"failure_count": types.Int64Type,
 	},
 }
 
-var loadBalancerHealthCheckSchema = types.ObjectType{
-	AttrTypes: map[string]attr.Type{
-		"timeout":       types.StringType,
-		"port":          types.StringType,
-		"interval":      types.StringType,
-		"success_count": types.StringType,
-		"failure_count": types.StringType,
-	},
+// shortProtocol converts the API's fully-qualified protocol into the short form used in
+// configuration, matching what the crusoe CLI accepts.
+func shortProtocol(protocol string) string {
+	upper := strings.ToUpper(strings.TrimSpace(protocol))
+
+	return strings.ToLower(strings.TrimPrefix(upper, protocolPrefix))
 }
+
+func listenPortsAndBackendsToResourceModel(ctx context.Context, items []swagger.ListenPortAndBackend,
+) (result types.Set, diags diag.Diagnostics) {
+	entries := make([]listenPortAndBackendResourceModel, 0, len(items))
+	for _, item := range items {
+		backends := make([]backendResourceModel, 0, len(item.Backends))
+		for _, backend := range item.Backends {
+			backends = append(backends, backendResourceModel{
+				IP:   types.StringValue(backend.Ip),
+				Port: types.Int64Value(backend.Port),
+			})
+		}
+
+		backendSet, backendDiags := types.SetValueFrom(ctx, backendObjectType, backends)
+		diags.Append(backendDiags...)
+
+		entries = append(entries, listenPortAndBackendResourceModel{
+			ListenPort: types.Int64Value(item.ListenPort),
+			Backends:   backendSet,
+		})
+	}
+
+	result, setDiags := types.SetValueFrom(ctx, listenPortAndBackendObjectType, entries)
+	diags.Append(setDiags...)
+
+	return result, diags
+}
+
+// listenPortsAndBackendsToSwagger decodes the attribute into a request payload. The attribute
+// must be decoded into the tfsdk-tagged model first — the swagger types only have json tags,
+// so decoding straight into them silently yields empty structs.
+func listenPortsAndBackendsToSwagger(ctx context.Context, set types.Set, diags *diag.Diagnostics,
+) []swagger.ListenPortAndBackend {
+	if set.IsNull() || set.IsUnknown() {
+		return nil
+	}
+
+	var entries []listenPortAndBackendResourceModel
+	diags.Append(set.ElementsAs(ctx, &entries, false)...)
+
+	items := make([]swagger.ListenPortAndBackend, 0, len(entries))
+	for _, entry := range entries {
+		var backendModels []backendResourceModel
+		if !entry.Backends.IsNull() && !entry.Backends.IsUnknown() {
+			diags.Append(entry.Backends.ElementsAs(ctx, &backendModels, false)...)
+		}
+
+		backends := make([]swagger.Backend, 0, len(backendModels))
+		for _, backend := range backendModels {
+			backends = append(backends, swagger.Backend{
+				Ip:   backend.IP.ValueString(),
+				Port: backend.Port.ValueInt64(),
+			})
+		}
+
+		items = append(items, swagger.ListenPortAndBackend{
+			ListenPort: entry.ListenPort.ValueInt64(),
+			Backends:   backends,
+		})
+	}
+
+	return items
+}
+
+func healthCheckOptionsToSwagger(ctx context.Context, obj types.Object, diags *diag.Diagnostics,
+) *swagger.HealthCheckOptionsExternalLb {
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil
+	}
+
+	var model healthCheckOptionsResourceModel
+	diags.Append(obj.As(ctx, &model, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return nil
+	}
+
+	return &swagger.HealthCheckOptionsExternalLb{
+		Timeout:      model.Timeout.ValueInt64(),
+		Interval:     model.Interval.ValueInt64(),
+		SuccessCount: model.SuccessCount.ValueInt64(),
+		FailureCount: model.FailureCount.ValueInt64(),
+	}
+}
+
+func healthCheckOptionsToResourceModel(ctx context.Context, options *swagger.HealthCheckOptionsExternalLb,
+) (types.Object, diag.Diagnostics) {
+	if options == nil {
+		return types.ObjectNull(healthCheckOptionsObjectType.AttrTypes), nil
+	}
+
+	return types.ObjectValueFrom(ctx, healthCheckOptionsObjectType.AttrTypes, healthCheckOptionsResourceModel{
+		Timeout:      types.Int64Value(options.Timeout),
+		Interval:     types.Int64Value(options.Interval),
+		SuccessCount: types.Int64Value(options.SuccessCount),
+		FailureCount: types.Int64Value(options.FailureCount),
+	})
+}
+
+// loadBalancerToResourceModel maps a GET response into Terraform state.
+func loadBalancerToResourceModel(ctx context.Context, lb *swagger.ExternalLoadBalancer,
+	state *loadBalancerResourceModel, diags *diag.Diagnostics,
+) {
+	state.ID = types.StringValue(lb.Id)
+	state.ProjectID = types.StringValue(lb.ProjectId)
+	state.Name = types.StringValue(lb.Name)
+	state.Location = types.StringValue(lb.Location)
+	state.VPCID = types.StringValue(lb.VpcId)
+	state.Protocol = types.StringValue(shortProtocol(lb.Protocol))
+	state.VIP = types.StringValue(lb.Vip)
+
+	listenPorts, listenDiags := listenPortsAndBackendsToResourceModel(ctx, lb.ListenPortsAndBackends)
+	diags.Append(listenDiags...)
+	state.ListenPortsAndBackends = listenPorts
+
+	healthCheck, healthDiags := healthCheckOptionsToResourceModel(ctx, lb.HealthCheckOptions)
+	diags.Append(healthDiags...)
+	state.HealthCheckOptions = healthCheck
+}
+
+// ilbDesc* and the loadBalancer*ToTerraformDataModel helpers below still serve the internal
+// load balancer data source. They are removed in the follow-up MR that repoints it.
+const (
+	ilbDescID                      = "ID of the load balancer."
+	ilbDescName                    = "Name of the load balancer."
+	ilbDescLocation                = "Location of the load balancer."
+	ilbDescHealthCheckTimeout      = "Timeout for a health check response, in seconds."
+	ilbDescHealthCheckInterval     = "Interval between health checks, in seconds."
+	ilbDescHealthCheckSuccessCount = "Number of successful checks required to consider a backend healthy."
+	ilbDescHealthCheckFailureCount = "Number of allowed failures before considering a backend unhealthy."
+
+	ilbDescAlgorithm          = "Load balancing algorithm used to distribute traffic across destinations (for example, `random`)."
+	ilbDescType               = "Type of the load balancer (for example, `internal_ipv4`)."
+	ilbDescProtocols          = "Network protocols the load balancer handles. Possible values: `tcp`, `udp`."
+	ilbDescDestinations       = "Backend targets the load balancer forwards traffic to, given as CIDR blocks or resource IDs."
+	ilbDescIPs                = "IP addresses assigned to the load balancer."
+	ilbDescNetworkInterfaces  = "Network interfaces the load balancer is attached to."
+	ilbDescNetwork            = "ID of the VPC network for the interface."
+	ilbDescSubnet             = "ID of the subnet for the interface."
+	ilbDescCidr               = "CIDR block, or an IP address that is converted to a CIDR. Mutually exclusive with resource_id."
+	ilbDescResourceID         = "ID of a backend resource. Mutually exclusive with cidr."
+	ilbDescPublicIPv4Address  = "Public IPv4 address."
+	ilbDescPrivateIPv4Address = "Private IPv4 address."
+	ilbDescHealthCheckPort    = "Port on which to perform health checks."
+
+	ilbProviderDescProjectID     = "ID of the project the load balancer belongs to. " + project.ProviderDescProjectIDFallback
+	ilbProviderDescLoadBalancers = "List of load balancers in the project."
+)
 
 func loadBalancerNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.LoadBalancerNetworkInterface,
 ) (lbNetworkInterfaces []networkInterfaceModel) {
@@ -136,106 +261,4 @@ func loadBalancerIPsToTerraformDataModel(ips []swagger.IpAddresses,
 	}
 
 	return lbIPs
-}
-
-func loadBalancerNetworkInterfacesToTerraformResourceModel(networkInterfaces []swagger.LoadBalancerNetworkInterface,
-) (lbNetworkInterfaces types.List, diags diag.Diagnostics) {
-	interfaces := make([]loadBalancerNetworkInterfaceModel, 0, len(networkInterfaces))
-	for _, networkInterface := range networkInterfaces {
-		interfaces = append(interfaces, loadBalancerNetworkInterfaceModel{
-			Network: types.StringValue(networkInterface.Network),
-			Subnet:  types.StringValue(networkInterface.Subnet),
-		})
-	}
-
-	lbNetworkInterfaces, diags = types.ListValueFrom(context.Background(), loadBalancerNetworkInterfaceSchema, interfaces)
-
-	return lbNetworkInterfaces, diags
-}
-
-func loadBalancerDestinationsToTerraformResourceModel(networkTargets []swagger.NetworkTarget,
-) (destinations types.List, diags diag.Diagnostics) {
-	lbNetworkTargets := make([]loadBalancerNetworkTargetModel, 0, len(networkTargets))
-	for _, networkTarget := range networkTargets {
-		lbNetworkTargets = append(lbNetworkTargets, loadBalancerNetworkTargetModel{
-			Cidr:       types.StringValue(networkTarget.Cidr),
-			ResourceID: types.StringValue(networkTarget.ResourceId),
-		})
-	}
-
-	destinations, diags = types.ListValueFrom(context.Background(), loadBalancerNetworkTargetSchema, lbNetworkTargets)
-
-	return destinations, diags
-}
-
-func loadBalancerIPsToTerraformResourceModel(ips []swagger.IpAddresses,
-) (lbIPs types.List, diags diag.Diagnostics) {
-	ipList := make([]loadBalancerIPAddressModel, 0, len(ips))
-	for _, ipAddress := range ips {
-		ipList = append(ipList, loadBalancerIPAddressModel{
-			PublicIpv4: loadBalancerPublicIPv4ResourceModel{
-				ID:      types.StringValue(ipAddress.PublicIpv4.Id),
-				Address: types.StringValue(ipAddress.PublicIpv4.Address),
-				Type:    types.StringValue(ipAddress.PublicIpv4.Type_),
-			},
-			PrivateIPv4: types.ObjectValueMust(
-				map[string]attr.Type{"address": types.StringType},
-				map[string]attr.Value{"address": types.StringValue(ipAddress.PrivateIpv4.Address)},
-			),
-		})
-	}
-
-	lbIPs, diags = types.ListValueFrom(context.Background(), loadBalancerIPAddressSchema, ipList)
-
-	return lbIPs, diags
-}
-
-func loadBalancerHealthCheckToTerraformResourceModel(healthCheck *swagger.HealthCheckOptions,
-) (lbHealthCheck *healthCheckOptionsResourceModel) {
-	lbHealthCheck = &healthCheckOptionsResourceModel{
-		Timeout:      types.StringValue(healthCheck.Timeout),
-		Port:         types.StringValue(healthCheck.Port),
-		Interval:     types.StringValue(healthCheck.Interval),
-		SuccessCount: types.StringValue(healthCheck.SuccessCount),
-		FailureCount: types.StringValue(healthCheck.FailureCount),
-	}
-
-	return lbHealthCheck
-}
-
-// healthCheckToSwagger decodes the health_check object attribute into a swagger
-// HealthCheckOptions request payload, returning nil when it is null or unknown.
-// The attribute must be decoded into the tfsdk-tagged resource model first — the
-// swagger type only has json tags, so decoding directly into it silently yields an
-// empty struct.
-func healthCheckToSwagger(ctx context.Context, obj types.Object, diags *diag.Diagnostics) *swagger.HealthCheckOptions {
-	if obj.IsNull() || obj.IsUnknown() {
-		return nil
-	}
-
-	var model healthCheckOptionsResourceModel
-	diags.Append(obj.As(ctx, &model, basetypes.ObjectAsOptions{})...)
-
-	return &swagger.HealthCheckOptions{
-		Timeout:      model.Timeout.ValueString(),
-		Port:         model.Port.ValueString(),
-		Interval:     model.Interval.ValueString(),
-		SuccessCount: model.SuccessCount.ValueString(),
-		FailureCount: model.FailureCount.ValueString(),
-	}
-}
-
-func loadBalancerUpdateTerraformState(ctx context.Context, lb *swagger.LoadBalancer, state *loadBalancerResourceModel) {
-	state.ID = types.StringValue(lb.Id)
-	state.Name = types.StringValue(lb.Name)
-	state.Location = types.StringValue(lb.Location)
-	state.Algorithm = types.StringValue(lb.Algorithm)
-	state.Type = types.StringValue(lb.Type_)
-	state.Destinations, _ = loadBalancerDestinationsToTerraformResourceModel(lb.Destinations)
-	protocols, _ := types.ListValueFrom(context.Background(), types.StringType, lb.Protocols)
-	state.Protocols = protocols
-	networkInterfaces, _ := loadBalancerNetworkInterfacesToTerraformResourceModel(lb.NetworkInterfaces)
-	state.NetworkInterfaces = networkInterfaces
-	state.HealthCheck, _ = types.ObjectValueFrom(ctx, loadBalancerHealthCheckSchema.AttrTypes, loadBalancerHealthCheckToTerraformResourceModel(lb.HealthCheck))
-	state.IPs, _ = loadBalancerIPsToTerraformResourceModel(lb.Ips)
 }

@@ -38,24 +38,27 @@ resource "crusoe_compute_instance" "backend_b" {
   ]
 }
 
+# Backends are addressed by the private IP of an existing VM, so the load
+# balancer depends on the instances being created first.
 resource "crusoe_load_balancer" "example" {
-  name      = "my-load-balancer"
-  algorithm = "random"
-  location  = "us-east1-a"
-  protocols = ["tcp"]
+  name     = "my-load-balancer"
+  location = "us-east1-a"
+  protocol = "tcp"
+  vpc_id   = crusoe_vpc_network.example.id
 
-  destinations = [
+  listen_ports_and_backends = [
     {
-      resource_id = crusoe_compute_instance.backend_a.id
-    },
-    {
-      resource_id = crusoe_compute_instance.backend_b.id
-    }
-  ]
-
-  network_interfaces = [
-    {
-      subnet = crusoe_vpc_subnet.example.id
+      listen_port = 80
+      backends = [
+        {
+          ip   = crusoe_compute_instance.backend_a.network_interfaces[0].private_ipv4.address
+          port = 8080
+        },
+        {
+          ip   = crusoe_compute_instance.backend_b.network_interfaces[0].private_ipv4.address
+          port = 8080
+        }
+      ]
     }
   ]
 }
