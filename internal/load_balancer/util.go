@@ -1,7 +1,9 @@
 package load_balancer
 
 import (
+	"cmp"
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -16,18 +18,20 @@ import (
 // apiDesc* — schema descriptions derived from the client-go swagger spec (ExternalLoadBalancer,
 // plus the nested ListenPortAndBackend, Backend, and HealthCheckOptionsExternalLB models).
 const (
-	apiDescID       = "ID of the External Load Balancer."
-	apiDescName     = "Name of the External Load Balancer."
-	apiDescLocation = "Location of the External Load Balancer."
-	apiDescProtocol = "Protocol of the External Load Balancer."
-	apiDescVIP      = "Virtual IP (VIP) of the External Load Balancer."
-	apiDescVPCID    = "ID of the VPC network this External Load Balancer belongs to."
+	apiDescID        = "ID of the External Load Balancer."
+	apiDescName      = "Name of the External Load Balancer."
+	apiDescLocation  = "Location of the External Load Balancer."
+	apiDescProtocol  = "Protocol of the External Load Balancer."
+	apiDescVIP       = "Virtual IP (VIP) of the External Load Balancer."
+	apiDescVPCID     = "ID of the VPC network this External Load Balancer belongs to."
+	apiDescProjectID = "ID of the project this External Load Balancer belongs to."
 
 	apiDescListenPortsAndBackends = "Listen ports and backends configuration."
 	apiDescListenPort             = "Port on which the load balancer listens."
 	apiDescBackends               = "List of backend configurations."
 	apiDescBackendIP              = "IP address of the backend server."
 	apiDescBackendPort            = "Port on which the backend server listens."
+	apiDescBackendStatus          = "Status of the backend server."
 
 	apiDescHealthCheckTimeout      = "Timeout for health check responses (in seconds)."
 	apiDescHealthCheckInterval     = "Interval between health checks (in seconds)."
@@ -42,6 +46,10 @@ const (
 	providerDescProtocol           = "Possible values: `tcp`, `udp`."
 	providerDescHealthCheckOptions = "Populated by the API when not specified."
 	providerDescBackendIP          = "Must be the private IP of an existing VM in the project."
+	providerDescLoadBalancers      = "List of External Load Balancers in the project."
+	providerDescFilterLocation     = "Only return load balancers in this location."
+	providerDescFilterVPCNetworkID = "Only return load balancers in this VPC network."
+	providerDescFilterName         = "Only return load balancers with this name."
 )
 
 const protocolPrefix = "LOAD_BALANCER_PROTOCOL_"
@@ -195,70 +203,57 @@ func loadBalancerToResourceModel(ctx context.Context, lb *swagger.ExternalLoadBa
 	state.HealthCheckOptions = healthCheck
 }
 
-// ilbDesc* and the loadBalancer*ToTerraformDataModel helpers below still serve the internal
-// load balancer data source. They are removed in the follow-up MR that repoints it.
-const (
-	ilbDescID                      = "ID of the load balancer."
-	ilbDescName                    = "Name of the load balancer."
-	ilbDescLocation                = "Location of the load balancer."
-	ilbDescHealthCheckTimeout      = "Timeout for a health check response, in seconds."
-	ilbDescHealthCheckInterval     = "Interval between health checks, in seconds."
-	ilbDescHealthCheckSuccessCount = "Number of successful checks required to consider a backend healthy."
-	ilbDescHealthCheckFailureCount = "Number of allowed failures before considering a backend unhealthy."
-
-	ilbDescAlgorithm          = "Load balancing algorithm used to distribute traffic across destinations (for example, `random`)."
-	ilbDescType               = "Type of the load balancer (for example, `internal_ipv4`)."
-	ilbDescProtocols          = "Network protocols the load balancer handles. Possible values: `tcp`, `udp`."
-	ilbDescDestinations       = "Backend targets the load balancer forwards traffic to, given as CIDR blocks or resource IDs."
-	ilbDescIPs                = "IP addresses assigned to the load balancer."
-	ilbDescNetworkInterfaces  = "Network interfaces the load balancer is attached to."
-	ilbDescNetwork            = "ID of the VPC network for the interface."
-	ilbDescSubnet             = "ID of the subnet for the interface."
-	ilbDescCidr               = "CIDR block, or an IP address that is converted to a CIDR. Mutually exclusive with resource_id."
-	ilbDescResourceID         = "ID of a backend resource. Mutually exclusive with cidr."
-	ilbDescPublicIPv4Address  = "Public IPv4 address."
-	ilbDescPrivateIPv4Address = "Private IPv4 address."
-	ilbDescHealthCheckPort    = "Port on which to perform health checks."
-
-	ilbProviderDescProjectID     = "ID of the project the load balancer belongs to. " + project.ProviderDescProjectIDFallback
-	ilbProviderDescLoadBalancers = "List of load balancers in the project."
-)
-
-func loadBalancerNetworkInterfacesToTerraformDataModel(networkInterfaces []swagger.LoadBalancerNetworkInterface,
-) (lbNetworkInterfaces []networkInterfaceModel) {
-	interfaces := make([]networkInterfaceModel, 0, len(networkInterfaces))
-	for _, networkInterface := range networkInterfaces {
-		interfaces = append(interfaces, networkInterfaceModel{
-			Network: networkInterface.Network,
-			Subnet:  networkInterface.Subnet,
+// sortListenPortsAndBackends ensures deterministic ordering for data source state (CCX-4394).
+func sortListenPortsAndBackends(items []swagger.ListenPortAndBackend) {
+	slices.SortFunc(items, func(a, b swagger.ListenPortAndBackend) int {
+		return cmp.Compare(a.ListenPort, b.ListenPort)
+	})
+	for i := range items {
+		slices.SortFunc(items[i].Backends, func(a, b swagger.Backend) int {
+			return cmp.Or(strings.Compare(a.Ip, b.Ip), cmp.Compare(a.Port, b.Port))
 		})
 	}
-
-	return interfaces
 }
 
-func loadBalancerDestinationsToTerraformDataModel(destinations []swagger.NetworkTarget,
-) (lbDestinations []destinationModel) {
-	lbDestinations = make([]destinationModel, 0, len(destinations))
-	for _, destination := range destinations {
-		lbDestinations = append(lbDestinations, destinationModel{
-			Cidr:       destination.Cidr,
-			ResourceID: destination.ResourceId,
+func loadBalancerToDataModel(lb *swagger.ExternalLoadBalancer) loadBalancerModel {
+	sortListenPortsAndBackends(lb.ListenPortsAndBackends)
+
+	entries := make([]listenPortAndBackendModel, 0, len(lb.ListenPortsAndBackends))
+	for _, item := range lb.ListenPortsAndBackends {
+		backends := make([]backendModel, 0, len(item.Backends))
+		for _, backend := range item.Backends {
+			backends = append(backends, backendModel{
+				IP:     backend.Ip,
+				Port:   backend.Port,
+				Status: backend.Status,
+			})
+		}
+
+		entries = append(entries, listenPortAndBackendModel{
+			ListenPort: item.ListenPort,
+			Backends:   backends,
 		})
 	}
 
-	return lbDestinations
-}
-
-func loadBalancerIPsToTerraformDataModel(ips []swagger.IpAddresses,
-) (lbIPs []ipAddressesModel) {
-	lbIPs = make([]ipAddressesModel, 0, len(ips))
-	for _, ip := range ips {
-		lbIPs = append(lbIPs, ipAddressesModel{
-			PrivateIPv4: lbIPv4{Address: ip.PrivateIpv4.Address},
-			PublicIPv4:  lbIPv4{Address: ip.PublicIpv4.Address},
-		})
+	model := loadBalancerModel{
+		ID:                     lb.Id,
+		ProjectID:              lb.ProjectId,
+		Name:                   lb.Name,
+		Location:               lb.Location,
+		VPCID:                  lb.VpcId,
+		Protocol:               shortProtocol(lb.Protocol),
+		VIP:                    lb.Vip,
+		ListenPortsAndBackends: entries,
 	}
 
-	return lbIPs
+	if lb.HealthCheckOptions != nil {
+		model.HealthCheckOptions = &healthCheckOptionsModel{
+			Timeout:      lb.HealthCheckOptions.Timeout,
+			Interval:     lb.HealthCheckOptions.Interval,
+			SuccessCount: lb.HealthCheckOptions.SuccessCount,
+			FailureCount: lb.HealthCheckOptions.FailureCount,
+		}
+	}
+
+	return model
 }

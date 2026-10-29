@@ -21,81 +21,54 @@ data "crusoe_load_balancer" "example" {}
 
 ### Optional
 
-- `project_id` (String) ID of the project the load balancer belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `location` (String) Only return load balancers in this location.
+- `name` (String) Only return load balancers with this name.
+- `project_id` (String) ID of the project the External Load Balancer belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
+- `vpc_network_id` (String) Only return load balancers in this VPC network.
 
 ### Read-Only
 
-- `load_balancers` (Attributes List) List of load balancers in the project. (see [below for nested schema](#nestedatt--load_balancers))
+- `load_balancers` (Attributes List) List of External Load Balancers in the project. (see [below for nested schema](#nestedatt--load_balancers))
 
 <a id="nestedatt--load_balancers"></a>
 ### Nested Schema for `load_balancers`
 
 Read-Only:
 
-- `algorithm` (String) Load balancing algorithm used to distribute traffic across destinations (for example, `random`).
-- `destinations` (Attributes List) Backend targets the load balancer forwards traffic to, given as CIDR blocks or resource IDs. (see [below for nested schema](#nestedatt--load_balancers--destinations))
-- `health_check` (Attributes) (see [below for nested schema](#nestedatt--load_balancers--health_check))
-- `id` (String) ID of the load balancer.
-- `ips` (Attributes List) IP addresses assigned to the load balancer. (see [below for nested schema](#nestedatt--load_balancers--ips))
-- `location` (String) Location of the load balancer.
-- `name` (String) Name of the load balancer.
-- `network_interfaces` (Attributes List) Network interfaces the load balancer is attached to. (see [below for nested schema](#nestedatt--load_balancers--network_interfaces))
-- `protocols` (List of String) Network protocols the load balancer handles. Possible values: `tcp`, `udp`.
-- `type` (String) Type of the load balancer (for example, `internal_ipv4`).
+- `health_check_options` (Attributes) (see [below for nested schema](#nestedatt--load_balancers--health_check_options))
+- `id` (String) ID of the External Load Balancer.
+- `listen_ports_and_backends` (Attributes List) Listen ports and backends configuration. (see [below for nested schema](#nestedatt--load_balancers--listen_ports_and_backends))
+- `location` (String) Location of the External Load Balancer.
+- `name` (String) Name of the External Load Balancer.
+- `project_id` (String) ID of the project this External Load Balancer belongs to.
+- `protocol` (String) Protocol of the External Load Balancer. Possible values: `tcp`, `udp`.
+- `vip` (String) Virtual IP (VIP) of the External Load Balancer.
+- `vpc_id` (String) ID of the VPC network this External Load Balancer belongs to.
 
-<a id="nestedatt--load_balancers--destinations"></a>
-### Nested Schema for `load_balancers.destinations`
-
-Read-Only:
-
-- `cidr` (String) CIDR block, or an IP address that is converted to a CIDR. Mutually exclusive with resource_id.
-- `resource_id` (String) ID of a backend resource. Mutually exclusive with cidr.
-
-
-<a id="nestedatt--load_balancers--health_check"></a>
-### Nested Schema for `load_balancers.health_check`
+<a id="nestedatt--load_balancers--health_check_options"></a>
+### Nested Schema for `load_balancers.health_check_options`
 
 Read-Only:
 
-- `failure_count` (String) Number of allowed failures before considering a backend unhealthy.
-- `interval` (String) Interval between health checks, in seconds.
-- `port` (String) Port on which to perform health checks.
-- `success_count` (String) Number of successful checks required to consider a backend healthy.
-- `timeout` (String) Timeout for a health check response, in seconds.
+- `failure_count` (Number) Number of allowed failures before considering the backend unhealthy.
+- `interval` (Number) Interval between health checks (in seconds).
+- `success_count` (Number) Number of successful checks required to consider the backend healthy.
+- `timeout` (Number) Timeout for health check responses (in seconds).
 
 
-<a id="nestedatt--load_balancers--ips"></a>
-### Nested Schema for `load_balancers.ips`
-
-Optional:
-
-- `public_ipv4` (Attributes) (see [below for nested schema](#nestedatt--load_balancers--ips--public_ipv4))
+<a id="nestedatt--load_balancers--listen_ports_and_backends"></a>
+### Nested Schema for `load_balancers.listen_ports_and_backends`
 
 Read-Only:
 
-- `private_ipv4` (Attributes) (see [below for nested schema](#nestedatt--load_balancers--ips--private_ipv4))
+- `backends` (Attributes List) List of backend configurations. (see [below for nested schema](#nestedatt--load_balancers--listen_ports_and_backends--backends))
+- `listen_port` (Number) Port on which the load balancer listens.
 
-<a id="nestedatt--load_balancers--ips--public_ipv4"></a>
-### Nested Schema for `load_balancers.ips.public_ipv4`
-
-Read-Only:
-
-- `address` (String) Public IPv4 address.
-
-
-<a id="nestedatt--load_balancers--ips--private_ipv4"></a>
-### Nested Schema for `load_balancers.ips.private_ipv4`
+<a id="nestedatt--load_balancers--listen_ports_and_backends--backends"></a>
+### Nested Schema for `load_balancers.listen_ports_and_backends.backends`
 
 Read-Only:
 
-- `address` (String) Private IPv4 address.
-
-
-
-<a id="nestedatt--load_balancers--network_interfaces"></a>
-### Nested Schema for `load_balancers.network_interfaces`
-
-Read-Only:
-
-- `network` (String) ID of the VPC network for the interface.
-- `subnet` (String) ID of the subnet for the interface.
+- `ip` (String) IP address of the backend server.
+- `port` (Number) Port on which the backend server listens.
+- `status` (String) Status of the backend server.

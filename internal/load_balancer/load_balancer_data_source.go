@@ -3,10 +3,12 @@ package load_balancer
 import (
 	"context"
 
+	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -16,54 +18,46 @@ type loadBalancerDataSource struct {
 
 type loadBalancerDataSourceModel struct {
 	ProjectID     types.String        `tfsdk:"project_id"`
+	Location      types.String        `tfsdk:"location"`
+	VPCNetworkID  types.String        `tfsdk:"vpc_network_id"`
+	Name          types.String        `tfsdk:"name"`
 	LoadBalancers []loadBalancerModel `tfsdk:"load_balancers"`
 }
 
-type networkInterfaceModel struct {
-	Network string `tfsdk:"network"`
-	Subnet  string `tfsdk:"subnet"`
+type loadBalancerModel struct {
+	ID                     string                      `tfsdk:"id"`
+	ProjectID              string                      `tfsdk:"project_id"`
+	Name                   string                      `tfsdk:"name"`
+	Location               string                      `tfsdk:"location"`
+	VPCID                  string                      `tfsdk:"vpc_id"`
+	Protocol               string                      `tfsdk:"protocol"`
+	VIP                    string                      `tfsdk:"vip"`
+	ListenPortsAndBackends []listenPortAndBackendModel `tfsdk:"listen_ports_and_backends"`
+	HealthCheckOptions     *healthCheckOptionsModel    `tfsdk:"health_check_options"`
 }
 
-type destinationModel struct {
-	Cidr       string `tfsdk:"cidr"`
-	ResourceID string `tfsdk:"resource_id"`
+type listenPortAndBackendModel struct {
+	ListenPort int64          `tfsdk:"listen_port"`
+	Backends   []backendModel `tfsdk:"backends"`
 }
 
-type ipAddressesModel struct {
-	PrivateIPv4 lbIPv4 `tfsdk:"private_ipv4"`
-	PublicIPv4  lbIPv4 `tfsdk:"public_ipv4"`
-}
-
-type lbIPv4 struct {
-	Address string `tfsdk:"address"`
+type backendModel struct {
+	IP     string `tfsdk:"ip"`
+	Port   int64  `tfsdk:"port"`
+	Status string `tfsdk:"status"`
 }
 
 type healthCheckOptionsModel struct {
-	Timeout      string `tfsdk:"timeout"`
-	Port         string `tfsdk:"port"`
-	Interval     string `tfsdk:"interval"`
-	SuccessCount string `tfsdk:"success_count"`
-	FailureCount string `tfsdk:"failure_count"`
-}
-
-type loadBalancerModel struct {
-	ID                string                   `tfsdk:"id"`
-	Name              string                   `tfsdk:"name"`
-	NetworkInterfaces []networkInterfaceModel  `tfsdk:"network_interfaces"`
-	Destinations      []destinationModel       `tfsdk:"destinations"`
-	Location          string                   `tfsdk:"location"`
-	Protocols         []string                 `tfsdk:"protocols"`
-	Algorithm         string                   `tfsdk:"algorithm"`
-	Type              string                   `tfsdk:"type"`
-	IPs               []ipAddressesModel       `tfsdk:"ips"`
-	HealthCheck       *healthCheckOptionsModel `tfsdk:"health_check"`
+	Timeout      int64 `tfsdk:"timeout"`
+	Interval     int64 `tfsdk:"interval"`
+	SuccessCount int64 `tfsdk:"success_count"`
+	FailureCount int64 `tfsdk:"failure_count"`
 }
 
 func NewLoadBalancerDataSource() datasource.DataSource {
 	return &loadBalancerDataSource{}
 }
 
-// Configure adds the provider configured client to the data source.
 func (ds *loadBalancerDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -89,126 +83,111 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 	response.Schema = schema.Schema{
 		MarkdownDescription: common.DevelopmentMessage,
 		Attributes: map[string]schema.Attribute{
+			"project_id": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: providerDescProjectID,
+			},
+			"location": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: providerDescFilterLocation,
+			},
+			"vpc_network_id": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: providerDescFilterVPCNetworkID,
+			},
+			"name": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: providerDescFilterName,
+			},
 			"load_balancers": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: ilbProviderDescLoadBalancers,
+				MarkdownDescription: providerDescLoadBalancers,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: ilbDescID,
+							MarkdownDescription: apiDescID,
+						},
+						"project_id": schema.StringAttribute{
+							Computed:            true,
+							MarkdownDescription: apiDescProjectID,
 						},
 						"name": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: ilbDescName,
-						},
-						"network_interfaces": schema.ListNestedAttribute{
-							Computed:            true,
-							MarkdownDescription: ilbDescNetworkInterfaces,
-							NestedObject: schema.NestedAttributeObject{
-								Attributes: map[string]schema.Attribute{
-									"network": schema.StringAttribute{
-										Computed:            true,
-										MarkdownDescription: ilbDescNetwork,
-									},
-									"subnet": schema.StringAttribute{
-										Computed:            true,
-										MarkdownDescription: ilbDescSubnet,
-									},
-								},
-							},
-						},
-						"destinations": schema.ListNestedAttribute{
-							Computed:            true,
-							MarkdownDescription: ilbDescDestinations,
-							NestedObject: schema.NestedAttributeObject{
-								Attributes: map[string]schema.Attribute{
-									"cidr": schema.StringAttribute{
-										Computed:            true,
-										MarkdownDescription: ilbDescCidr,
-									},
-									"resource_id": schema.StringAttribute{
-										Computed:            true,
-										MarkdownDescription: ilbDescResourceID,
-									},
-								},
-							},
+							MarkdownDescription: apiDescName,
 						},
 						"location": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: ilbDescLocation,
+							MarkdownDescription: apiDescLocation,
 						},
-						"protocols": schema.ListAttribute{
-							ElementType:         types.StringType,
+						"vpc_id": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: ilbDescProtocols,
+							MarkdownDescription: apiDescVPCID,
 						},
-						"algorithm": schema.StringAttribute{
+						"protocol": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: ilbDescAlgorithm,
+							MarkdownDescription: apiDescProtocol + " " + providerDescProtocol,
 						},
-						"type": schema.StringAttribute{
+						"vip": schema.StringAttribute{
 							Computed:            true,
-							MarkdownDescription: ilbDescType,
+							MarkdownDescription: apiDescVIP,
 						},
-						"ips": schema.ListNestedAttribute{
+						"listen_ports_and_backends": schema.ListNestedAttribute{
 							Computed:            true,
-							MarkdownDescription: ilbDescIPs,
+							MarkdownDescription: apiDescListenPortsAndBackends,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
-									"public_ipv4": schema.SingleNestedAttribute{
-										Computed: true,
-										Optional: true,
-										Attributes: map[string]schema.Attribute{
-											"address": schema.StringAttribute{
-												Computed:            true,
-												MarkdownDescription: ilbDescPublicIPv4Address,
-											},
-										},
+									"listen_port": schema.Int64Attribute{
+										Computed:            true,
+										MarkdownDescription: apiDescListenPort,
 									},
-									"private_ipv4": schema.SingleNestedAttribute{
-										Computed: true,
-										Attributes: map[string]schema.Attribute{
-											"address": schema.StringAttribute{
-												Computed:            true,
-												MarkdownDescription: ilbDescPrivateIPv4Address,
+									"backends": schema.ListNestedAttribute{
+										Computed:            true,
+										MarkdownDescription: apiDescBackends,
+										NestedObject: schema.NestedAttributeObject{
+											Attributes: map[string]schema.Attribute{
+												"ip": schema.StringAttribute{
+													Computed:            true,
+													MarkdownDescription: apiDescBackendIP,
+												},
+												"port": schema.Int64Attribute{
+													Computed:            true,
+													MarkdownDescription: apiDescBackendPort,
+												},
+												"status": schema.StringAttribute{
+													Computed:            true,
+													MarkdownDescription: apiDescBackendStatus,
+												},
 											},
 										},
 									},
 								},
 							},
 						},
-						"health_check": schema.SingleNestedAttribute{
+						"health_check_options": schema.SingleNestedAttribute{
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
-								"timeout": schema.StringAttribute{
+								"timeout": schema.Int64Attribute{
 									Computed:            true,
-									MarkdownDescription: ilbDescHealthCheckTimeout,
+									MarkdownDescription: apiDescHealthCheckTimeout,
 								},
-								"port": schema.StringAttribute{
+								"interval": schema.Int64Attribute{
 									Computed:            true,
-									MarkdownDescription: ilbDescHealthCheckPort,
+									MarkdownDescription: apiDescHealthCheckInterval,
 								},
-								"interval": schema.StringAttribute{
+								"success_count": schema.Int64Attribute{
 									Computed:            true,
-									MarkdownDescription: ilbDescHealthCheckInterval,
+									MarkdownDescription: apiDescHealthCheckSuccessCount,
 								},
-								"success_count": schema.StringAttribute{
+								"failure_count": schema.Int64Attribute{
 									Computed:            true,
-									MarkdownDescription: ilbDescHealthCheckSuccessCount,
-								},
-								"failure_count": schema.StringAttribute{
-									Computed:            true,
-									MarkdownDescription: ilbDescHealthCheckFailureCount,
+									MarkdownDescription: apiDescHealthCheckFailureCount,
 								},
 							},
 						},
 					},
 				},
-			},
-			"project_id": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: ilbProviderDescProjectID,
 			},
 		},
 	}
@@ -217,44 +196,40 @@ func (ds *loadBalancerDataSource) Schema(ctx context.Context, request datasource
 //nolint:gocritic // Implements Terraform defined interface
 func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var config loadBalancerDataSourceModel
-	diags := req.Config.Get(ctx, &config)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	projectID := common.GetProjectIDOrFallback(ds.client, config.ProjectID.ValueString())
 
-	dataResp, httpResp, err := ds.client.APIClient.InternalLoadBalancersApi.ListLoadBalancers(ctx, projectID)
+	opts := &swagger.LoadBalancersApiListExternalLoadBalancersOpts{}
+	if !config.Location.IsNull() {
+		opts.Location = optional.NewString(config.Location.ValueString())
+	}
+	if !config.VPCNetworkID.IsNull() {
+		opts.VpcNetworkId = optional.NewString(config.VPCNetworkID.ValueString())
+	}
+	if !config.Name.IsNull() {
+		opts.Name = optional.NewString(config.Name.ValueString())
+	}
+
+	dataResp, httpResp, err := ds.client.APIClient.LoadBalancersApi.ListExternalLoadBalancers(ctx, projectID, opts)
 	if httpResp != nil {
 		defer httpResp.Body.Close()
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch load balancers", "Could not fetch load balancers data at this time.")
+		resp.Diagnostics.AddError("Failed to fetch load balancers",
+			"Could not fetch load balancers data at this time: "+common.UnpackAPIError(err).Error())
 
 		return
 	}
 
-	var state loadBalancerDataSourceModel
+	state := config
+	state.ProjectID = types.StringValue(projectID)
+	state.LoadBalancers = make([]loadBalancerModel, 0, len(dataResp.Items))
 	for i := range dataResp.Items {
-		state.LoadBalancers = append(state.LoadBalancers, loadBalancerModel{
-			ID:                dataResp.Items[i].Id,
-			Name:              dataResp.Items[i].Name,
-			NetworkInterfaces: loadBalancerNetworkInterfacesToTerraformDataModel(dataResp.Items[i].NetworkInterfaces),
-			Destinations:      loadBalancerDestinationsToTerraformDataModel(dataResp.Items[i].Destinations),
-			Location:          dataResp.Items[i].Location,
-			Protocols:         dataResp.Items[i].Protocols,
-			Algorithm:         dataResp.Items[i].Algorithm,
-			Type:              dataResp.Items[i].Type_,
-			IPs:               loadBalancerIPsToTerraformDataModel(dataResp.Items[i].Ips),
-			HealthCheck: &healthCheckOptionsModel{
-				Timeout:      dataResp.Items[i].HealthCheck.Timeout,
-				Port:         dataResp.Items[i].HealthCheck.Port,
-				Interval:     dataResp.Items[i].HealthCheck.Interval,
-				SuccessCount: dataResp.Items[i].HealthCheck.SuccessCount,
-				FailureCount: dataResp.Items[i].HealthCheck.FailureCount,
-			},
-		})
+		state.LoadBalancers = append(state.LoadBalancers, loadBalancerToDataModel(&dataResp.Items[i]))
 	}
 
 	// Sort load balancers deterministically so repeated reads produce a stable ordering.
@@ -263,6 +238,5 @@ func (ds *loadBalancerDataSource) Read(ctx context.Context, req datasource.ReadR
 		func(lb loadBalancerModel) string { return lb.ID },
 	)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
