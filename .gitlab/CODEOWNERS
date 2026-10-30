@@ -1,9 +1,1 @@
-.gitlab/CODEOWNERS @crusoeenergy/squads/ccx
-.gitlab-ci.yml @crusoeenergy/squads/ccx
-.golangci.yml @crusoeenergy/squads/ccx
-Makefile @crusoeenergy/squads/ccx
-Dockerfile* @crusoeenergy/squads/ccx
-.changelog/ @crusoeenergy/squads/ccx
-CHANGELOG.md @crusoeenergy/squads/ccx
-versions.env @crusoeenergy/squads/ccx
-scripts/ @crusoeenergy/squads/ccx
+* @crusoeenergy/squads/client-interfaces
