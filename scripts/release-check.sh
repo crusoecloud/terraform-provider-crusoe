@@ -11,6 +11,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 . scripts/release-common.sh
+require_tools git jq
 
 fetch_release_tags || echo "release-check: warning, could not fetch the release tags from GitHub; using local tags" >&2
 

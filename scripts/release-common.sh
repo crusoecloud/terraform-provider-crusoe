@@ -120,9 +120,14 @@ configure_fallback_identity() {
   fi
 }
 
-# bot_push REF BRANCH: pushes REF as BRANCH, replacing it when it exists.
+# bot_push REF BRANCH: pushes REF as BRANCH, replacing it when it exists. The
+# token reaches git through a credential helper, not the remote URL, so that
+# an error message from git cannot print it.
 bot_push() {
-  git push --force "https://oauth2:${BOT_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$1:refs/heads/$2"
+  # shellcheck disable=SC2016  # git's shell expands the token, not this one
+  RELEASE_BOT_GIT_TOKEN="$BOT_TOKEN" GIT_TERMINAL_PROMPT=0 \
+    git -c credential.helper='!f() { echo "username=oauth2"; echo "password=${RELEASE_BOT_GIT_TOKEN}"; }; f' \
+    push --force "https://${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$1:refs/heads/$2"
 }
 
 # gitlab_api METHOD PATH [JSON]: a call on this project; fails on HTTP errors.
@@ -141,16 +146,18 @@ assignee_ids() {
 }
 
 # open_or_update_mr SOURCE TARGET TITLE DESCRIPTION_FILE [EXTRA_JSON]
-# Refreshes the title and description of the merge request already open from
-# SOURCE, or creates it with the EXTRA_JSON attributes (squash, assignees...).
+# Refreshes the merge request already open from SOURCE, or creates it. The
+# EXTRA_JSON attributes (squash, assignees...) are sent both times, so that a
+# setting changed by hand in between, squash on the release MR for example, is
+# put back.
 open_or_update_mr() {
   local source=$1 target=$2 title=$3 description_file=$4 extra=${5:-'{}'}
   local encoded iid payload
   encoded=$(jq -rn --arg s "$source" '$s | @uri')
   iid=$(gitlab_api GET "/merge_requests?source_branch=${encoded}&state=opened" | jq -r '.[0].iid // empty')
   if [[ -n "$iid" ]]; then
-    payload=$(jq -n --arg title "$title" --rawfile desc "$description_file" \
-      '{ title: $title, description: $desc }')
+    payload=$(jq -n --arg title "$title" --rawfile desc "$description_file" --argjson extra "$extra" \
+      '{ title: $title, description: $desc } + $extra')
     gitlab_api PUT "/merge_requests/${iid}" "$payload" | jq -r '"merge request updated: " + .web_url'
   else
     payload=$(jq -n --arg source "$source" --arg target "$target" --arg title "$title" \
