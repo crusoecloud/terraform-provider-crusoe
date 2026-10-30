@@ -34,6 +34,17 @@ jobs:
           ./scripts/tag_semver.sh $MAJOR_VERSION $MINOR_VERSION ""
         shell: bash
 
+      - name: Check the changelog before tagging
+        # The top section of CHANGELOG.md must be the version about to be
+        # tagged (make changelog, README "Preparing a release"); otherwise the
+        # workflow stops here, before any tag exists, and the release is
+        # retried by merging the release-prep commit and pushing again.
+        run: |
+          source variables.env
+          export RELEASE_VERSION
+          scripts/release-notes.sh --check
+          scripts/release-manifest.sh --check
+
       - name: Read version and push tag
         run: |
           source variables.env
@@ -55,6 +66,16 @@ jobs:
           # setup-go installs the Go version from go.mod.
           go-version-file: 'go.mod'
           cache: true
+      - name: Release notes and manifest
+        # The tag the semver-tag job pushed points at HEAD. Both scripts fail
+        # when the top section of CHANGELOG.md is not that version, so a
+        # release cannot ship with stale notes (make changelog, README).
+        run: |
+          RELEASE_VERSION="$(git describe --tags --exact-match HEAD)"
+          export RELEASE_VERSION
+          scripts/release-notes.sh > release-notes.md
+          scripts/release-manifest.sh > release-manifest.json
+          scripts/release-manifest.sh --check
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         id: import_gpg
@@ -64,7 +85,9 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
-          args: release --clean
+          # The release body is the top section of CHANGELOG.md; the manifest
+          # is attached by release.extra_files in .goreleaser.yml.
+          args: release --clean --release-notes release-notes.md
           # Pinned: bump only after testing with `goreleaser release --snapshot`
           # at the same version (a CI-only config break failed the v1.7.1 release).
           version: '2.18.3'

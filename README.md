@@ -151,6 +151,7 @@ A new version of the Crusoe Cloud Terraform provider is generated when there is 
 This generates a new tag and triggers our `goreleaser` pipeline which will handle distributing the new Terraform version.
 On a successful release, the pipeline posts an announcement (version, commit, and a link to the GitHub release) to the `#ccx-ci-releases` Slack channel.
 These notifications require the `SLACK_CCX_CI_RELEASES_WEBHOOK_URL` webhook URL to be configured as both a GitHub Actions secret (release announcement) and a GitLab CI/CD variable (pipeline status notifications); if unset, the notification steps log a message and skip without failing the release.
+The notes of the GitHub release are the top section of `CHANGELOG.md`, and `release-manifest.json`, the same entries as data for the Crusoe Updates translator in the docs repo, is attached to the release. The workflow generates both with `scripts/release-notes.sh` and `scripts/release-manifest.sh`, which fail the release when that section is not the version being tagged.
 
 `main` is releasable at all times: anything merged into it can go out in the next release. A change whose backend is not in production yet waits in its merge request; one that only some organizations can reach is merged with the limited-availability marker described under Contributing. A Crusoe Cloud maintainer merges `main` into `release` to publish a version.
 
