@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "categories": {
+    "repo-agents": {
+      "instructions": {
+        "changelog-fragment": ".crusoe-review/changelog-fragment.md"
+      }
+    },
+    "terraform": {
+      "instructions": {
+        "changelog-fragment": ".crusoe-review/changelog-fragment.md"
+      }
+    }
+  }
+}
