@@ -1,0 +1,9 @@
+```release-note:enhancement
+`crusoe_registry_repository` rotates the credentials of a pull-through cache in place: `upstream_registry_credentials.username` and `.password` are write-only (never stored in the plan or state; needs Terraform 1.11 or later), and changing the new `credentials_version` sends them again. Changing `upstream_registry.provider`, `upstream_registry.url` or `project_id` now replaces the repository instead of failing. Existing state is upgraded and the stored username and password are dropped from it.
+<!-- site: developer-tools/terraform -->
+<!-- title: Rotate pull-through cache credentials in place with Terraform -->
+```
+
+```release-note:bug
+Creating a `pull-through-cache` repository for a private AWS ECR upstream no longer fails with "inconsistent result after apply". The credentials are required when the repository is created; a repository created without them has to be recreated to add them.
+```

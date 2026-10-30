@@ -73,3 +73,26 @@ docs-ci: build-deps
 	@echo "==> $@"
 	@go generate ./... || true # tfplugindocs requires Terraform binary; tolerate download failures (e.g. expired HashiCorp PGP key)
 	@git diff --exit-code docs/* # fail if doc autogen produces a diff
+
+.PHONY: changelog
+changelog: ## Renders .changelog/ fragments since the last release tag into CHANGELOG.md (VERSION=vX.Y.Z to override)
+	@echo "==> $@"
+	@scripts/changelog-build.sh
+
+.PHONY: changelog-preview
+changelog-preview: ## Prints the next CHANGELOG.md section without editing the file
+	@echo "==> $@"
+	@scripts/changelog-build.sh --dry-run
+
+.PHONY: changelog-check
+changelog-check: ## Validates a changelog fragment: make changelog-check FILE=.changelog/123.txt
+	@echo "==> $@"
+	@scripts/changelog-check.sh $(FILE)
+
+.PHONY: changelog-tags
+changelog-tags: ## Lists the valid product tags for fragments, from the docs repo
+	@scripts/changelog-check.sh --tags
+
+.PHONY: release-manifest
+release-manifest: ## Prints release-manifest.json for the top section of CHANGELOG.md
+	@scripts/release-manifest.sh

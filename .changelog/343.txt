@@ -1,0 +1,9 @@
+```release-note:breaking-change
+Service account credentials are read from `client_id`, `client_secret`, `token_url` and `audience` in `~/.crusoe/config`, and from the `CRUSOE_CLIENT_ID`, `CRUSOE_CLIENT_SECRET`, `CRUSOE_TOKEN_URL` and `CRUSOE_AUDIENCE` environment variables. The former `service_account_*` keys and `CRUSOE_SERVICE_ACCOUNT_*` variables are no longer read.
+<!-- site: developer-tools/terraform -->
+<!-- title: Service account settings in the Terraform provider use new names -->
+```
+
+```release-note:bug
+The provider no longer combines credentials from different sources: it uses the first complete pair it finds, environment variables first, then the configuration profile, so a stray variable cannot be paired with a key from the profile. Overriding only one of `token_url` and `audience` is now an error.
+```

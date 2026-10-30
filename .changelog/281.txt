@@ -1,0 +1,5 @@
+```release-note:enhancement
+`crusoe_kubernetes_node_pool` takes an `autoscaling_config` block (`enabled`, `min_node_size`, `max_node_size`) that lets the cluster autoscaler size the node pool within those bounds, on clusters with a supported autoscaler version; the data source reports it. Add `instance_count` to `lifecycle { ignore_changes }` when enabling it, since the autoscaler owns the node count. A node pool whose autoscaling was enabled outside Terraform, with no block in the configuration, is disabled on apply.
+<!-- site: infrastructure-cloud/managed-kubernetes -->
+<!-- title: Autoscale Kubernetes node pools with the Terraform provider -->
+```

@@ -6,6 +6,7 @@ This file provides guidance to Claude Code when working with this Terraform prov
 
 - **Build**: `make build` | **Test + Lint**: `make dev` | **Pre-commit**: `make precommit`
 - **Breaking changes**: Avoid for released resources; use deprecation for field renames (see [Breaking Changes Policy](#breaking-changes-policy))
+- **Changelog**: every customer-visible MR carries `.changelog/<MR>.txt` (`/changelog` drafts it); `CHANGELOG.md` is rendered from them at release time (see [Changelog and Versioning](#changelog-and-versioning))
 - **Resource packages** in `internal/<resource>/` with `_resource.go`, `_data_source.go`, `*_test.go`, `util.go`
 - **Examples & tests** in `examples/<resource>/` with `main.tf` and `tests/*.tftest.hcl`
 - **ID fields**: Always suffix with `ID` (e.g., `ProjectID`, `InstanceTemplateID`)
@@ -467,9 +468,11 @@ Watch out for these frequently triggered lint errors:
 
 ## Changelog and Versioning
 
-When preparing a release, commit the `CHANGELOG.md` and `versions.env` updates **to `main` first** (a dedicated release-prep commit), **then** open the `main → release` MR. Do **not** edit these files on the `release` branch or as part of the release MR, and don't squash the release MR — release-only commits make `release` diverge from `main` and cause conflicts on the next `main → release` merge. Ordinary feature merges into `main` should not touch these files; only the release-prep commit does.
+Every merge request with a customer-visible change carries a changelog fragment, `.changelog/<MR>.txt`: rules in [`.changelog/README.md`](.changelog/README.md), `/changelog` drafts it from the branch diff, `make changelog-check FILE=.changelog/<MR>.txt` validates it. CI fails a merge request without one unless it has the `skip-changelog` label or only touches files no customer can notice. Feature merge requests never edit `CHANGELOG.md` or `versions.env`.
 
-See [readme.md](readme.md) (Contributing, Versioning, and Maintaining Changelog sections) for full details on semantic versioning rules, `versions.env` format, changelog categories, and examples.
+When preparing a release (`/release-prep`), `make changelog` renders the fragments merged since the last tag into `CHANGELOG.md`. Commit that section, and the `versions.env` bump for a minor or major release, **to `main` first** (a dedicated release-prep commit), **then** open the `main → release` MR. Do **not** edit these files on the `release` branch or as part of the release MR, and don't squash the release MR — release-only commits make `release` diverge from `main` and cause conflicts on the next `main → release` merge.
+
+See [README.md](README.md) (Contributing, Versioning, and Maintaining Changelog sections) for the semantic versioning rules and the `versions.env` format.
 
 ## Creating Merge Request Descriptions
 

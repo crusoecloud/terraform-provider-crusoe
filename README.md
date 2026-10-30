@@ -177,7 +177,7 @@ export MAJOR_VERSION=0
 export MINOR_VERSION=6
 ```
 
-Update this file **only for major or minor version bumps**, in the same release-prep commit on `main` that adds the changelog entry (before the release MR is opened) — not on the `release` branch. Patch versions are auto-incremented by the release pipeline.
+Update this file **only for major or minor version bumps**, in the same release-prep commit on `main` that adds the changelog section (`make changelog VERSION=vX.Y.0`), before the release MR is opened and never on the `release` branch. Patch versions are auto-incremented by the release pipeline.
 
 ## Contributing
 
@@ -185,43 +185,19 @@ We welcome (and have already had several!) open-source contributions to the Crus
 Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 1. Make a branch off `main` and open a merge request from your branch into `main`.
 2. A Crusoe Cloud maintainer will review the merge request and, once approved, merge it into the `main` branch.
-3. Before a release, add a changelog entry for the new version (see Maintaining Changelog below) that documents all of the changes/commits since the last release. Merge this change in before the next step.
-4. To release: open a merge request from `main` into `release`. 
-5. Once the merge request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
+3. Add a changelog fragment to the merge request, `.changelog/<MR>.txt` (see Maintaining Changelog below). CI fails a merge request that needs one and has none.
+4. Before a release, a maintainer runs `make changelog` on a branch off `main`, which renders the fragments merged since the last release into a new section of `CHANGELOG.md`, and merges that release-prep commit into `main` (with the `versions.env` bump for a minor or major release).
+5. To release: open a merge request from `main` into `release`.
+6. Once the merge request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
 
 ## Maintaining Changelog
 
 The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
 
-**Every release must include a changelog entry, committed to `main` *before* the release MR is opened** (see the Contributing steps above) — do not add it on the `release` branch or inside the release MR, which would make `release` diverge from `main` and conflict on the next merge. To add an entry:
+`CHANGELOG.md` is generated from fragments: one file per merge request in [`.changelog/`](.changelog/README.md), named `.changelog/<MR>.txt`, with one fenced `release-note:<type>` block per customer-visible change. That README has the types, the format and the product tag that turns an entry into a post on [Crusoe Updates](https://docs.crusoecloud.com/updates/). In Claude Code, `/changelog` drafts the fragment from the branch diff; `make changelog-check FILE=.changelog/<MR>.txt` validates it. CI (`changelog_check`) fails a merge request without a fragment unless it carries the `skip-changelog` label or only touches files no customer can notice.
 
-1. Open `CHANGELOG.md` and add a new version section at the top
-2. Increment the version number from the previous release (e.g., `0.5.45` → `0.5.46`)
-3. Follow the category and format guidelines below
+### Preparing a release
 
-### Changelog Categories
+`make changelog` renders the fragments merged since the last release tag into a new `## vX.Y.Z (date)` section at the top of `CHANGELOG.md`; `make changelog-preview` prints it without editing the file. The version is the next patch of `versions.env`, the one the release pipeline will tag; for a minor or major release run `make changelog VERSION=vX.Y.0` and bump `versions.env` in the same commit. Commit the section to `main` in a release-prep commit **before** the release MR is opened. Never add it on the `release` branch or inside the release MR, which would make `release` diverge from `main` and conflict on the next merge. Until the version is tagged, running `make changelog` again replaces the section, so a wrong entry is fixed in its fragment and rendered again rather than edited in `CHANGELOG.md`.
 
-Only include categories that have entries. Use dash-prefixed bullets. Keep descriptions concise but informative.
-
-- `ENHANCEMENTS:` - Smaller features added to an existing resource or data source, such as a new attribute.
-- `BUG FIXES:` - Any bugs that were fixed.
-- `SECURITY:` - Fixes for vulnerabilities in the provider or its build, such as a CVE fixed by a Go toolchain or dependency bump. Name the CVE.
-- `NEW FEATURES:` - Major new improvements such as a new resource or data source.
-- `UPGRADE NOTES:` - Breaking or incompatible changes and how to handle them.
-
-### Example
-
-```markdown
-## 0.6.0
-
-ENHANCEMENTS:
-
-- Added `profile` attribute to provider block for config file profile selection
-```
-
-### When a Changelog Entry is Needed
-
-- New provider/resource/data source attributes
-- Behavioral changes
-- Bug fixes
-- Breaking changes (always include UPGRADE NOTES)
+The release tags live on GitHub, where the release workflow creates them; `make changelog` fetches them itself. Sections up to 1.8.0 were written by hand and keep their format.

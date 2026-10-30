@@ -1,3 +1,15 @@
+# Changelog
+
+All customer-visible changes to the Crusoe Cloud Terraform provider. Each
+section is generated from the fragments in [`.changelog/`](.changelog/README.md)
+when a release is prepared (see [`README.md`](README.md#contributing)); the
+sections up to 1.8.0 were written by hand.
+
+Every release is also listed on GitHub:
+https://github.com/crusoecloud/terraform-provider-crusoe/releases
+
+<!-- new releases go below this line -->
+
 ## 1.8.0
 
 ENHANCEMENTS:

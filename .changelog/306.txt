@@ -1,0 +1,9 @@
+```release-note:feature
+`crusoe_load_balancer` manages external load balancers: `vpc_id`, `protocol` (`tcp` or `udp`), `listen_ports_and_backends` (each `listen_port` with its `backends` of `ip` and `port`), optional `health_check_options` and the read-only `vip`.
+<!-- site: infrastructure-cloud/networking -->
+<!-- title: Manage external load balancers with the Terraform provider -->
+```
+
+```release-note:note
+State written by earlier versions of `crusoe_load_balancer`, which managed internal load balancers, cannot be migrated: remove those resources with `terraform state rm` and create them again.
+```

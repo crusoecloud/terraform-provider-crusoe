@@ -46,3 +46,5 @@ terraform
 .claude/**
 !.claude/skills/
 !.claude/skills/**
+!.claude/commands/
+!.claude/commands/**

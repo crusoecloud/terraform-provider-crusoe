@@ -1,0 +1,4 @@
+```release-note:feature
+`data.crusoe_load_balancer` lists external load balancers, with the same attributes as the resource plus the `status` of each backend, and takes `location`, `vpc_network_id` and `name` to filter the result.
+<!-- site: none -->
+```
