@@ -65,6 +65,10 @@ release:
   extra_files:
     - glob: 'terraform-registry-manifest.json'
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+    # The release's changelog entries as data, written by
+    # scripts/release-manifest.sh in the workflow; the docs repo turns it into
+    # Crusoe Updates entries.
+    - glob: 'release-manifest.json'
   # If you want to manually examine the release before its live, uncomment this line:
   # draft: true
 changelog:

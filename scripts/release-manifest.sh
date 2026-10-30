@@ -7,8 +7,8 @@
 #
 # Usage: scripts/release-manifest.sh [--check]
 #   Prints the manifest to stdout. --check validates it and prints a status
-#   line instead. When RELEASE_VERSION is set (scripts/tag_semver.sh writes it
-#   in the release workflow) the section's version must match it, same rule as
+#   line instead. When RELEASE_VERSION is set (the release workflow sets it
+#   from the tag) the section's version must match it, same rule as
 #   release-notes.sh.
 #   RELEASE_DATE=YYYY-MM-DD sets the manifest date; the default is today (UTC).
 set -euo pipefail

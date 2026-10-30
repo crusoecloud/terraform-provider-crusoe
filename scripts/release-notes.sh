@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Prints the top section of CHANGELOG.md, the release being cut, for GoReleaser
-# (--release-notes). When RELEASE_VERSION is set (scripts/tag_semver.sh writes
-# it in the release workflow) the section's version must match it, so a release
-# cannot ship with stale notes.
+# (--release-notes). When RELEASE_VERSION is set (the release workflow sets it
+# from the tag) the section's version must match it, so a release cannot ship
+# with stale notes.
 #
 # Usage: scripts/release-notes.sh [--check]
 #   --check   verify only, print nothing but a status line
