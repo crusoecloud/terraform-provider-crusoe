@@ -46,6 +46,13 @@ const (
 	onlyUserReadPerms         = 0o600
 	two                       = 2
 	internalErrorCode         = "internal_error"
+
+	// LimitedAvailabilityMessage prefixes the description of an attribute or
+	// resource that the backend enables per organization (a server-side flag).
+	// The merge request that opens the feature to everyone removes it; see the
+	// README, "Features behind a server-side flag".
+	LimitedAvailabilityMessage = "Available only to organizations enrolled by Crusoe support; the API rejects it otherwise. " +
+		"Reach out to support@crusoecloud.com to enable it."
 )
 
 var version string

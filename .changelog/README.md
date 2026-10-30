@@ -22,22 +22,22 @@ or dependency bumps with no visible effect; add the `skip-changelog` label for
 those. Tests, docs, examples and CI config need nothing: CI skips the check when
 a merge request touches only those.
 
-### Changes behind a feature flag
+### Changes behind a server-side flag
 
-A change that only customers with a feature flag can reach gets no entry while
-the flag is off for customers: add the `skip-changelog` label. When a merge
-request mixes the two, the fragment covers only the part every customer sees.
+The provider has no feature flags of its own; the backend enables some features
+per organization. A change that only enrolled organizations can reach gets no
+entry while the flag is off for everyone else: add the `skip-changelog` label
+and mark the attribute or resource as the README says (Contributing, "Features
+behind a server-side flag"). When a merge request mixes the two, the fragment
+covers only the part every customer sees.
 
 The feature is announced once, when it becomes generally available, with a
 single `feature` entry that describes it as it is then, not the renames and
 fixes it went through behind the flag. The flag is turned on server-side, which
-cuts no provider release, so the entry goes in:
-
-- the merge request that removes the flag check from the provider, when there
-  is one;
-- otherwise, a small merge request of its own, merged before the flag is turned
-  on for everyone, that says which provider version is needed ("requires
-  provider vX.Y.Z or later").
+cuts no provider release, so the entry goes in the merge request that removes
+the limited-availability marker from the provider, merged before the flag is
+turned on for everyone; the entry says which provider version is needed
+("requires provider vX.Y.Z or later").
 
 Make the fragment part of the general-availability ticket so it is not
 forgotten.

@@ -152,7 +152,7 @@ This generates a new tag and triggers our `goreleaser` pipeline which will handl
 On a successful release, the pipeline posts an announcement (version, commit, and a link to the GitHub release) to the `#ccx-ci-releases` Slack channel.
 These notifications require the `SLACK_CCX_CI_RELEASES_WEBHOOK_URL` webhook URL to be configured as both a GitHub Actions secret (release announcement) and a GitLab CI/CD variable (pipeline status notifications); if unset, the notification steps log a message and skip without failing the release.
 
-`main` is releasable at all times: anything merged into it can go out in the next release. A change whose backend is not in production yet, or that customers cannot reach yet, waits in its merge request or goes in behind a feature flag with the `skip-changelog` label (see [`.changelog/README.md`](.changelog/README.md), "Changes behind a feature flag"). A Crusoe Cloud maintainer merges `main` into `release` to publish a version.
+`main` is releasable at all times: anything merged into it can go out in the next release. A change whose backend is not in production yet waits in its merge request; one that only some organizations can reach is merged with the limited-availability marker described under Contributing. A Crusoe Cloud maintainer merges `main` into `release` to publish a version.
 
 ### Semantic Versioning
 
@@ -184,11 +184,21 @@ Update this file **only for major or minor version bumps**, in the same release-
 We welcome (and have already had several!) open-source contributions to the Crusoe Cloud Terraform Provider.
 Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 1. Make a branch off `main` and open a merge request from your branch into `main`.
-2. A Crusoe Cloud maintainer reviews the merge request and merges it into `main` once it can ship: `main` is releasable at all times, so a change that depends on a backend not yet in production waits in the merge request, or goes in behind a feature flag. Every merge request needs an approval from the Client Interfaces squad (CCX-CI), the code owner of the repository (`.gitlab/CODEOWNERS`).
+2. A Crusoe Cloud maintainer reviews the merge request and merges it into `main` once it can ship: `main` is releasable at all times, so a change that depends on a backend not yet in production waits in the merge request. Every merge request needs an approval from the Client Interfaces squad (CCX-CI), the code owner of the repository (`.gitlab/CODEOWNERS`).
 3. Add a changelog fragment to the merge request, `.changelog/<MR>.txt` (see Maintaining Changelog below). CI fails a merge request that needs one and has none.
 4. Before a release, a maintainer runs `make changelog` on a branch off `main`, which renders the fragments merged since the last release into a new section of `CHANGELOG.md`, and merges that release-prep commit into `main` (with the `versions.env` bump for a minor or major release).
 5. To release: open a merge request from `main` into `release`. Its review checks the rendered changelog entry by entry; it does not hold features back, since everything on `main` can ship.
 6. Once the merge request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
+
+### Features behind a server-side flag
+
+The provider has no feature flags of its own: everything in a release is in the schema and in the documentation on the Terraform Registry, for every customer. When the backend enables a feature per organization, the provider says so, in three places:
+
+- the description of the attribute or resource starts with `common.LimitedAvailabilityMessage`, so the Registry documentation says who can use it and what happens otherwise;
+- a `common.NewDevelopmentWarning*Modifier` on the attribute warns at plan time, so a customer who sets it without being enrolled learns it there, not from an API error at apply;
+- the merge request carries the `skip-changelog` label, and the one that opens the feature to everyone removes the marker and the warning and adds the changelog fragment (see [`.changelog/README.md`](.changelog/README.md), "Changes behind a server-side flag").
+
+`common.DevelopmentMessage` stays for what cannot be enabled on request yet.
 
 ## Maintaining Changelog
 
