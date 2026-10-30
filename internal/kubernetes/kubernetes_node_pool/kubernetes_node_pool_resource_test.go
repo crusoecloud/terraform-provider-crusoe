@@ -75,3 +75,47 @@ func TestKubernetesNodePoolResource_NodeTaintsBlockExists(t *testing.T) {
 		t.Error("effect attribute should have validators")
 	}
 }
+
+func TestKubernetesNodePoolResource_AutoscalingConfigBlockExists(t *testing.T) {
+	r := NewKubernetesNodePoolResource()
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	block, ok := schemaResp.Schema.Blocks["autoscaling_config"]
+	if !ok {
+		t.Fatal("autoscaling_config block not found in schema")
+	}
+
+	nestedBlock, ok := block.(schema.SingleNestedBlock)
+	if !ok {
+		t.Fatal("autoscaling_config is not a SingleNestedBlock")
+	}
+
+	enabledAttr, ok := nestedBlock.Attributes["enabled"].(schema.BoolAttribute)
+	if !ok {
+		t.Fatal("enabled attribute is not a BoolAttribute")
+	}
+	// Optional in the schema (Required inside a SingleNestedBlock breaks
+	// block removal); presence is enforced by ValidateConfig.
+	if !enabledAttr.Optional || enabledAttr.Required {
+		t.Error("enabled should be optional (presence enforced in ValidateConfig)")
+	}
+
+	// bounds are optional (omitted when disabling) and carry the shape
+	// validators
+	for _, field := range []string{"min_node_size", "max_node_size"} {
+		boundAttr, ok := nestedBlock.Attributes[field].(schema.Int64Attribute)
+		if !ok {
+			t.Fatalf("%s attribute is not an Int64Attribute", field)
+		}
+		// bounds must be plain Optional: Computed here breaks
+		// removal-means-disable (the framework plans a removed block as a
+		// partially-unknown object instead of null)
+		if !boundAttr.Optional || boundAttr.Computed {
+			t.Errorf("%s should be optional and not computed", field)
+		}
+		if len(boundAttr.Validators) == 0 {
+			t.Errorf("%s should have validators", field)
+		}
+	}
+}

@@ -7,6 +7,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -20,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
@@ -66,6 +69,19 @@ type kubernetesNodePoolResourceModel struct {
 	Health                        types.Object      `tfsdk:"health"`
 	Current                       types.Int64       `tfsdk:"current"`
 	NodePoolGeneration            types.Int64       `tfsdk:"node_pool_generation"`
+	AutoscalingConfig             types.Object      `tfsdk:"autoscaling_config"`
+}
+
+type autoscalingConfigModel struct {
+	Enabled     types.Bool  `tfsdk:"enabled"`
+	MinNodeSize types.Int64 `tfsdk:"min_node_size"`
+	MaxNodeSize types.Int64 `tfsdk:"max_node_size"`
+}
+
+var autoscalingConfigAttrTypes = map[string]attr.Type{
+	"enabled":       types.BoolType,
+	"min_node_size": types.Int64Type,
+	"max_node_size": types.Int64Type,
 }
 
 func (r *kubernetesNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -111,6 +127,102 @@ func (r *kubernetesNodePoolResource) ValidateConfig(
 	if vErr := validateNodeTaintDuplicates(nodeTaints); vErr != nil {
 		resp.Diagnostics.AddError("Invalid node_taints", vErr.Error())
 	}
+
+	r.validateAutoscalingConfig(ctx, data.AutoscalingConfig, resp)
+}
+
+// validateAutoscalingConfig enforces the cross-field rules of the block, mirroring
+// the server's write modes: enabling is a full replace requiring both bounds;
+// disabling is flag-only, so bounds must be omitted (the API ignores them and
+// retains the stored bounds — leaving them in config would cause a permanent
+// diff against the refreshed state).
+func (r *kubernetesNodePoolResource) validateAutoscalingConfig(
+	ctx context.Context,
+	scalingConfig types.Object,
+	resp *resource.ValidateConfigResponse,
+) {
+	if scalingConfig.IsNull() || scalingConfig.IsUnknown() {
+		return
+	}
+
+	var sc autoscalingConfigModel
+	resp.Diagnostics.Append(scalingConfig.As(ctx, &sc, basetypes.ObjectAsOptions{})...)
+	if resp.Diagnostics.HasError() || sc.Enabled.IsUnknown() {
+		return
+	}
+
+	// enabled is schema-Optional only to keep block removal plannable (see
+	// the schema comment); a present block must state it.
+	if sc.Enabled.IsNull() {
+		resp.Diagnostics.AddError("Invalid autoscaling_config",
+			"enabled must be set when the autoscaling_config block is present")
+
+		return
+	}
+
+	if !sc.Enabled.ValueBool() {
+		if !sc.MinNodeSize.IsNull() || !sc.MaxNodeSize.IsNull() {
+			resp.Diagnostics.AddError("Invalid autoscaling_config",
+				"omit min_node_size and max_node_size when disabling autoscaling; "+
+					"the stored bounds are retained — re-enable with new bounds to change them")
+		}
+
+		return
+	}
+
+	if sc.MinNodeSize.IsNull() || sc.MaxNodeSize.IsNull() {
+		resp.Diagnostics.AddError("Invalid autoscaling_config",
+			"enabling autoscaling requires both min_node_size and max_node_size")
+
+		return
+	}
+	if !sc.MinNodeSize.IsUnknown() && !sc.MaxNodeSize.IsUnknown() &&
+		sc.MinNodeSize.ValueInt64() > sc.MaxNodeSize.ValueInt64() {
+
+		resp.Diagnostics.AddError("Invalid autoscaling_config",
+			fmt.Sprintf("min_node_size (%d) must be <= max_node_size (%d)",
+				sc.MinNodeSize.ValueInt64(), sc.MaxNodeSize.ValueInt64()))
+	}
+}
+
+// validateAutoscalingUpdateCount catches at plan time an update the API would
+// reject: while autoscaling is enabled, the count must lie within the bounds,
+// and every update sends instance_count (the generated client's count has no
+// omitempty). count is the planned instance_count, which under
+// ignore_changes is the state value, i.e. the autoscaler's last count. Unknown
+// values skip the check; the API still enforces it at apply.
+func validateAutoscalingUpdateCount(ctx context.Context, count types.Int64, scalingConfig types.Object) diag.Diagnostics {
+	if count.IsNull() || count.IsUnknown() || scalingConfig.IsNull() || scalingConfig.IsUnknown() {
+		return nil
+	}
+
+	var sc autoscalingConfigModel
+	if diags := scalingConfig.As(ctx, &sc, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return diags
+	}
+	if sc.Enabled.IsNull() || sc.Enabled.IsUnknown() || !sc.Enabled.ValueBool() ||
+		sc.MinNodeSize.IsNull() || sc.MinNodeSize.IsUnknown() ||
+		sc.MaxNodeSize.IsNull() || sc.MaxNodeSize.IsUnknown() {
+
+		return nil
+	}
+
+	n, minSize, maxSize := count.ValueInt64(), sc.MinNodeSize.ValueInt64(), sc.MaxNodeSize.ValueInt64()
+	if n >= minSize && n <= maxSize {
+		return nil
+	}
+
+	var diags diag.Diagnostics
+	diags.AddAttributeError(path.Root("instance_count"),
+		"instance_count outside autoscaling bounds",
+		fmt.Sprintf("This update would send instance_count = %d, outside the autoscaling bounds "+
+			"[min_node_size = %d, max_node_size = %d], and the API rejects a count outside the bounds while "+
+			"autoscaling is enabled. Every update sends instance_count; under "+
+			"lifecycle { ignore_changes = [instance_count] } the value sent is the node pool's current count. "+
+			"Set instance_count within the bounds in the same apply, temporarily removing it from "+
+			"ignore_changes if needed.", n, minSize, maxSize))
+
+	return diags
 }
 
 func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -144,7 +256,7 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			},
 			"instance_count": schema.Int64Attribute{
 				Required:            true,
-				MarkdownDescription: apiDescInstanceCount,
+				MarkdownDescription: apiDescInstanceCount + " " + providerDescAutoscalingOwnsCount,
 			},
 			"cluster_id": schema.StringAttribute{
 				Required:            true,
@@ -303,6 +415,40 @@ func (r *kubernetesNodePoolResource) Schema(_ context.Context, _ resource.Schema
 			},
 		},
 		Blocks: map[string]schema.Block{
+			"autoscaling_config": schema.SingleNestedBlock{
+				MarkdownDescription: apiDescAutoscalingConfig + " " + providerDescAutoscalingRequiresAutoscaler + " " +
+					providerDescAutoscalingConfig,
+				Attributes: map[string]schema.Attribute{
+					// Optional, not Required: the framework validates a Required
+					// attribute inside a SingleNestedBlock even when the whole
+					// block is absent from config, which breaks block removal.
+					// Presence is enforced in ValidateConfig instead.
+					"enabled": schema.BoolAttribute{
+						Optional:            true,
+						MarkdownDescription: apiDescAutoscalingEnabled + " " + providerDescAutoscalingEnabled,
+					},
+					// The bounds are deliberately NOT Computed: a Computed
+					// attribute inside the block makes the framework plan a
+					// config-removed block as a partially-unknown object
+					// instead of null, which breaks removal-means-disable
+					// with "Missing Configuration for Required Attribute".
+					"min_node_size": schema.Int64Attribute{
+						Optional:            true,
+						MarkdownDescription: apiDescAutoscalingMinNodeSize + " " + providerDescAutoscalingBounds,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(0),
+						},
+					},
+					"max_node_size": schema.Int64Attribute{
+						Optional:            true,
+						MarkdownDescription: apiDescAutoscalingMaxNodeSize + " " + providerDescAutoscalingBounds,
+						Validators: []validator.Int64{
+							// 0, not 1: [0, 0] is legal and pins the pool at zero nodes.
+							int64validator.AtLeast(0),
+						},
+					},
+				},
+			},
 			"node_taints": schema.SetNestedBlock{
 				MarkdownDescription: apiDescNodeTaints,
 				NestedObject: schema.NestedBlockObject{
@@ -368,6 +514,8 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 
 	updateSettings, settingsDiags := tfObjectToUpdateSettings(ctx, plan.UpdateSettings)
 	resp.Diagnostics.Append(settingsDiags...)
+	scalingConfig, scDiags := tfObjectToAutoscalingConfig(ctx, plan.AutoscalingConfig)
+	resp.Diagnostics.Append(scDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -389,8 +537,9 @@ func (r *kubernetesNodePoolResource) Create(ctx context.Context, req resource.Cr
 		PublicIpType:                  plan.PublicIPType.ValueString(),
 		// Both have omitempty, so an unset value is genuinely omitted and the
 		// backend keeps its own default rather than being told "".
-		ConsentMode:    plan.ConsentMode.ValueString(),
-		UpdateSettings: updateSettings,
+		ConsentMode:       plan.ConsentMode.ValueString(),
+		UpdateSettings:    updateSettings,
+		AutoscalingConfig: scalingConfig,
 	}, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create node pool",
@@ -500,6 +649,15 @@ func (r *kubernetesNodePoolResource) ModifyPlan(ctx context.Context, req resourc
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// A plan equal to state sends no update, so only a planned change is
+	// checked; an out-of-bounds count with nothing to apply is left alone.
+	if !req.Plan.Raw.Equal(req.State.Raw) {
+		resp.Diagnostics.Append(validateAutoscalingUpdateCount(ctx, plan.InstanceCount, plan.AutoscalingConfig)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// Warn if instance count is decreasing. What actually happens depends on
@@ -621,6 +779,13 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	// A removed autoscaling_config block sends an explicit disable; see
+	// autoscalingUpdateConfig.
+	scalingConfig, scDiags := autoscalingUpdateConfig(ctx, plan.AutoscalingConfig, stored.AutoscalingConfig)
+	resp.Diagnostics.Append(scDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	patchRequest := swagger.KubernetesNodePoolPatchRequest{
 		Count:                         plan.InstanceCount.ValueInt64(),
@@ -644,8 +809,9 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		// carries its presence on the pointer, because allow_scale_down's own
 		// omitempty means a present block holding false marshals as {} — which
 		// the API still reads as an assertion to turn scale-down off.
-		ConsentMode:    plan.ConsentMode.ValueString(),
-		UpdateSettings: planUpdateSettings,
+		ConsentMode:       plan.ConsentMode.ValueString(),
+		UpdateSettings:    planUpdateSettings,
+		AutoscalingConfig: scalingConfig,
 	}
 
 	updateAsyncOperation, _, err := r.client.APIClient.KubernetesNodePoolsApi.UpdateNodePool(

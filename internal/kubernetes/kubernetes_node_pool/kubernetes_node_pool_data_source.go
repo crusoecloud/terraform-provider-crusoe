@@ -45,6 +45,7 @@ type kubernetesNodePoolDataSourceModel struct {
 	Health                        types.Object `tfsdk:"health"`
 	Current                       types.Int64  `tfsdk:"current"`
 	NodePoolGeneration            types.Int64  `tfsdk:"node_pool_generation"`
+	AutoscalingConfig             types.Object `tfsdk:"autoscaling_config"`
 }
 
 func (e *kubernetesNodePoolDataSource) Metadata(_ context.Context,
@@ -189,6 +190,25 @@ func (e *kubernetesNodePoolDataSource) Schema(_ context.Context,
 			"node_pool_generation": schema.Int64Attribute{
 				Computed:            true,
 				MarkdownDescription: apiDescGeneration + " " + providerDescGeneration,
+			},
+			"autoscaling_config": schema.SingleNestedAttribute{
+				Computed: true,
+				MarkdownDescription: apiDescAutoscalingConfig + " " + providerDescAutoscalingRequiresAutoscaler + " " +
+					providerDescAutoscalingDataSource,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						Computed:            true,
+						MarkdownDescription: apiDescAutoscalingEnabled,
+					},
+					"min_node_size": schema.Int64Attribute{
+						Computed:            true,
+						MarkdownDescription: apiDescAutoscalingMinNodeSize,
+					},
+					"max_node_size": schema.Int64Attribute{
+						Computed:            true,
+						MarkdownDescription: apiDescAutoscalingMaxNodeSize,
+					},
+				},
 			},
 		},
 	}

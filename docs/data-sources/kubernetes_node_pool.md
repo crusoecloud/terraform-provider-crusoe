@@ -42,6 +42,7 @@ data "crusoe_kubernetes_node_pool" "example" {
 
 ### Read-Only
 
+- `autoscaling_config` (Attributes) Autoscaling configuration for the node pool. Only applicable when a supported cluster autoscaler version is installed in the cluster. Null when autoscaling has never been configured on the node pool. A node pool with autoscaling disabled reports `enabled = false` with the bounds the API retains. (see [below for nested schema](#nestedatt--autoscaling_config))
 - `consent_mode` (String) Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
 - `current` (Number) Number of the pool's nodes that have joined the cluster and passed readiness: registered with the API server and ready to take workloads. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
 - `health` (Attributes) Issues currently detected on the node pool. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--health))
@@ -49,6 +50,16 @@ data "crusoe_kubernetes_node_pool" "example" {
 - `node_taints` (Attributes Set) Taints applied to nodes in the node pool. (see [below for nested schema](#nestedatt--node_taints))
 - `public_ip_type` (String) Public IP type for the node pool's nodes. Possible values: `dynamic`, `static`, `none`.
 - `update_settings` (Attributes) Settings controlling how update operations may act on the node pool's existing nodes. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions. (see [below for nested schema](#nestedatt--update_settings))
+
+<a id="nestedatt--autoscaling_config"></a>
+### Nested Schema for `autoscaling_config`
+
+Read-Only:
+
+- `enabled` (Boolean) Whether the cluster autoscaler manages this node pool.
+- `max_node_size` (Number) Maximum number of nodes the autoscaler may scale the node pool up to.
+- `min_node_size` (Number) Minimum number of nodes the autoscaler may scale the node pool down to.
+
 
 <a id="nestedatt--health"></a>
 ### Nested Schema for `health`

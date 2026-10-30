@@ -178,12 +178,27 @@ resource "crusoe_kubernetes_node_pool" "my_node_pool" {
   # batch_size       = 10  # The number of nodes to replace at a time
   # batch_percentage = 100 # The percentage of nodes to replace at a time
 
+  # Optional: Let the cluster autoscaler manage the pool's size within bounds.
+  # While enabled, the autoscaler manages the node count: also uncomment
+  # instance_count in ignore_changes below, or every plan shows the
+  # autoscaler's changes as a diff and apply resizes the pool back to
+  # instance_count. Disabling (enabled = false, bounds omitted) stops the
+  # autoscaler from scaling the pool; the stored bounds are retained.
+  # autoscaling_config {
+  #   enabled       = true
+  #   min_node_size = 1
+  #   max_node_size = 10
+  # }
+
   # Optional: Select the public IP type for the node_pool
   # public_ip_type = "dynamic"
 
   lifecycle {
     ignore_changes = [
       ssh_key,
+      # Required while autoscaling_config is enabled: the autoscaler, not
+      # Terraform, manages the node count.
+      # instance_count,
     ]
   }
 }

@@ -3,14 +3,18 @@ package kubernetes_node_pool
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
@@ -239,17 +243,17 @@ func Test_nodePoolSchemaAliasPair(t *testing.T) {
 	}
 
 	for _, name := range []string{attrIBPartitionID, attrTransportPartitionID} {
-		attr, ok := schemaResp.Schema.Attributes[name].(schema.StringAttribute)
+		strAttr, ok := schemaResp.Schema.Attributes[name].(schema.StringAttribute)
 		if !ok {
 			t.Fatalf("%s is not a StringAttribute", name)
 		}
 
-		if attr.Description == "" {
+		if strAttr.Description == "" {
 			t.Errorf("%s has no description, which renders bare in the generated docs", name)
 		}
-		if len(attr.PlanModifiers) != 1 {
+		if len(strAttr.PlanModifiers) != 1 {
 			t.Errorf("%s has %d plan modifiers, want exactly the alias pair modifier",
-				name, len(attr.PlanModifiers))
+				name, len(strAttr.PlanModifiers))
 		}
 	}
 }
@@ -807,5 +811,434 @@ func TestGenerationSchema(t *testing.T) {
 	}
 	if dataSourceAttr.GetMarkdownDescription() != resourceAttr.MarkdownDescription {
 		t.Error("resource and data source generation descriptions differ")
+	}
+}
+
+// TestTfObjectToAutoscalingConfig covers the block→API conversion: null/unknown
+// blocks leave autoscaling untouched, disable writes are flag-only (bounds
+// never sent), enable writes carry both bounds.
+func TestTfObjectToAutoscalingConfig(t *testing.T) {
+	ctx := context.Background()
+
+	if got, d := tfObjectToAutoscalingConfig(ctx, types.ObjectNull(autoscalingConfigAttrTypes)); got != nil || d.HasError() {
+		t.Errorf("null block = %+v (diags %v), want nil", got, d)
+	}
+	if got, d := tfObjectToAutoscalingConfig(ctx, types.ObjectUnknown(autoscalingConfigAttrTypes)); got != nil || d.HasError() {
+		t.Errorf("unknown block = %+v (diags %v), want nil", got, d)
+	}
+
+	enabled, d := types.ObjectValue(autoscalingConfigAttrTypes, map[string]attr.Value{
+		"enabled":       types.BoolValue(true),
+		"min_node_size": types.Int64Value(0),
+		"max_node_size": types.Int64Value(3),
+	})
+	if d.HasError() {
+		t.Fatalf("building enabled object: %v", d)
+	}
+	got, cd := tfObjectToAutoscalingConfig(ctx, enabled)
+	if cd.HasError() {
+		t.Fatalf("converting enabled object: %v", cd)
+	}
+	want := &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: true, MinNodeSize: 0, MaxNodeSize: 3}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("enabled block = %+v, want %+v (scale-to-zero min preserved)", got, want)
+	}
+
+	// A disable write drops any bound values: disable is flag-only.
+	disabled, d := types.ObjectValue(autoscalingConfigAttrTypes, map[string]attr.Value{
+		"enabled":       types.BoolValue(false),
+		"min_node_size": types.Int64Value(5),
+		"max_node_size": types.Int64Value(9),
+	})
+	if d.HasError() {
+		t.Fatalf("building disabled object: %v", d)
+	}
+	got, cd = tfObjectToAutoscalingConfig(ctx, disabled)
+	if cd.HasError() {
+		t.Fatalf("converting disabled object: %v", cd)
+	}
+	want = &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("disabled block = %+v, want flag-only %+v", got, want)
+	}
+}
+
+// TestAutoscalingConfigToTFObject covers the API→state mapping and the ref-shape
+// rule: unconfigured pools keep a null block, paused pools with the block in
+// config keep their retained bounds, and enabled pools always surface the
+// block even when the config omitted it.
+func TestAutoscalingConfigToTFObject(t *testing.T) {
+	ctx := context.Background()
+	nullRef := types.ObjectNull(autoscalingConfigAttrTypes)
+	presentRef := types.ObjectUnknown(autoscalingConfigAttrTypes)
+
+	// nil API block (old gateway) or never-configured pool + no block in config → null
+	if got, d := autoscalingConfigToTFObject(ctx, nil, nullRef); d.HasError() || !got.IsNull() {
+		t.Errorf("nil block + null ref = %v (diags %v), want null", got, d)
+	}
+	if got, d := autoscalingConfigToTFObject(ctx, &swagger.KubernetesNodePoolAutoscalingConfig{}, nullRef); d.HasError() || !got.IsNull() {
+		t.Errorf("never-configured + null ref = %v (diags %v), want null", got, d)
+	}
+
+	// paused pool with the block in config → retained bounds surface
+	got, d := autoscalingConfigToTFObject(ctx, &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false, MinNodeSize: 1, MaxNodeSize: 2}, presentRef)
+	if d.HasError() {
+		t.Fatalf("paused pool: %v", d)
+	}
+	assertScalingObject(t, got, false, 1, 2)
+
+	// enabled pool always surfaces the block, even with a null ref (drift)
+	got, d = autoscalingConfigToTFObject(ctx, &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: true, MinNodeSize: 0, MaxNodeSize: 3}, nullRef)
+	if d.HasError() {
+		t.Fatalf("enabled pool: %v", d)
+	}
+	assertScalingObject(t, got, true, 0, 3)
+
+	// nil API block but block present in config → the block stays, disabled,
+	// with null bounds: there are no retained bounds to report, and a zero
+	// would read as a configured [0, 0]
+	got, d = autoscalingConfigToTFObject(ctx, nil, presentRef)
+	if d.HasError() {
+		t.Fatalf("nil block + present ref: %v", d)
+	}
+	var sc autoscalingConfigModel
+	if asDiags := got.As(ctx, &sc, basetypes.ObjectAsOptions{}); asDiags.HasError() {
+		t.Fatalf("reading object: %v", asDiags)
+	}
+	if sc.Enabled.ValueBool() || !sc.MinNodeSize.IsNull() || !sc.MaxNodeSize.IsNull() {
+		t.Errorf("nil block + present ref = {%v, %v, %v}, want {false, null, null}",
+			sc.Enabled, sc.MinNodeSize, sc.MaxNodeSize)
+	}
+}
+
+func assertScalingObject(t *testing.T, obj types.Object, enabled bool, minSize, maxSize int64) {
+	t.Helper()
+
+	var sc autoscalingConfigModel
+	if d := obj.As(context.Background(), &sc, basetypes.ObjectAsOptions{}); d.HasError() {
+		t.Fatalf("reading scaling object: %v", d)
+	}
+	if sc.Enabled.ValueBool() != enabled || sc.MinNodeSize.ValueInt64() != minSize || sc.MaxNodeSize.ValueInt64() != maxSize {
+		t.Errorf("scaling object = {%v, %d, %d}, want {%v, %d, %d}",
+			sc.Enabled.ValueBool(), sc.MinNodeSize.ValueInt64(), sc.MaxNodeSize.ValueInt64(), enabled, minSize, maxSize)
+	}
+}
+
+// TestAutoscalingConfigToTFObject_PausedMirrorsConfigShape covers the pause flow
+// with the non-Computed bounds: a disabled pool whose ref block omits the
+// bounds keeps them null in state (no diff against the boundless config),
+// while a disabled pool whose ref carries bounds surfaces the API values
+// (drift from an out-of-band pause stays visible).
+func TestAutoscalingConfigToTFObject_PausedMirrorsConfigShape(t *testing.T) {
+	ctx := context.Background()
+
+	pausedRef, d := types.ObjectValue(autoscalingConfigAttrTypes, map[string]attr.Value{
+		"enabled":       types.BoolValue(false),
+		"min_node_size": types.Int64Null(),
+		"max_node_size": types.Int64Null(),
+	})
+	if d.HasError() {
+		t.Fatalf("building paused ref: %v", d)
+	}
+	got, d := autoscalingConfigToTFObject(ctx,
+		&swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false, MinNodeSize: 1, MaxNodeSize: 2}, pausedRef)
+	if d.HasError() {
+		t.Fatalf("paused pool with boundless ref: %v", d)
+	}
+	var sc autoscalingConfigModel
+	if asDiags := got.As(ctx, &sc, basetypes.ObjectAsOptions{}); asDiags.HasError() {
+		t.Fatalf("reading object: %v", asDiags)
+	}
+	if sc.Enabled.ValueBool() || !sc.MinNodeSize.IsNull() || !sc.MaxNodeSize.IsNull() {
+		t.Errorf("boundless ref = {%v, %v, %v}, want {false, null, null}",
+			sc.Enabled, sc.MinNodeSize, sc.MaxNodeSize)
+	}
+
+	enabledRef, d := types.ObjectValue(autoscalingConfigAttrTypes, map[string]attr.Value{
+		"enabled":       types.BoolValue(true),
+		"min_node_size": types.Int64Value(1),
+		"max_node_size": types.Int64Value(2),
+	})
+	if d.HasError() {
+		t.Fatalf("building enabled ref: %v", d)
+	}
+	got, d = autoscalingConfigToTFObject(ctx,
+		&swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false, MinNodeSize: 1, MaxNodeSize: 2}, enabledRef)
+	if d.HasError() {
+		t.Fatalf("paused pool with bounded ref: %v", d)
+	}
+	assertScalingObject(t, got, false, 1, 2)
+}
+
+// TestAutoscalingConfigFromAPI covers the data source mapping, which has no
+// config to mirror: a missing block means autoscaling was never configured and
+// must stay null, distinct from a disabled pool reporting its retained bounds.
+func TestAutoscalingConfigFromAPI(t *testing.T) {
+	ctx := context.Background()
+
+	got, d := autoscalingConfigFromAPI(nil)
+	if d.HasError() || !got.IsNull() {
+		t.Errorf("nil block = %v (diags %v), want null; {enabled = false} would read as disabled", got, d)
+	}
+
+	got, d = autoscalingConfigFromAPI(&swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false, MinNodeSize: 1, MaxNodeSize: 4})
+	if d.HasError() {
+		t.Fatalf("disabled pool: %v", d)
+	}
+	assertScalingObject(t, got, false, 1, 4)
+
+	got, d = autoscalingConfigFromAPI(&swagger.KubernetesNodePoolAutoscalingConfig{Enabled: true, MinNodeSize: 0, MaxNodeSize: 3})
+	if d.HasError() {
+		t.Fatalf("enabled pool: %v", d)
+	}
+	assertScalingObject(t, got, true, 0, 3)
+
+	// the data source model goes through the same helper
+	var diags diag.Diagnostics
+	var model kubernetesNodePoolDataSourceModel
+	nodePoolToDataSourceModel(ctx, &swagger.KubernetesNodePool{Id: "pool-1"}, "project-1", &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if !model.AutoscalingConfig.IsNull() {
+		t.Errorf("data source autoscaling_config = %v, want null for a pool without the block", model.AutoscalingConfig)
+	}
+}
+
+// TestAutoscalingUpdateConfig covers the Update path's write decision: removing
+// the block from config while state holds one sends a flag-only disable, and
+// an absent block with nothing in state leaves autoscaling out of the request.
+func TestAutoscalingUpdateConfig(t *testing.T) {
+	ctx := context.Background()
+	null := types.ObjectNull(autoscalingConfigAttrTypes)
+	enabled := scalingObject(t, types.BoolValue(true), types.Int64Value(1), types.Int64Value(5))
+
+	got, d := autoscalingUpdateConfig(ctx, null, null)
+	if d.HasError() || got != nil {
+		t.Errorf("absent block, no state = %+v (diags %v), want nil so the request omits autoscaling_config", got, d)
+	}
+
+	got, d = autoscalingUpdateConfig(ctx, null, enabled)
+	if d.HasError() {
+		t.Fatalf("removed block: %v", d)
+	}
+	want := &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("removed block = %+v, want explicit disable %+v", got, want)
+	}
+
+	got, d = autoscalingUpdateConfig(ctx, enabled, null)
+	if d.HasError() {
+		t.Fatalf("added block: %v", d)
+	}
+	want = &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: true, MinNodeSize: 1, MaxNodeSize: 5}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("added block = %+v, want %+v", got, want)
+	}
+}
+
+// TestValidateAutoscalingConfig covers the cross-field rules ValidateConfig
+// enforces on the block, and the per-attribute validators that reject negative
+// bounds.
+func TestValidateAutoscalingConfig(t *testing.T) {
+	ctx := context.Background()
+	r := &kubernetesNodePoolResource{}
+
+	tests := []struct {
+		name    string
+		obj     types.Object
+		wantErr string
+	}{
+		{
+			name:    "absent block",
+			obj:     types.ObjectNull(autoscalingConfigAttrTypes),
+			wantErr: "",
+		},
+		{
+			name:    "enabled unset",
+			obj:     scalingObject(t, types.BoolNull(), types.Int64Value(1), types.Int64Value(2)),
+			wantErr: "enabled must be set",
+		},
+		{
+			name:    "enable without bounds",
+			obj:     scalingObject(t, types.BoolValue(true), types.Int64Null(), types.Int64Null()),
+			wantErr: "requires both",
+		},
+		{
+			name:    "enable without max",
+			obj:     scalingObject(t, types.BoolValue(true), types.Int64Value(1), types.Int64Null()),
+			wantErr: "requires both",
+		},
+		{
+			name:    "enable without min",
+			obj:     scalingObject(t, types.BoolValue(true), types.Int64Null(), types.Int64Value(2)),
+			wantErr: "requires both",
+		},
+		{
+			name:    "min above max",
+			obj:     scalingObject(t, types.BoolValue(true), types.Int64Value(3), types.Int64Value(2)),
+			wantErr: "must be <=",
+		},
+		{
+			name:    "min equals max",
+			obj:     scalingObject(t, types.BoolValue(true), types.Int64Value(2), types.Int64Value(2)),
+			wantErr: "",
+		},
+		{
+			name:    "zero to zero",
+			obj:     scalingObject(t, types.BoolValue(true), types.Int64Value(0), types.Int64Value(0)),
+			wantErr: "",
+		},
+		{
+			name:    "unknown bound",
+			obj:     scalingObject(t, types.BoolValue(true), types.Int64Unknown(), types.Int64Value(2)),
+			wantErr: "",
+		},
+		{
+			name:    "disable flag-only",
+			obj:     scalingObject(t, types.BoolValue(false), types.Int64Null(), types.Int64Null()),
+			wantErr: "",
+		},
+		{
+			name:    "bounds on disable",
+			obj:     scalingObject(t, types.BoolValue(false), types.Int64Value(1), types.Int64Value(2)),
+			wantErr: "omit min_node_size",
+		},
+		{
+			name:    "min on disable",
+			obj:     scalingObject(t, types.BoolValue(false), types.Int64Value(1), types.Int64Null()),
+			wantErr: "omit min_node_size",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := &resource.ValidateConfigResponse{}
+			r.validateAutoscalingConfig(ctx, tc.obj, resp)
+
+			if tc.wantErr == "" {
+				if resp.Diagnostics.HasError() {
+					t.Errorf("unexpected diagnostics: %v", resp.Diagnostics)
+				}
+
+				return
+			}
+			if !resp.Diagnostics.HasError() {
+				t.Fatalf("expected an error containing %q", tc.wantErr)
+			}
+			if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, tc.wantErr) {
+				t.Errorf("error = %q, want it to contain %q", detail, tc.wantErr)
+			}
+		})
+	}
+
+	// Negative bounds are rejected by the attribute validators, which the
+	// framework runs before ValidateConfig; 0 is accepted for both.
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+	block, ok := schemaResp.Schema.Blocks["autoscaling_config"].(schema.SingleNestedBlock)
+	if !ok {
+		t.Fatal("autoscaling_config is not a SingleNestedBlock")
+	}
+	for _, field := range []string{"min_node_size", "max_node_size"} {
+		bound, ok := block.Attributes[field].(schema.Int64Attribute)
+		if !ok {
+			t.Fatalf("%s is not an Int64Attribute", field)
+		}
+		for _, tc := range []struct {
+			value   int64
+			wantErr bool
+		}{{-1, true}, {0, false}, {1, false}} {
+			var diags diag.Diagnostics
+			for _, v := range bound.Validators {
+				vResp := &validator.Int64Response{}
+				v.ValidateInt64(ctx, validator.Int64Request{
+					Path:        path.Root("autoscaling_config").AtName(field),
+					ConfigValue: types.Int64Value(tc.value),
+				}, vResp)
+				diags.Append(vResp.Diagnostics...)
+			}
+			if diags.HasError() != tc.wantErr {
+				t.Errorf("%s = %d: error = %v, want error %v", field, tc.value, diags.HasError(), tc.wantErr)
+			}
+		}
+	}
+}
+
+func scalingObject(t *testing.T, enabled types.Bool, minSize, maxSize types.Int64) types.Object {
+	t.Helper()
+
+	obj, d := types.ObjectValue(autoscalingConfigAttrTypes, map[string]attr.Value{
+		"enabled":       enabled,
+		"min_node_size": minSize,
+		"max_node_size": maxSize,
+	})
+	if d.HasError() {
+		t.Fatalf("building scaling object: %v", d)
+	}
+
+	return obj
+}
+
+func TestValidateAutoscalingUpdateCount(t *testing.T) {
+	ctx := context.Background()
+	enabled := func(minSize, maxSize types.Int64) types.Object {
+		return scalingObject(t, types.BoolValue(true), minSize, maxSize)
+	}
+
+	tests := []struct {
+		name    string
+		count   types.Int64
+		obj     types.Object
+		wantErr bool
+	}{
+		{"within bounds", types.Int64Value(3), enabled(types.Int64Value(1), types.Int64Value(5)), false},
+		{"at min", types.Int64Value(1), enabled(types.Int64Value(1), types.Int64Value(5)), false},
+		{"at max", types.Int64Value(5), enabled(types.Int64Value(1), types.Int64Value(5)), false},
+		{"zero to zero", types.Int64Value(0), enabled(types.Int64Value(0), types.Int64Value(0)), false},
+		{"below min", types.Int64Value(0), enabled(types.Int64Value(1), types.Int64Value(5)), true},
+		{"above max", types.Int64Value(7), enabled(types.Int64Value(1), types.Int64Value(5)), true},
+		{"unknown count", types.Int64Unknown(), enabled(types.Int64Value(1), types.Int64Value(5)), false},
+		{"null count", types.Int64Null(), enabled(types.Int64Value(1), types.Int64Value(5)), false},
+		{"unknown min", types.Int64Value(7), enabled(types.Int64Unknown(), types.Int64Value(5)), false},
+		{"unknown max", types.Int64Value(7), enabled(types.Int64Value(1), types.Int64Unknown()), false},
+		{"null bounds", types.Int64Value(7), enabled(types.Int64Null(), types.Int64Null()), false},
+		{
+			"unknown enabled", types.Int64Value(7),
+			scalingObject(t, types.BoolUnknown(), types.Int64Value(1), types.Int64Value(5)), false,
+		},
+		{
+			"disabled", types.Int64Value(7),
+			scalingObject(t, types.BoolValue(false), types.Int64Null(), types.Int64Null()), false,
+		},
+		{"null block", types.Int64Value(7), types.ObjectNull(autoscalingConfigAttrTypes), false},
+		{"unknown block", types.Int64Value(7), types.ObjectUnknown(autoscalingConfigAttrTypes), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := validateAutoscalingUpdateCount(ctx, tc.count, tc.obj)
+			if diags.HasError() != tc.wantErr {
+				t.Fatalf("error = %v, want error %v: %v", diags.HasError(), tc.wantErr, diags)
+			}
+			if !tc.wantErr {
+				return
+			}
+
+			errDiag := diags.Errors()[0]
+			withPath, ok := errDiag.(diag.DiagnosticWithPath)
+			if !ok || !withPath.Path().Equal(path.Root("instance_count")) {
+				t.Errorf("error should be attributed to instance_count, got %v", errDiag)
+			}
+			detail := errDiag.Detail()
+			for _, want := range []string{
+				fmt.Sprintf("instance_count = %d", tc.count.ValueInt64()),
+				"min_node_size = 1", "max_node_size = 5", "ignore_changes",
+			} {
+				if !strings.Contains(detail, want) {
+					t.Errorf("detail %q should contain %q", detail, want)
+				}
+			}
+		})
 	}
 }

@@ -47,13 +47,14 @@ resource "crusoe_kubernetes_node_pool" "example" {
 ### Required
 
 - `cluster_id` (String) ID of the Kubernetes cluster the node pool belongs to.
-- `instance_count` (Number) Number of nodes in the node pool.
+- `instance_count` (Number) Number of nodes in the node pool. While autoscaling is enabled, the cluster autoscaler manages the node count, so `instance_count` drifts from the configuration. Every update sends `instance_count`: a plan shows the autoscaler's changes as a diff, and applying it resizes the node pool back to the configured value, which the API rejects when it lies outside the autoscaling bounds. Configurations that enable autoscaling should set `lifecycle { ignore_changes = [instance_count] }`; the configured value then only sets the node pool's size at creation.
 - `name` (String) Name of the node pool.
 - `ssh_key` (String) SSH public key to use for all VMs created from the new node pool.
 - `type` (String) VM type of the node pool.
 
 ### Optional
 
+- `autoscaling_config` (Block, Optional) Autoscaling configuration for the node pool. Only applicable when a supported cluster autoscaler version is installed in the cluster. Enabling requires both `min_node_size` and `max_node_size` and replaces any previously stored bounds. Setting `enabled = false` (or removing this block) disables autoscaling: the cluster autoscaler no longer scales the node pool, and the stored bounds are retained by the API but unused; omit the bounds when disabling. While autoscaling is enabled, the cluster autoscaler manages the node count, so `instance_count` drifts from the configuration. Every update sends `instance_count`: a plan shows the autoscaler's changes as a diff, and applying it resizes the node pool back to the configured value, which the API rejects when it lies outside the autoscaling bounds. Configurations that enable autoscaling should set `lifecycle { ignore_changes = [instance_count] }`; the configured value then only sets the node pool's size at creation. After an import, a node pool with autoscaling disabled has no block in state, so a configuration that sets `enabled = false` plans to add it. Applying that plan sends the disable again, which changes nothing, together with `instance_count`. (see [below for nested schema](#nestedblock--autoscaling_config))
 - `batch_percentage` (Number) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. Percentage of nodes to update concurrently during rollout. The calculated number will not exceed 10 nodes. Mutually exclusive with batch_size. If both this and batch_size are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
 - `batch_size` (Number) This feature is currently in development. Reach out to support@crusoecloud.com with any questions. Number of nodes to update at a time during rollout (minimum 1, maximum 10). Mutually exclusive with batch_percentage. If both this and batch_percentage are omitted, existing nodes will not be updated, but new nodes will use the new configuration.
 - `consent_mode` (String) Remediation consent posture for the node pool. Possible values: `auto`, `propose`, `off`. Newly created node pools default to `propose`. A node pool that predates this setting starts at `off`, so that remediation does not begin on a pool whose owner was never asked. Supported only on some clusters; null on node pools where it is not supported. Reach out to support@crusoecloud.com with any questions.
@@ -78,6 +79,16 @@ resource "crusoe_kubernetes_node_pool" "example" {
 - `instance_ids` (List of String) IDs of the instances within the node pool.
 - `node_pool_generation` (Number) Generation of the node pool. Null when the API does not report it.
 - `state` (String) Current state of the node pool.
+
+<a id="nestedblock--autoscaling_config"></a>
+### Nested Schema for `autoscaling_config`
+
+Optional:
+
+- `enabled` (Boolean) Whether the cluster autoscaler manages this node pool. Must be set whenever the block is present.
+- `max_node_size` (Number) Maximum number of nodes the autoscaler may scale the node pool up to. Required when `enabled` is true; omit when disabling (stored bounds are retained). `min_node_size` must not exceed `max_node_size`; both may be 0, which holds the node pool at zero nodes.
+- `min_node_size` (Number) Minimum number of nodes the autoscaler may scale the node pool down to. Required when `enabled` is true; omit when disabling (stored bounds are retained). `min_node_size` must not exceed `max_node_size`; both may be 0, which holds the node pool at zero nodes.
+
 
 <a id="nestedblock--node_taints"></a>
 ### Nested Schema for `node_taints`

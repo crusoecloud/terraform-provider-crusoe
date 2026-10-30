@@ -65,6 +65,14 @@ const (
 
 	apiDescGeneration = "Generation of the node pool."
 
+	// Scaling config descriptions match the gateway's struct comments; the
+	// swagger spec gains them with the client-go regen for this feature —
+	// re-run /derive-schema-descriptions after bumping client-go.
+	apiDescAutoscalingConfig      = "Autoscaling configuration for the node pool."
+	apiDescAutoscalingEnabled     = "Whether the cluster autoscaler manages this node pool."
+	apiDescAutoscalingMinNodeSize = "Minimum number of nodes the autoscaler may scale the node pool down to."
+	apiDescAutoscalingMaxNodeSize = "Maximum number of nodes the autoscaler may scale the node pool up to."
+
 	apiDescTaintKey    = "Taint key. Follows the Kubernetes qualified-name format: an optional DNS subdomain prefix (up to 253 characters) followed by a `/`, then a name segment (up to 63 characters). Allowed characters: alphanumerics, `-`, `_`, and `.`. Must start and end with an alphanumeric character. Keys beginning with `crusoe.ai/` are reserved for internal use."
 	apiDescTaintValue  = "Taint value. May be empty. Follows the same format rules as a Kubernetes label value: up to 63 characters, alphanumerics and `-`, `_`, `.`."
 	apiDescTaintEffect = "Taint effect, controlling how pods are treated on matching nodes. `NoSchedule`: new pods are not scheduled unless they tolerate. `PreferNoSchedule`: new pods avoid the node if possible. `NoExecute`: new pods are not scheduled and existing non-tolerating pods are evicted."
@@ -99,6 +107,34 @@ const (
 	providerDescConsentModeDefault = "Newly created node pools default to `propose`. " +
 		"A node pool that predates this setting starts at `off`, so that remediation does not begin " +
 		"on a pool whose owner was never asked."
+	providerDescAutoscalingConfig = "Enabling requires both `min_node_size` and `max_node_size` and replaces any " +
+		"previously stored bounds. Setting `enabled = false` (or removing this block) disables autoscaling: " +
+		"the cluster autoscaler no longer scales the node pool, and the stored " +
+		"bounds are retained by the API but unused; omit the bounds when disabling. " + providerDescAutoscalingOwnsCount + " " + providerDescAutoscalingImport
+	// providerDescAutoscalingImport: an import has no config to mirror, so a
+	// disabled pool maps to a null block (see autoscalingConfigToTFObject).
+	providerDescAutoscalingImport = "After an import, a node pool with autoscaling disabled has no block in " +
+		"state, so a configuration that sets `enabled = false` plans to add it. Applying that plan sends the " +
+		"disable again, which changes nothing, together with `instance_count`."
+	// providerDescAutoscalingRequiresAutoscaler is a generic caveat: which
+	// autoscaler versions honor the block is not something the API reports.
+	providerDescAutoscalingRequiresAutoscaler = "Only applicable when a supported cluster autoscaler version " +
+		"is installed in the cluster."
+	providerDescAutoscalingBounds = "Required when `enabled` is true; omit when disabling (stored bounds are retained). " +
+		"`min_node_size` must not exceed `max_node_size`; both may be 0, which holds the node pool at zero nodes."
+	providerDescAutoscalingEnabled = "Must be set whenever the block is present."
+	// providerDescAutoscalingOwnsCount is shared by instance_count and
+	// autoscaling_config. Every update sends instance_count, because the
+	// generated client's count has no omitempty, so without ignore_changes a
+	// plan reverts whatever the autoscaler did.
+	providerDescAutoscalingOwnsCount = "While autoscaling is enabled, the cluster autoscaler manages the node " +
+		"count, so `instance_count` drifts from the configuration. Every update sends `instance_count`: a plan " +
+		"shows the autoscaler's changes as a diff, and applying it resizes the node pool back to the configured " +
+		"value, which the API rejects when it lies outside the autoscaling bounds. Configurations that enable " +
+		"autoscaling should set `lifecycle { ignore_changes = [instance_count] }`; the configured value then " +
+		"only sets the node pool's size at creation."
+	providerDescAutoscalingDataSource = "Null when autoscaling has never been configured on the node pool. " +
+		"A node pool with autoscaling disabled reports `enabled = false` with the bounds the API retains."
 )
 
 // providerDescIBPartitionIDDeprecated marks ib_partition_id as replaced by
@@ -360,6 +396,115 @@ func validateNodeTaintDuplicates(taints []swagger.KubernetesNodeTaint) error {
 	}
 }
 
+// tfObjectToAutoscalingConfig converts the autoscaling_config block into the API
+// model. A null or unknown block returns nil (autoscaling left untouched).
+// Disable writes leave the bounds unset, but the generated client's bounds have
+// no omitempty, so the wire carries {"enabled":false,"max_node_size":0,
+// "min_node_size":0}; the server ignores bounds on disable and retains the
+// stored ones.
+func tfObjectToAutoscalingConfig(ctx context.Context, obj types.Object) (*swagger.KubernetesNodePoolAutoscalingConfig, diag.Diagnostics) {
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil, nil
+	}
+
+	var sc autoscalingConfigModel
+	diags := obj.As(ctx, &sc, basetypes.ObjectAsOptions{})
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	if !sc.Enabled.ValueBool() {
+		return &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false}, diags
+	}
+
+	return &swagger.KubernetesNodePoolAutoscalingConfig{
+		Enabled:     true,
+		MinNodeSize: sc.MinNodeSize.ValueInt64(),
+		MaxNodeSize: sc.MaxNodeSize.ValueInt64(),
+	}, diags
+}
+
+// autoscalingUpdateConfig decides the autoscaling_config sent on an update. A
+// block removed from config while state still holds one sends an explicit
+// disable: Terraform cannot express "don't touch", and omitting the block would
+// silently leave autoscaling on. The API retains the stored bounds
+// (paused-pool semantics).
+func autoscalingUpdateConfig(ctx context.Context, plan, stored types.Object) (*swagger.KubernetesNodePoolAutoscalingConfig, diag.Diagnostics) {
+	scalingConfig, diags := tfObjectToAutoscalingConfig(ctx, plan)
+	if diags.HasError() {
+		return nil, diags
+	}
+	if scalingConfig == nil && !stored.IsNull() {
+		scalingConfig = &swagger.KubernetesNodePoolAutoscalingConfig{Enabled: false}
+	}
+
+	return scalingConfig, diags
+}
+
+// autoscalingConfigFromAPI maps the API's block as reported. A missing block
+// means autoscaling was never configured on the pool and maps to null, so it
+// stays distinct from a disabled pool, which reports enabled = false with the
+// bounds the API retains. The data source uses this directly; the resource
+// uses it for an enabled pool the config does not describe.
+func autoscalingConfigFromAPI(scalingConfig *swagger.KubernetesNodePoolAutoscalingConfig) (types.Object, diag.Diagnostics) {
+	if scalingConfig == nil {
+		return types.ObjectNull(autoscalingConfigAttrTypes), nil
+	}
+
+	return types.ObjectValue(autoscalingConfigAttrTypes, map[string]attr.Value{
+		"enabled":       types.BoolValue(scalingConfig.Enabled),
+		"min_node_size": types.Int64Value(scalingConfig.MinNodeSize),
+		"max_node_size": types.Int64Value(scalingConfig.MaxNodeSize),
+	})
+}
+
+// autoscalingConfigToTFObject maps the API's block into resource state. The ref
+// block preserves the config's shape: a pool whose config never used the block
+// (ref null) and that isn't enabled keeps a null block, so unconfigured and
+// never-configured pools don't show a spurious "block removed" diff. An
+// enabled pool always surfaces the block, even if the config omitted it —
+// that drift is real (autoscaling was enabled outside Terraform).
+//
+// For a disabled pool whose ref omits the bounds (the pause flow — the block
+// bounds are not Computed, see the schema comment), the bounds stay null in
+// state: the API retains the stored bounds, but surfacing them would produce
+// a permanent diff against the boundless config. A disabled pool whose ref
+// carries bounds (e.g. prior state was enabled and the pool was paused
+// outside Terraform) surfaces the API values so the drift is visible. A
+// missing API block under a present ref keeps the block with null bounds,
+// matching what the config can express.
+func autoscalingConfigToTFObject(ctx context.Context, scalingConfig *swagger.KubernetesNodePoolAutoscalingConfig, ref types.Object) (types.Object, diag.Diagnostics) {
+	enabled := scalingConfig != nil && scalingConfig.Enabled
+	if ref.IsNull() {
+		if !enabled {
+			return types.ObjectNull(autoscalingConfigAttrTypes), nil
+		}
+
+		return autoscalingConfigFromAPI(scalingConfig)
+	}
+
+	mirrorConfigShape := false
+	if !ref.IsUnknown() && !enabled {
+		var refSC autoscalingConfigModel
+		if diags := ref.As(ctx, &refSC, basetypes.ObjectAsOptions{}); diags.HasError() {
+			return types.ObjectNull(autoscalingConfigAttrTypes), diags
+		}
+		mirrorConfigShape = refSC.MinNodeSize.IsNull() && refSC.MaxNodeSize.IsNull()
+	}
+
+	minVal, maxVal := types.Int64Null(), types.Int64Null()
+	if scalingConfig != nil && !mirrorConfigShape {
+		minVal = types.Int64Value(scalingConfig.MinNodeSize)
+		maxVal = types.Int64Value(scalingConfig.MaxNodeSize)
+	}
+
+	return types.ObjectValue(autoscalingConfigAttrTypes, map[string]attr.Value{
+		"enabled":       types.BoolValue(enabled),
+		"min_node_size": minVal,
+		"max_node_size": maxVal,
+	})
+}
+
 // nodePoolToResourceModel maps an API node pool onto model, following the CCX-4492
 // convention that the API object is the source of truth. It is called from Create,
 // Read, and Update so the three previously-duplicated mappings stay in sync — in
@@ -396,6 +541,10 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	instanceIDs, d := common.StringSliceToTFList(sortedInstanceIDs(nodePool.InstanceIds))
 	diags.Append(d...)
 	model.InstanceIDs = instanceIDs
+
+	scalingConfig, d := autoscalingConfigToTFObject(ctx, nodePool.AutoscalingConfig, ref.AutoscalingConfig)
+	diags.Append(d...)
+	model.AutoscalingConfig = scalingConfig
 
 	// The v2-only group. All four are absent on a node pool served by v1, and
 	// absence is carried through rather than defaulted — see the API contract
@@ -493,6 +642,8 @@ func nodePoolToDataSourceModel(ctx context.Context, nodePool *swagger.Kubernetes
 	diags.Append(d...)
 	model.Current = currentOrNull(nodePool)
 	model.NodePoolGeneration = common.GenerationOrNull(nodePool.NodePoolGeneration)
+	model.AutoscalingConfig, d = autoscalingConfigFromAPI(nodePool.AutoscalingConfig)
+	diags.Append(d...)
 }
 
 // stringOrNull maps an empty API string to a null value, matching how the nullable
