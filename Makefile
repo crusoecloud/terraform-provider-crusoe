@@ -96,3 +96,7 @@ changelog-tags: ## Lists the valid product tags for fragments, from the docs rep
 .PHONY: release-manifest
 release-manifest: ## Prints release-manifest.json for the top section of CHANGELOG.md
 	@scripts/release-manifest.sh
+
+.PHONY: release-check
+release-check: ## Checks that the top section of CHANGELOG.md is the version the release workflow will tag
+	@scripts/release-check.sh

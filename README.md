@@ -187,8 +187,8 @@ Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 1. Make a branch off `main` and open a merge request from your branch into `main`.
 2. A Crusoe Cloud maintainer reviews the merge request and merges it into `main` once it can ship: `main` is releasable at all times, so a change that depends on a backend not yet in production waits in the merge request. Every merge request needs an approval from the Client Interfaces squad (CCX-CI), the code owner of the repository (`.gitlab/CODEOWNERS`).
 3. Add a changelog fragment to the merge request, `.changelog/<MR>.txt` (see Maintaining Changelog below). CI fails a merge request that needs one and has none.
-4. Before a release, a maintainer runs `make changelog` on a branch off `main`, which renders the fragments merged since the last release into a new section of `CHANGELOG.md`, and merges that release-prep commit into `main` (with the `versions.env` bump for a minor or major release).
-5. To release: open a merge request from `main` into `release`. Its review checks the rendered changelog entry by entry; it does not hold features back, since everything on `main` can ship.
+4. Before a release, a maintainer runs the `prepare_release` job on a `main` pipeline (see Preparing a release below). It renders the fragments merged since the last release into a new section of `CHANGELOG.md`, with the `versions.env` bump for a minor or major release, and opens the release-prep merge request into `main`.
+5. When that merge request merges, the `cut_release_candidate` job opens the merge request from `rc/<version>` into `release`. Its review checks the rendered changelog entry by entry; it does not hold features back, since everything on `main` can ship.
 6. Once the merge request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
 
 ### Features behind a server-side flag
@@ -209,6 +209,11 @@ The Crusoe Cloud changelog follows [Hashicorp's best practices](https://develope
 
 ### Preparing a release
 
-`make changelog` renders the fragments merged since the last release tag into a new `## vX.Y.Z (date)` section at the top of `CHANGELOG.md`; `make changelog-preview` prints it without editing the file. The version is the next patch of `versions.env`, the one the release pipeline will tag; for a minor or major release run `make changelog VERSION=vX.Y.0` and bump `versions.env` in the same commit. Commit the section to `main` in a release-prep commit **before** the release MR is opened. Never add it on the `release` branch or inside the release MR, which would make `release` diverge from `main` and conflict on the next merge. Until the version is tagged, running `make changelog` again replaces the section, so a wrong entry is fixed in its fragment and rendered again rather than edited in `CHANGELOG.md`.
+Two CI jobs do the release prep, as the CCX Release Bot:
 
-The release tags live on GitHub, where the release workflow creates them; `make changelog` fetches them itself. Sections up to 1.8.0 were written by hand and keep their format.
+1. `prepare_release`, manual on every `main` pipeline. Run it from the pipeline graph for the next patch of `versions.env`; for a minor or major release open the job page and set `version` to `vX.Y.0`, which also bumps `versions.env`. The job renders the fragments merged since the last release into a new `## vX.Y.Z (date)` section at the top of `CHANGELOG.md`, commits on `release-prep/<version>` and opens the merge request into `main` (or refreshes the one already open). Review the wording there; fix a wrong entry in its fragment and run the job again rather than editing `CHANGELOG.md`.
+2. `cut_release_candidate`, automatic on `main` when `CHANGELOG.md` changes, that is when the prep merges. It points `rc/<version>` at that commit and opens the merge request into `release`, squash off, with the section as its description. Merging it fast-forwards `release`; the GitHub workflow then tags and publishes.
+
+`changelog_release_check` runs in merge requests into `release` and on the branch itself, and fails when the top section of `CHANGELOG.md` is not the version about to be tagged (`make release-check` does the same locally). Never add the section on the `release` branch or inside the release MR, which would make `release` diverge from `main`.
+
+By hand, the same thing is `make changelog` (or `make changelog VERSION=vX.Y.0` plus the `versions.env` bump) committed on a branch off `main` and merged before the release MR; `make changelog-preview` prints the section without editing the file. Until the version is tagged, running it again replaces the section. The release tags live on GitHub, where the release workflow creates them; the scripts fetch them themselves. Sections up to 1.8.0 were written by hand and keep their format.

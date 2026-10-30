@@ -1,11 +1,11 @@
 ---
 name: release-prep
-description: Use when cutting or preparing a release of this provider — rendering the CHANGELOG section with `make changelog`, bumping versions.env, opening the release-prep MR into main, or the main→release MR. Triggers include "release X.Y", "cut a release", "prep the release", "update the changelog for the release", "bump the version".
+description: Use when cutting or preparing a release of this provider — running the prepare_release job (or `make changelog` by hand), bumping versions.env, the release-prep MR into main, or the rc/<version> → release MR. Triggers include "release X.Y", "cut a release", "prep the release", "update the changelog for the release", "bump the version".
 ---
 
 # Release Prep
 
-Two MRs, in order: **(1)** a prep commit into `main`, **(2)** `main → release` (never squashed). Policy: CLAUDE.md "Changelog and Versioning" + readme "Versioning" / "Contributing" / "Maintaining Changelog". This is the operational checklist.
+Two MRs, in order: **(1)** a prep commit into `main`, **(2)** `rc/<version> → release` (never squashed). Two CI jobs open them as the release bot: `prepare_release`, manual on every `main` pipeline (job input `version` for a minor or major release), and `cut_release_candidate`, automatic once the prep merges (README, "Preparing a release"). Policy: CLAUDE.md "Changelog and Versioning" + README "Versioning" / "Contributing" / "Maintaining Changelog". This is the checklist of what to verify around the jobs, and the by-hand path when a job cannot run.
 
 ## 1. Establish the delta
 
@@ -26,6 +26,8 @@ git log --oneline origin/main..origin/release   # must be EMPTY; commits only on
 
 ## 3. Prep commit (branch off `origin/main`)
 
+Preferred: run `prepare_release` on the latest `main` pipeline (play icon for a patch; open the job page and set `version` to `vX.Y.0` for a minor or major), then review the MR it opens. By hand, the same commit is:
+
 - `CHANGELOG.md`: `make changelog` (patch) or `make changelog VERSION=vX.Y.0` (minor/major) renders the fragments merged since the last tag into a new `## vX.Y.Z (date)` section at the top. Never write the section by hand: a wrong or missing entry is fixed in its fragment (a missing one gets a fragment of its own, named after the original MR, merged into `main` first), then render again; until the tag exists the command replaces the section.
 - **Deprecation sweep** (precedent: `e3707ea`): `grep -rn 'FormatDeprecationWithReplacement' internal/` — any message naming an already-shipped version was written against a release that didn't include it; correct it to X.Y.Z. Data-source copies carry the notice in `MarkdownDescription` only, never `DeprecationMessage` (1.3.1 lesson: attribute deprecations propagate to whole-object references).
 - `grep -n replace go.mod` — must be empty. Lint allow-lists client-go replaces, so CI will NOT catch a preview-SDK pin reaching a release.
@@ -36,7 +38,7 @@ git log --oneline origin/main..origin/release   # must be EMPTY; commits only on
 ## 4. Release MR
 
 1. Wait for the prep MR to merge and `main`'s pipeline to go green. **Freeze `main` until the release ships** — anything merging now is missing from the changelog.
-2. Open `main → release`, title `Release vX.Y.Z`. **Squash OFF, merge commit, never delete the source branch.** No file edits in this MR.
+2. `cut_release_candidate` opens `rc/vX.Y.Z → release`, title `Release vX.Y.Z`, squash off, when the prep merges; `changelog_release_check` in that MR confirms the section is the version about to be tagged. By hand only if the job could not run: open `main → release` yourself, **squash OFF, merge commit**. No file edits in this MR.
 3. On merge: the GitHub semver-tag workflow tags `vX.Y.Z`, goreleaser publishes to the registry, announcement lands in `#ccx-ci-releases`.
 
 ## 5. Verify

@@ -30,6 +30,84 @@ changelog_check:
   script:
     - scripts/changelog-check.sh
 
+# On the release branch, and in merge requests into it, the top section of
+# CHANGELOG.md must be the version the GitHub workflow is about to tag, so a
+# stale changelog fails here, before the merge; the workflow checks again
+# before tagging.
+changelog_release_check:
+  needs: []
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release"'
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "release"'
+  script:
+    - scripts/release-check.sh
+
+# The release jobs (README, "Preparing a release"). prepare_release is the
+# click that starts a release: on a main pipeline it renders CHANGELOG.md and
+# opens the release-prep merge request. cut_release_candidate runs on main when
+# CHANGELOG.md changes, that is when the prep merges, and opens the merge
+# request into release from rc/<version>. Both commit and push as the release
+# bot, whose token and signing key are protected variables (main only). In a
+# merge request pipeline they appear as manual jobs when their scripts change,
+# run without the bot and keep what they would have pushed as artifacts.
+prepare_release:
+  stage: build
+  needs: []
+  manual_confirmation: >-
+    This opens the release-prep merge request for the next patch of
+    versions.env, as the release bot. For a minor or major release, cancel and
+    open the job page instead to set "version". Nothing is published until that
+    merge request and the one into release are reviewed and merged.
+  variables:
+    GIT_DEPTH: 0   # go-changelog walks the history from the last tag
+  inputs:
+    version:
+      default: ""
+      description: "Empty: the next patch of versions.env. For a minor or major release, vX.Y.0: the job bumps versions.env in the same commit."
+      regex: '^(v[0-9]+\.[0-9]+\.[0-9]+)?$'
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: true
+    - if: '$CI_MERGE_REQUEST_IID'
+      changes:
+        - .gitlab-ci.yml
+        - scripts/changelog-build.sh
+        - scripts/release-*.sh
+      when: manual
+      allow_failure: true
+  script:
+    - 'VERSION="${{ job.inputs.version }}" scripts/release-prepare.sh'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - release-prep.patch
+      - release-prep-mr.md
+
+cut_release_candidate:
+  stage: deploy
+  needs:
+    - job: test_and_lint
+      optional: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes:
+        - CHANGELOG.md
+    - if: '$CI_MERGE_REQUEST_IID'
+      changes:
+        - .gitlab-ci.yml
+        - scripts/release-*.sh
+      when: manual
+      allow_failure: true
+  script:
+    - scripts/release-candidate.sh
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - release-candidate-mr.md
+
 # Remove the tag_semver and pages jobs from merges into main.
 # The tag_semver job will be run using a GitHub action on
 # merges into the release branch, and we will only ever
