@@ -33,6 +33,15 @@ func TestGenerationOrNull(t *testing.T) {
 	}
 }
 
+func TestStringOrNull(t *testing.T) {
+	if got := StringOrNull(""); !got.IsNull() {
+		t.Errorf(`StringOrNull("") = %v, want null`, got)
+	}
+	if got := StringOrNull("v1.19.1"); got.ValueString() != "v1.19.1" {
+		t.Errorf("StringOrNull returned %q, want %q", got.ValueString(), "v1.19.1")
+	}
+}
+
 func TestStringSliceToTFList(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -22,15 +22,6 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
-func TestStringOrNull(t *testing.T) {
-	if got := stringOrNull(""); !got.IsNull() {
-		t.Errorf("stringOrNull(\"\") = %v, want null", got)
-	}
-	if got := stringOrNull("nvlink-1"); got.ValueString() != "nvlink-1" {
-		t.Errorf("stringOrNull(%q) = %q, want %q", "nvlink-1", got.ValueString(), "nvlink-1")
-	}
-}
-
 func TestSortedInstanceIDs(t *testing.T) {
 	got := sortedInstanceIDs([]string{"i-c", "i-a", "i-b"})
 	if want := []string{"i-a", "i-b", "i-c"}; !reflect.DeepEqual(got, want) {

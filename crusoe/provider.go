@@ -26,6 +26,7 @@ import (
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/instance_group"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/instance_template"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubeconfig"
+	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubernetes_addon"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubernetes_cluster"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/kubernetes/kubernetes_node_pool"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/load_balancer"
@@ -97,6 +98,8 @@ func (p *crusoeProvider) DataSources(_ context.Context) []func() datasource.Data
 		kubeconfig.NewKubeConfigDataSource,
 		kubernetes_cluster.NewKubernetesClusterDataSource,
 		kubernetes_node_pool.NewKubernetesNodePoolDataSource,
+		kubernetes_addon.NewKubernetesAddonsDataSource,
+		kubernetes_addon.NewKubernetesAvailableAddonsDataSource,
 		custom_image.NewCustomImageDataSource,
 		repository.NewRegistryRepositoriesDataSource,
 		image.NewRegistryImagesDataSource,
@@ -125,6 +128,7 @@ func (p *crusoeProvider) Resources(_ context.Context) []func() resource.Resource
 		kubeconfig.NewKubeConfigResource,
 		kubernetes_cluster.NewKubernetesClusterResource,
 		kubernetes_node_pool.NewKubernetesNodePoolResource,
+		kubernetes_addon.NewKubernetesAddonResource,
 		repository.NewRegistryRepositoryResource,
 		token.NewRegistryTokenResource,
 		s3_bucket.NewS3BucketResource,

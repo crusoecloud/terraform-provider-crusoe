@@ -528,7 +528,7 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	model.Name = types.StringValue(nodePool.Name)
 	model.EphemeralStorageForContainerd = types.BoolValue(nodePool.EphemeralStorageForContainerd)
 	model.PublicIPType = types.StringValue(nodePool.PublicIpType)
-	model.NvlinkDomainID = stringOrNull(nodePool.NvlinkDomainId)
+	model.NvlinkDomainID = common.StringOrNull(nodePool.NvlinkDomainId)
 
 	allNodeLabels, d := common.StringMapToTFMap(nodePool.NodeLabels)
 	diags.Append(d...)
@@ -549,7 +549,7 @@ func nodePoolToResourceModel(ctx context.Context, nodePool *swagger.KubernetesNo
 	// The v2-only group. All four are absent on a node pool served by v1, and
 	// absence is carried through rather than defaulted — see the API contract
 	// notes on each helper.
-	model.ConsentMode = stringOrNull(nodePool.ConsentMode)
+	model.ConsentMode = common.StringOrNull(nodePool.ConsentMode)
 
 	updateSettings, d := updateSettingsToTFObject(nodePool.UpdateSettings)
 	diags.Append(d...)
@@ -633,9 +633,9 @@ func nodePoolToDataSourceModel(ctx context.Context, nodePool *swagger.Kubernetes
 	model.State = types.StringValue(nodePool.State)
 	model.Name = types.StringValue(nodePool.Name)
 	model.EphemeralStorageForContainerd = types.BoolValue(nodePool.EphemeralStorageForContainerd)
-	model.NvlinkDomainID = stringOrNull(nodePool.NvlinkDomainId)
+	model.NvlinkDomainID = common.StringOrNull(nodePool.NvlinkDomainId)
 	model.PublicIPType = types.StringValue(nodePool.PublicIpType)
-	model.ConsentMode = stringOrNull(nodePool.ConsentMode)
+	model.ConsentMode = common.StringOrNull(nodePool.ConsentMode)
 	model.UpdateSettings, d = updateSettingsToTFObject(nodePool.UpdateSettings)
 	diags.Append(d...)
 	model.Health, d = healthToTFObject(ctx, nodePool.Health)
@@ -644,16 +644,6 @@ func nodePoolToDataSourceModel(ctx context.Context, nodePool *swagger.Kubernetes
 	model.NodePoolGeneration = common.GenerationOrNull(nodePool.NodePoolGeneration)
 	model.AutoscalingConfig, d = autoscalingConfigFromAPI(nodePool.AutoscalingConfig)
 	diags.Append(d...)
-}
-
-// stringOrNull maps an empty API string to a null value, matching how the nullable
-// nvlink_domain_id attribute is represented in Terraform state.
-func stringOrNull(s string) types.String {
-	if s == "" {
-		return types.StringNull()
-	}
-
-	return types.StringValue(s)
 }
 
 // sortedInstanceIDs returns the instance IDs in a deterministic (lexical) order.
@@ -783,7 +773,7 @@ func healthToTFObject(ctx context.Context, health *swagger.KubernetesNodePoolHea
 		issueValue, d := types.ObjectValue(healthIssueAttrTypes(), map[string]attr.Value{
 			attrIssueCode:       types.StringValue(issue.Code),
 			attrIssueMessage:    types.StringValue(issue.Message),
-			attrIssueSince:      stringOrNull(issue.Since),
+			attrIssueSince:      common.StringOrNull(issue.Since),
 			attrAffectedCount:   types.Int64Value(issue.AffectedCount),
 			attrAffectedNodeIDs: nodeIDs,
 		})

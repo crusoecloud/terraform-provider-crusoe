@@ -513,6 +513,15 @@ func GenerationOrNull(generation int32) types.Int64 {
 	return types.Int64Value(int64(generation))
 }
 
+// StringOrNull maps an empty API string to a null Terraform value.
+func StringOrNull(s string) types.String {
+	if s == "" {
+		return types.StringNull()
+	}
+
+	return types.StringValue(s)
+}
+
 func StringSliceToTFList(s []string) (types.List, diag.Diagnostics) {
 	tfList := make([]attr.Value, len(s))
 	for i, val := range s {

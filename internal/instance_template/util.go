@@ -104,9 +104,9 @@ func instanceTemplateToResourceModel(ctx context.Context, template *swagger.Inst
 	model.Subnet = types.StringValue(template.SubnetId)
 	model.PublicIpAddressType = types.StringValue(template.PublicIpAddressType)
 
-	model.StartupScript = stringOrNull(template.StartupScript)
-	model.ShutdownScript = stringOrNull(template.ShutdownScript)
-	model.NvlinkDomainID = stringOrNull(template.NvlinkDomainId)
+	model.StartupScript = common.StringOrNull(template.StartupScript)
+	model.ShutdownScript = common.StringOrNull(template.ShutdownScript)
+	model.NvlinkDomainID = common.StringOrNull(template.NvlinkDomainId)
 
 	if template.PlacementPolicy != "" {
 		model.PlacementPolicy = types.StringValue(template.PlacementPolicy)
@@ -180,7 +180,7 @@ func hydrateAliasPairForImport(model *instanceTemplateResourceModel, template *s
 		return
 	}
 
-	model.TransportPartitionID = stringOrNull(
+	model.TransportPartitionID = common.StringOrNull(
 		common.EffectiveAliasString(template.IbPartitionId, template.TransportPartitionId))
 }
 
@@ -197,16 +197,6 @@ func stringsToSet(ctx context.Context, values []string, current types.Set,
 	diags.Append(d...)
 
 	return set
-}
-
-// stringOrNull maps an empty API string to a null value, matching how the
-// nullable, Optional attributes are represented in Terraform state.
-func stringOrNull(s string) types.String {
-	if s == "" {
-		return types.StringNull()
-	}
-
-	return types.StringValue(s)
 }
 
 // disksToSet builds the disks Set from the API response. When the template has
