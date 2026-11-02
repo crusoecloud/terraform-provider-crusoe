@@ -1,0 +1,3 @@
+```release-note:bug
+`crusoe_compute_instance_by_template` now sets `attachment_type` and `mode` for each disk in `disks` after create, and a refresh now updates `disks` from the API.
+```

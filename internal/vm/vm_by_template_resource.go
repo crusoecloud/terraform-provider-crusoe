@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -49,6 +50,26 @@ type vmByTemplateResourceModel struct {
 	NvlinkDomainID              types.String `tfsdk:"nvlink_domain_id"`
 	InstallCrusoeWatchAgent     types.Bool   `tfsdk:"install_crusoe_watch_agent"`
 	CrusoeWatchAgentInstallMode types.String `tfsdk:"crusoe_watch_agent_install_mode"`
+}
+
+// vmByTemplateDisksToTerraformResourceModel keeps the OS disk, unlike vmToTerraformResourceModel.
+// Users do not configure disks on this resource, so state lists every disk on the VM.
+func vmByTemplateDisksToTerraformResourceModel(disks []swagger.AttachedDiskV1) (types.Set, diag.Diagnostics) {
+	if len(disks) == 0 {
+		return types.SetNull(vmDiskAttachmentSchema), nil
+	}
+
+	attachments := make([]vmDiskResourceModel, 0, len(disks))
+	for i := range disks {
+		disk := &disks[i]
+		attachments = append(attachments, vmDiskResourceModel{
+			ID:             disk.Id,
+			AttachmentType: disk.AttachmentType,
+			Mode:           disk.Mode,
+		})
+	}
+
+	return types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
 }
 
 func NewVMByTemplateResource() resource.Resource {
@@ -345,6 +366,17 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	}
 	instance := instancesList[0]
 
+	// The operation result gives only the disk IDs. The other disk fields are empty.
+	// Read the VM again so that Create writes the same disks that Read returns.
+	freshInstance, err := getVM(ctx, r.client.APIClient, projectID, instance.Id)
+	if err != nil {
+		resp.Diagnostics.AddWarning("Failed to read instance after create",
+			fmt.Sprintf("The instance was created, but reading it back failed: %s. "+
+				"Disk details will be filled in on the next refresh.", err))
+	} else {
+		instance = *freshInstance
+	}
+
 	plan.ID = types.StringValue(instance.Id)
 	plan.Name = types.StringValue(instance.Name)
 	plan.ProjectID = types.StringValue(projectID)
@@ -406,24 +438,12 @@ func (r *vmByTemplateResource) Create(ctx context.Context, req resource.CreateRe
 	hostChannelAdaptersList, _ := types.ListValueFrom(context.Background(), vmHostChannelAdapterSchema, hostChannelAdapters)
 	plan.HostChannelAdapters = hostChannelAdaptersList
 
-	if len(instance.Disks) > 0 {
-		attachments := []vmDiskResourceModel{}
-		for _, diskAttachment := range instance.Disks {
-			attachments = append(attachments, vmDiskResourceModel{
-				ID:             diskAttachment.Id,
-				AttachmentType: diskAttachment.AttachmentType,
-				Mode:           diskAttachment.Mode,
-			})
-		}
-
-		diskAttachmentsSet, diskDiags := types.SetValueFrom(context.Background(), vmDiskAttachmentSchema, attachments)
-		resp.Diagnostics.Append(diskDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		plan.Disks = diskAttachmentsSet
+	disks, diskDiags := vmByTemplateDisksToTerraformResourceModel(instance.Disks)
+	resp.Diagnostics.Append(diskDiags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
+	plan.Disks = disks
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -450,9 +470,12 @@ func (r *vmByTemplateResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	var vmState vmResourceModel
-	vmToTerraformResourceModel(instance, &vmState)
-	resp.State.Set(ctx, &vmState)
+	disks, diskDiags := vmByTemplateDisksToTerraformResourceModel(instance.Disks)
+	resp.Diagnostics.Append(diskDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Disks = disks
 
 	// install_crusoe_watch_agent and crusoe_watch_agent_install_mode are not returned by the API (create-time-only flags);
 	// preserve existing state values, defaulting to the API defaults when empty (e.g., imports).

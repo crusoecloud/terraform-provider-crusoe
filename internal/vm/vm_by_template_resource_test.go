@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 )
 
@@ -78,6 +79,50 @@ func TestVMByTemplateImportState(t *testing.T) {
 
 		if !resp.Diagnostics.HasError() {
 			t.Error("expected diagnostics error for invalid identifier, got none")
+		}
+	})
+}
+
+// TestVMByTemplateDisksToTerraformResourceModel makes sure that Create and Read write the
+// same disks: every attached disk, the OS disk included, with the API attachment_type.
+func TestVMByTemplateDisksToTerraformResourceModel(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("keeps every disk with its attachment type", func(t *testing.T) {
+		disks, diags := vmByTemplateDisksToTerraformResourceModel([]swagger.AttachedDiskV1{
+			{Id: "os-disk", AttachmentType: DiskOS, Mode: "read-write"},
+			{Id: "data-disk", AttachmentType: "data", Mode: "read-only"},
+		})
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", diags)
+		}
+
+		var got []vmDiskResourceModel
+		if diags := disks.ElementsAs(ctx, &got, false); diags.HasError() {
+			t.Fatalf("failed reading disks: %v", diags)
+		}
+
+		want := map[string]vmDiskResourceModel{
+			"os-disk":   {ID: "os-disk", AttachmentType: DiskOS, Mode: "read-write"},
+			"data-disk": {ID: "data-disk", AttachmentType: "data", Mode: "read-only"},
+		}
+		if len(got) != len(want) {
+			t.Fatalf("got %d disks, want %d", len(got), len(want))
+		}
+		for _, disk := range got {
+			if disk != want[disk.ID] {
+				t.Errorf("disk %q = %+v, want %+v", disk.ID, disk, want[disk.ID])
+			}
+		}
+	})
+
+	t.Run("no disks gives a null set", func(t *testing.T) {
+		disks, diags := vmByTemplateDisksToTerraformResourceModel(nil)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", diags)
+		}
+		if !disks.IsNull() {
+			t.Errorf("disks = %v, want null", disks)
 		}
 	})
 }

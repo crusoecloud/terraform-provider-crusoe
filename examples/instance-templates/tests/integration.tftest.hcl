@@ -85,22 +85,21 @@ run "validate_create_instance_templates" {
     ])}"
   }
 
-  # attachment_type on disk is returning an empty string, commenting out until this can be resolved
-  # assert {
-  #   condition = alltrue([
-  #     for vm in crusoe_compute_instance_by_template.my_vms : length([
-  #       for disk in vm.disks : disk
-  #       if disk.attachment_type != "os"
-  #     ]) == 2
-  #   ])
-  #   error_message = "Failed VM disks verification - expected: 2, actual: ${join("; ", [
-  #     for vm in crusoe_compute_instance_by_template.my_vms :
-  #     "${vm.name}: ${length([
-  #       for disk in vm.disks : disk
-  #       if disk.attachment_type != "os"
-  #     ])}"
-  #   ])}"
-  # }
+  assert {
+    condition = alltrue([
+      for vm in crusoe_compute_instance_by_template.my_vms : length([
+        for disk in vm.disks : disk
+        if disk.attachment_type != "os"
+      ]) == 2
+    ])
+    error_message = "Failed VM disks verification - expected: 2, actual: ${join("; ", [
+      for vm in crusoe_compute_instance_by_template.my_vms :
+      "${vm.name}: ${length([
+        for disk in vm.disks : disk
+        if disk.attachment_type != "os"
+      ])}"
+    ])}"
+  }
 
   assert {
     condition = alltrue([
