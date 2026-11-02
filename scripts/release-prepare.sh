@@ -25,6 +25,7 @@ if ! git diff --quiet -- "$CHANGELOG" "$VERSIONS_FILE"; then
   echo "release-prepare: ${CHANGELOG} or ${VERSIONS_FILE} has uncommitted changes; commit or discard them first" >&2
   exit 1
 fi
+check_go_mod_replace
 
 fetch_release_tags || echo "release-prepare: warning, could not fetch the release tags from GitHub; using local tags" >&2
 

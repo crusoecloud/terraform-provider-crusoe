@@ -216,4 +216,9 @@ Two CI jobs do the release prep, as the CCX Release Bot:
 
 `changelog_release_check` runs in merge requests into `release` and on the branch itself, and fails when the top section of `CHANGELOG.md` is not the version about to be tagged (`make release-check` does the same locally). Never add the section on the `release` branch or inside the release MR, which would make `release` diverge from `main`.
 
+Two checks around the jobs:
+
+- Before `prepare_release`: a deprecation message (`common.FormatDeprecationWithReplacement`) that names a version already released was written for a release that did not include it; make it name the version being prepared. A `replace` directive in `go.mod`, which lint allows for client-go, fails both `prepare_release` and `changelog_release_check`.
+- After the release: the tag is on the merge commit of the release MR, the Registry lists the version, the announcement reached `#ccx-ci-releases` (silence may be an unset webhook) and `git log origin/main..origin/release` prints nothing. A commit only on `release` means the release MR was squashed, which 1.1.0 needed 17ec31d to reconcile.
+
 By hand, the same thing is `make changelog` (or `make changelog VERSION=vX.Y.0` plus the `versions.env` bump) committed on a branch off `main` and merged before the release MR; `make changelog-preview` prints the section without editing the file. Until the version is tagged, running it again replaces the section. The release tags live on GitHub, where the release workflow creates them; the scripts fetch them themselves. Sections up to 1.8.0 were written by hand and keep their format.

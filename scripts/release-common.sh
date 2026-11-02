@@ -81,6 +81,16 @@ require_tools() {
   fi
 }
 
+# A replace directive in go.mod points a module at a preview or a local copy.
+# Lint allows the client-go ones, so the prep and the check before the merge
+# into release are the two places that refuse one. Every directive has a =>.
+check_go_mod_replace() {
+  if grep -q '=>' go.mod; then
+    echo "release: go.mod has a replace directive; a release cannot ship a replaced module" >&2
+    exit 1
+  fi
+}
+
 # True when the script can push and open merge requests: the bot's token is
 # set and the script runs in GitLab CI, where the API location and the project
 # come from the predefined variables.

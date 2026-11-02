@@ -3,7 +3,8 @@
 # workflow will tag: the next patch of versions.env, counted from the tags on
 # GitHub. CI runs it on the release branch and in merge requests into it
 # (changelog_release_check), so a stale changelog fails before the merge; the
-# GitHub workflow runs the same two checks again before tagging.
+# GitHub workflow runs the same two checks again before tagging. It also
+# refuses a go.mod with a replace directive, which lint lets through.
 #
 # Usage: scripts/release-check.sh
 #   RELEASE_VERSION=vX.Y.Z   the version to compare with (default: computed)
@@ -12,6 +13,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 . scripts/release-common.sh
 require_tools git jq
+check_go_mod_replace
 
 fetch_release_tags || echo "release-check: warning, could not fetch the release tags from GitHub; using local tags" >&2
 

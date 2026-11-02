@@ -236,6 +236,8 @@ For released resources requiring deprecation:
 - Keep both old and new fields functional during deprecation period
 - Handle fallback logic: prefer new field, fall back to old field if new is empty
 - Preserve deprecated field values from plan/state (don't overwrite from API)
+- The version in the message is the release the deprecation ships in; one that names a version already released is corrected before the release prep (README, "Preparing a release")
+- On a data source, the copy of a deprecated attribute carries the notice in `MarkdownDescription` only, never `DeprecationMessage`: there the warning fires on every reference to the whole object (1.3.1)
 
 ### HTTP Response Handling
 
@@ -470,7 +472,7 @@ Watch out for these frequently triggered lint errors:
 
 Every merge request with a customer-visible change carries a changelog fragment, `.changelog/<MR>.txt`: rules in [`.changelog/README.md`](.changelog/README.md), `/changelog` drafts it from the branch diff, `make changelog-check FILE=.changelog/<MR>.txt` validates it. CI fails a merge request without one unless it has the `skip-changelog` label or only touches files no customer can notice. Feature merge requests never edit `CHANGELOG.md` or `versions.env`.
 
-When preparing a release (`/release-prep`), the `prepare_release` job on a `main` pipeline renders the fragments merged since the last tag into `CHANGELOG.md` and opens the release-prep MR as the release bot (job input `version` for a minor or major release, which also bumps `versions.env`); when it merges, `cut_release_candidate` opens the MR into `release` from `rc/<version>`. By hand, `make changelog` does the rendering. Either way, that section, and the `versions.env` bump, land **on `main` first** (a dedicated release-prep commit), **then** comes the MR into `release`. Do **not** edit these files on the `release` branch or as part of the release MR, and don't squash the release MR — release-only commits make `release` diverge from `main` and cause conflicts on the next `main → release` merge.
+When preparing a release (README, "Preparing a release"), the `prepare_release` job on a `main` pipeline renders the fragments merged since the last tag into `CHANGELOG.md` and opens the release-prep MR as the release bot (job input `version` for a minor or major release, which also bumps `versions.env`); when it merges, `cut_release_candidate` opens the MR into `release` from `rc/<version>`. By hand, `make changelog` does the rendering. Either way, that section, and the `versions.env` bump, land **on `main` first** (a dedicated release-prep commit), **then** comes the MR into `release`. Do **not** edit these files on the `release` branch or as part of the release MR, and don't squash the release MR — release-only commits make `release` diverge from `main` and cause conflicts on the next `main → release` merge.
 
 See [README.md](README.md) (Contributing, Versioning, and Maintaining Changelog sections) for the semantic versioning rules and the `versions.env` format.
 
