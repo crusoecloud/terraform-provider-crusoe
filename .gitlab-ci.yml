@@ -263,3 +263,41 @@ notify_release_branch_failure:
           ]
         }'
   allow_failure: true
+
+# Crusoe Updates (README, "Versioning"): once the GitHub release carries
+# release-manifest.json, the docs pipeline imports it and opens the merge
+# request with the site entries. wait_for_release polls for the file, since
+# the GitHub workflow runs after the push mirror and uploads it last, and
+# writes RELEASE_VERSION to release.env; notify_docs then starts the docs
+# pipeline with it and RELEASE_ARTIFACT. inherit:variables:false keeps this
+# project's variables out of that pipeline.
+wait_for_release:
+  stage: .post
+  needs: []
+  timeout: 45m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release"'
+  script:
+    - scripts/release-wait.sh
+  artifacts:
+    reports:
+      dotenv: release.env
+
+notify_docs:
+  stage: .post
+  needs:
+    - job: wait_for_release
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "release"'
+  inherit:
+    variables: false
+  variables:
+    RELEASE_ARTIFACT: terraform
+  trigger:
+    project: crusoeenergy/island/external/docs
+    branch: main
+    strategy: mirror
+    forward:
+      pipeline_variables: true
+  allow_failure: true

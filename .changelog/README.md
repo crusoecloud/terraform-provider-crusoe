@@ -85,7 +85,7 @@ for what is `feature` and `breaking-change` here.
 
 ## Product tag and title for Crusoe Updates
 
-Entries that may appear on [Crusoe Updates](https://docs.crusoecloud.com/updates/)
+Entries that may appear on [Crusoe Updates](https://docs.crusoe.ai/updates/)
 also name the product they touch, with an HTML comment inside the block. The
 comment is invisible in the rendered changelog and in the GitHub release notes.
 
