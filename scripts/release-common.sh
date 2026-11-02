@@ -132,12 +132,17 @@ configure_fallback_identity() {
 
 # bot_push REF BRANCH: pushes REF as BRANCH, replacing it when it exists. The
 # token reaches git through a credential helper, not the remote URL, so that
-# an error message from git cannot print it.
+# an error message from git cannot print it. The runner's git config, included
+# from .git/config and from GIT_CONFIG_GLOBAL, rewrites this project's plain
+# URL into one carrying the job token, which cannot push, and can add a helper
+# of its own: the user name in the URL keeps the rewrite from matching, and the
+# empty helper first clears the list of helpers (gitcredentials(7)).
 bot_push() {
   # shellcheck disable=SC2016  # git's shell expands the token, not this one
   RELEASE_BOT_GIT_TOKEN="$BOT_TOKEN" GIT_TERMINAL_PROMPT=0 \
-    git -c credential.helper='!f() { echo "username=oauth2"; echo "password=${RELEASE_BOT_GIT_TOKEN}"; }; f' \
-    push --force "https://${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$1:refs/heads/$2"
+    git -c credential.helper= \
+      -c credential.helper='!f() { echo "username=oauth2"; echo "password=${RELEASE_BOT_GIT_TOKEN}"; }; f' \
+      push --force "https://oauth2@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$1:refs/heads/$2"
 }
 
 # gitlab_api METHOD PATH [JSON]: a call on this project; fails on HTTP errors.
