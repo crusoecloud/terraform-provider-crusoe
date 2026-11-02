@@ -19,7 +19,8 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 . scripts/release-common.sh
-require_tools git curl jq base64 ssh-keygen
+require_tools git jq
+if bot_available; then require_tools curl base64 ssh-keygen; fi   # the push and the merge request
 
 if ! git diff --quiet -- "$CHANGELOG" "$VERSIONS_FILE"; then
   echo "release-prepare: ${CHANGELOG} or ${VERSIONS_FILE} has uncommitted changes; commit or discard them first" >&2

@@ -14,7 +14,8 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 . scripts/release-common.sh
-require_tools git curl jq base64 ssh-keygen
+require_tools git jq
+if bot_available; then require_tools curl base64 ssh-keygen; fi   # the push and the merge request
 
 fetch_release_tags || echo "release-candidate: warning, could not fetch the release tags from GitHub; using local tags" >&2
 

@@ -33,7 +33,8 @@ changelog_check:
 # On the release branch, and in merge requests into it, the top section of
 # CHANGELOG.md must be the version the GitHub workflow is about to tag, so a
 # stale changelog fails here, before the merge; the workflow checks again
-# before tagging.
+# before tagging. On the branch the job runs after the merge, when the
+# workflow may already have tagged the commit; the script accepts that tag.
 changelog_release_check:
   needs: []
   rules:
