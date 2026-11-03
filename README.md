@@ -147,11 +147,7 @@ Schema attribute descriptions are derived from the `github.com/crusoecloud/clien
 
 ## Versioning
 
-A new version of the Crusoe Cloud Terraform provider is generated when there is a new merge request into the `release` branch in GitHub.
-This generates a new tag and triggers our `goreleaser` pipeline which will handle distributing the new Terraform version.
-On a successful release, the pipeline posts an announcement (version, commit, and a link to the GitHub release) to the `#ccx-ci-releases` Slack channel.
-These notifications require the `SLACK_CCX_CI_RELEASES_WEBHOOK_URL` webhook URL to be configured as both a GitHub Actions secret (release announcement) and a GitLab CI/CD variable (pipeline status notifications); if unset, the notification steps log a message and skip without failing the release.
-The notes of the GitHub release are the top section of `CHANGELOG.md`, and `release-manifest.json`, the same entries as data for the Crusoe Updates translator in the docs repo, is attached to the release. The workflow generates both with `scripts/release-notes.sh` and `scripts/release-manifest.sh`, which fail the release when that section is not the version being tagged. On the `release` pipeline, `wait_for_release` waits for that file on the GitHub release and `notify_docs` then starts the docs pipeline, which drafts the Crusoe Updates entries from it and opens a merge request for the docs team.
+A release is a merge into `release`: the GitHub workflow tags it and GoReleaser publishes the provider to the GitHub release, where the Terraform Registry picks it up, then the docs repo drafts the Crusoe Updates entries. The steps are in [`RELEASING.md`](RELEASING.md): run the `prepare_release` job on `main`, which opens the release-prep merge request with the new `CHANGELOG.md` section; merge it; then get the `Release vX.Y.Z` merge request that CI opens into `release` approved and merge it, squash off.
 
 `main` is releasable at all times: anything merged into it can go out in the next release. A change whose backend is not in production yet waits in its merge request; one that only some organizations can reach is merged with the limited-availability marker described under Contributing. A Crusoe Cloud maintainer merges `main` into `release` to publish a version.
 
@@ -178,7 +174,7 @@ export MAJOR_VERSION=0
 export MINOR_VERSION=6
 ```
 
-Update this file **only for major or minor version bumps**, in the same release-prep commit on `main` that adds the changelog section (`make changelog VERSION=vX.Y.0`), before the release MR is opened and never on the `release` branch. Patch versions are auto-incremented by the release pipeline.
+Update this file **only for major or minor version bumps**, in the same release-prep commit on `main` that adds the changelog section (`prepare_release` with `version` set to `vX.Y.0` does both, see [`RELEASING.md`](RELEASING.md)), never on the `release` branch. Patch versions are counted by the release workflow.
 
 ## Contributing
 
@@ -187,7 +183,7 @@ Here is the workflow for contributing to the Crusoe Cloud Terraform provider:
 1. Make a branch off `main` and open a merge request from your branch into `main`.
 2. A Crusoe Cloud maintainer reviews the merge request and merges it into `main` once it can ship: `main` is releasable at all times, so a change that depends on a backend not yet in production waits in the merge request. Every merge request needs an approval from the Client Interfaces squad (CCX-CI), the code owner of the repository (`.gitlab/CODEOWNERS`).
 3. Add a changelog fragment to the merge request, `.changelog/<MR>.txt` (see Maintaining Changelog below). CI fails a merge request that needs one and has none.
-4. Before a release, a maintainer runs the `prepare_release` job on a `main` pipeline (see Preparing a release below). It renders the fragments merged since the last release into a new section of `CHANGELOG.md`, with the `versions.env` bump for a minor or major release, and opens the release-prep merge request into `main`.
+4. Before a release, a maintainer runs the `prepare_release` job on a `main` pipeline (see [`RELEASING.md`](RELEASING.md)). It renders the fragments merged since the last release into a new section of `CHANGELOG.md`, with the `versions.env` bump for a minor or major release, and opens the release-prep merge request into `main`.
 5. When that merge request merges, the `cut_release_candidate` job opens the merge request from `rc/<version>` into `release`. Its review checks the rendered changelog entry by entry; it does not hold features back, since everything on `main` can ship.
 6. Once the merge request has been approved and merged by a Crusoe Cloud maintainer, a new Terraform version will be released. Do not squash the commits, as it will cause the `main` and `release` branches to diverge.
 
@@ -206,19 +202,3 @@ The provider has no feature flags of its own: everything in a release is in the 
 The Crusoe Cloud changelog follows [Hashicorp's best practices](https://developer.hashicorp.com/terraform/plugin/best-practices/versioning) for versioning and changelog specifications.
 
 `CHANGELOG.md` is generated from fragments: one file per merge request in [`.changelog/`](.changelog/README.md), named `.changelog/<MR>.txt`, with one fenced `release-note:<type>` block per customer-visible change. That README has the types, the format and the product tag that turns an entry into a post on [Crusoe Updates](https://docs.crusoe.ai/updates/). In Claude Code, `/changelog` drafts the fragment from the branch diff; `make changelog-check FILE=.changelog/<MR>.txt` validates it. CI (`changelog_check`) fails a merge request without a fragment unless it carries the `skip-changelog` label or only touches files no customer can notice.
-
-### Preparing a release
-
-Two CI jobs do the release prep, as the CCX Release Bot:
-
-1. `prepare_release`, manual on every `main` pipeline. Run it from the pipeline graph for the next patch of `versions.env`; for a minor or major release open the job page and set `version` to `vX.Y.0`, which also bumps `versions.env`. The job renders the fragments merged since the last release into a new `## vX.Y.Z (date)` section at the top of `CHANGELOG.md`, commits on `release-prep/<version>` and opens the merge request into `main` (or refreshes the one already open). Review the wording there; fix a wrong entry in its fragment and run the job again rather than editing `CHANGELOG.md`.
-2. `cut_release_candidate`, automatic on `main` when `CHANGELOG.md` changes, that is when the prep merges. It points `rc/<version>` at that commit and opens the merge request into `release`, squash off, with the section as its description. Merging it fast-forwards `release`; the GitHub workflow then tags and publishes.
-
-`changelog_release_check` runs in merge requests into `release` and on the branch itself, and fails when the top section of `CHANGELOG.md` is not the version about to be tagged (`make release-check` does the same locally). Never add the section on the `release` branch or inside the release MR, which would make `release` diverge from `main`.
-
-Two checks around the jobs:
-
-- Before `prepare_release`: a deprecation message (`common.FormatDeprecationWithReplacement`) that names a version already released was written for a release that did not include it; make it name the version being prepared. A `replace` directive in `go.mod`, which lint allows for client-go, fails both `prepare_release` and `changelog_release_check`.
-- After the release: the tag is on the merge commit of the release MR, the Registry lists the version, the announcement reached `#ccx-ci-releases` (silence may be an unset webhook) and `git log origin/main..origin/release` prints nothing. A commit only on `release` means the release MR was squashed, which 1.1.0 needed 17ec31d to reconcile.
-
-By hand, the same thing is `make changelog` (or `make changelog VERSION=vX.Y.0` plus the `versions.env` bump) committed on a branch off `main` and merged before the release MR; `make changelog-preview` prints the section without editing the file. Until the version is tagged, running it again replaces the section. The release tags live on GitHub, where the release workflow creates them; the scripts fetch them themselves. Sections up to 1.8.0 were written by hand and keep their format.

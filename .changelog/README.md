@@ -151,8 +151,8 @@ before you push: the author owns the fragment.
 
 ## How it becomes a changelog
 
-`make changelog` on the release-prep branch (see [`README.md`](../README.md),
-"Contributing") renders every fragment added since the last release tag with
-`changelog.tmpl` and `note.tmpl` into a new section at the top of
-`CHANGELOG.md`. The release then publishes that section as the GitHub release
-notes.
+`make changelog` on the release-prep branch (see
+[`RELEASING.md`](../RELEASING.md), "By hand") renders every fragment added
+since the last release tag with `changelog.tmpl` and `note.tmpl` into a new
+section at the top of `CHANGELOG.md`. The release then publishes that section
+as the GitHub release notes.

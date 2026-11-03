@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Opens the release-prep merge request (README, "Preparing a release"): renders
+# Opens the release-prep merge request (RELEASING.md): renders
 # the fragments since the last tag into CHANGELOG.md, commits it on
 # release-prep/<version> and opens the merge request into main, or refreshes
 # the one already open from that branch. CI runs it in the manual
@@ -93,7 +93,7 @@ last=$(release_tags | head -n 1)
   cat <<MR
 The \`${version}\` section of \`CHANGELOG.md\`, rendered from the fragments merged since \`${last}\`: this is what the release announces. Opened by the prepare_release job${CI_PIPELINE_URL:+ (${CI_PIPELINE_URL})}.
 
-Review the wording, fix it on the branch if needed, and merge. The next pipeline on \`main\` cuts \`rc/${version}\` and opens the merge request into \`release\`. If more work should ship, merge it first and run prepare_release again: the section is rendered again and this merge request updated, until the version is tagged.
+Review the wording and merge. A wrong entry is fixed in its fragment, through a merge request into \`main\`, and prepare_release run again: the release manifest is built from the fragments, and the next run replaces this section. The next pipeline on \`main\` cuts \`rc/${version}\` and opens the merge request into \`release\`. If more work should ship, merge it first and run prepare_release again: the section is rendered again and this merge request updated, until the version is tagged.
 
 ### ${version}
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Renders the .changelog/ fragments added since the last tag into a new
 # "## vX.Y.Z (date)" section at the top of CHANGELOG.md, for the release-prep
-# merge request: `make changelog` on a branch off `main` (see README.md,
-# "Contributing"). Running it again before the version is tagged replaces the
+# merge request: `make changelog` on a branch off `main` (see RELEASING.md,
+# "By hand"). Running it again before the version is tagged replaces the
 # section. HEAD must be on a branch: go-changelog reads the repository through
 # an in-memory clone that only follows branches and tags, so a detached HEAD
 # (a CI checkout) fails with "object not found".

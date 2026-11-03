@@ -43,7 +43,7 @@ changelog_release_check:
   script:
     - scripts/release-check.sh
 
-# The release jobs (README, "Preparing a release"). prepare_release is the
+# The release jobs (RELEASING.md). prepare_release is the
 # click that starts a release: on a main pipeline it renders CHANGELOG.md and
 # opens the release-prep merge request. cut_release_candidate runs on main when
 # CHANGELOG.md changes, that is when the prep merges, and opens the merge
@@ -264,7 +264,7 @@ notify_release_branch_failure:
         }'
   allow_failure: true
 
-# Crusoe Updates (README, "Versioning"): once the GitHub release carries
+# Crusoe Updates (RELEASING.md): once the GitHub release carries
 # release-manifest.json, the docs pipeline imports it and opens the merge
 # request with the site entries. wait_for_release polls for the file, since
 # the GitHub workflow runs after the push mirror and uploads it last, and

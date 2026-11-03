@@ -36,7 +36,7 @@ jobs:
 
       - name: Check the changelog before tagging
         # The top section of CHANGELOG.md must be the version about to be
-        # tagged (make changelog, README "Preparing a release"); otherwise the
+        # tagged (make changelog, RELEASING.md); otherwise the
         # workflow stops here, before any tag exists, and the release is
         # retried by merging the release-prep commit and pushing again.
         run: |
@@ -69,7 +69,7 @@ jobs:
       - name: Release notes and manifest
         # The tag the semver-tag job pushed points at HEAD. Both scripts fail
         # when the top section of CHANGELOG.md is not that version, so a
-        # release cannot ship with stale notes (make changelog, README).
+        # release cannot ship with stale notes (make changelog, RELEASING.md).
         run: |
           RELEASE_VERSION="$(git describe --tags --exact-match HEAD)"
           export RELEASE_VERSION

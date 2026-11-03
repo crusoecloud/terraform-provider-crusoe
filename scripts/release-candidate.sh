@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cuts the release candidate (README, "Preparing a release"): points
+# Cuts the release candidate (RELEASING.md): points
 # rc/<version> at this commit and opens the merge request into release, squash
 # off, with the CHANGELOG.md section as its description, or refreshes the one
 # already open from that branch. <version> is the top section of

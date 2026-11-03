@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Waits for the GitHub release of the version just merged into release to
 # carry release-manifest.json, then writes RELEASE_VERSION to release.env for
-# notify_docs, the trigger job that starts the docs pipeline (README,
-# "Versioning"). The version is the top section of CHANGELOG.md, the one the
-# GitHub workflow tags. The workflow starts after the push mirror and uploads
-# the assets last, so the file shows up some minutes after the merge.
+# notify_docs, the trigger job that starts the docs pipeline (RELEASING.md).
+# The version is the top section of CHANGELOG.md, the one the GitHub workflow
+# tags. The workflow starts after the push mirror and uploads the assets last,
+# so the file shows up some minutes after the merge.
 #
 # Usage: scripts/release-wait.sh
 #   RELEASE_VERSION=vX.Y.Z      the version to wait for (default: the top section)
