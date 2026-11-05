@@ -491,6 +491,21 @@ func TFListToStringSlice(tfList types.List) ([]string, error) {
 	return stringSlice, nil
 }
 
+// SameStringListElements reports whether two string slices hold the same
+// elements, ignoring order. Duplicates count. Neither input is mutated.
+func SameStringListElements(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	sortedA := append([]string(nil), a...)
+	sortedB := append([]string(nil), b...)
+	slices.Sort(sortedA)
+	slices.Sort(sortedB)
+
+	return slices.Equal(sortedA, sortedB)
+}
+
 func StringerSliceToTFList[T fmt.Stringer](s []T) (types.List, diag.Diagnostics) {
 	tfList := make([]attr.Value, len(s))
 	for i, val := range s {

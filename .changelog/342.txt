@@ -1,0 +1,5 @@
+```release-note:bug
+`crusoe_kubernetes_cluster` no longer destroys and recreates the cluster, or fails an apply with "Provider produced inconsistent result after apply", when the API returns `add_ons` in a different order than the configuration: replacement now depends on which add-ons are set, not on their order. A reorder plans as an in-place update instead, so configurations that pinned the `add_ons` order or listed it in `lifecycle { ignore_changes }` to work around this can drop that.
+<!-- site: infrastructure-cloud/managed-kubernetes -->
+<!-- title: Reordered Kubernetes add-ons no longer replace the cluster -->
+```

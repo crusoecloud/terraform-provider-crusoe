@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -347,5 +348,191 @@ func Test_controlPlaneGenerationSchema(t *testing.T) {
 	}
 	if dataSourceAttr.GetMarkdownDescription() != resourceAttr.MarkdownDescription {
 		t.Error("resource and data source control_plane_generation descriptions differ")
+	}
+}
+
+func mustList(t *testing.T, values []string) types.List {
+	t.Helper()
+
+	elements := make([]attr.Value, len(values))
+	for i, v := range values {
+		elements[i] = types.StringValue(v)
+	}
+
+	tfList, diags := types.ListValue(types.StringType, elements)
+	if diags.HasError() {
+		t.Fatalf("building list: %v", diags)
+	}
+
+	return tfList
+}
+
+func Test_addOnsInRefOrder(t *testing.T) {
+	configured := []string{"crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters", "active_health_checks"}
+	rotated := []string{"active_health_checks", "crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters"}
+
+	tests := []struct {
+		name string
+		api  []string
+		ref  types.List
+		want []string
+	}{
+		{
+			name: "the rotation from the ticket keeps the reference order",
+			api:  rotated, ref: mustList(t, configured), want: configured,
+		},
+		{
+			name: "an unchanged response is unchanged",
+			api:  configured, ref: mustList(t, configured), want: configured,
+		},
+		{
+			name: "an add-on removed outside Terraform takes the API order",
+			api:  []string{"autoclusters", "crusoe_csi"}, ref: mustList(t, configured),
+			want: []string{"autoclusters", "crusoe_csi"},
+		},
+		{
+			name: "an add-on added outside Terraform takes the API order",
+			api:  []string{"autoclusters", "crusoe_csi", "something_new"}, ref: mustList(t, []string{"crusoe_csi", "autoclusters"}),
+			want: []string{"autoclusters", "crusoe_csi", "something_new"},
+		},
+		{
+			name: "a null reference takes the API order",
+			api:  rotated, ref: types.ListNull(types.StringType), want: rotated,
+		},
+		{
+			name: "an unknown reference takes the API order",
+			api:  rotated, ref: types.ListUnknown(types.StringType), want: rotated,
+		},
+		{
+			name: "no add-ons at all",
+			api:  []string{}, ref: mustList(t, []string{}), want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := addOnsInRefOrder(tt.api, tt.ref)
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("addOnsInRefOrder(%v, %v) = %v, want %v", tt.api, tt.ref, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_clusterToResourceModel_addOnReorderIsNotAChange(t *testing.T) {
+	configured := []string{"crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters", "active_health_checks"}
+	rotated := []string{"active_health_checks", "crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters"}
+
+	planned := mustList(t, configured)
+
+	ref := &kubernetesClusterResourceModel{
+		AddOns:                     planned,
+		ApiserverExtraArgs:         types.MapNull(types.StringType),
+		SchedulerExtraArgs:         types.MapNull(types.StringType),
+		ControllerManagerExtraArgs: types.MapNull(types.StringType),
+	}
+	cluster := &swagger.KubernetesCluster{Id: "cluster-1", AddOns: rotated}
+
+	var diags diag.Diagnostics
+	var model kubernetesClusterResourceModel
+	clusterToResourceModel(cluster, ref, &model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !model.AddOns.Equal(planned) {
+		t.Errorf("a reordering by the API registered as a change:\n planned = %v\n state   = %v", planned, model.AddOns)
+	}
+}
+
+func Test_clusterToResourceModel_addOnsAliasedRefAndModel(t *testing.T) {
+	stored := []string{"crusoe_csi", "autoclusters"}
+	rotated := []string{"autoclusters", "crusoe_csi"}
+
+	model := &kubernetesClusterResourceModel{
+		AddOns:                     mustList(t, stored),
+		ApiserverExtraArgs:         types.MapNull(types.StringType),
+		SchedulerExtraArgs:         types.MapNull(types.StringType),
+		ControllerManagerExtraArgs: types.MapNull(types.StringType),
+	}
+	cluster := &swagger.KubernetesCluster{Id: "cluster-1", AddOns: rotated}
+
+	var diags diag.Diagnostics
+	clusterToResourceModel(cluster, model, model, &diags)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if !model.AddOns.Equal(mustList(t, stored)) {
+		t.Errorf("the stored ordering was not preserved: got %v, want %v", model.AddOns, stored)
+	}
+}
+
+func Test_addOnsReplacesOnMembershipOnly(t *testing.T) {
+	configured := []string{"crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters", "active_health_checks"}
+	rotated := []string{"active_health_checks", "crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters"}
+
+	tests := []struct {
+		name        string
+		state, plan types.List
+		want        bool
+	}{
+		{"the rotation from the ticket", mustList(t, configured), mustList(t, rotated), false},
+		{"reversed", mustList(t, []string{"a", "b", "c"}), mustList(t, []string{"c", "b", "a"}), false},
+		{"an add-on removed", mustList(t, configured), mustList(t, configured[1:]), true},
+		{"an add-on added", mustList(t, []string{"crusoe_csi"}), mustList(t, []string{"crusoe_csi", "autoclusters"}), true},
+		{"an add-on swapped", mustList(t, []string{"crusoe_csi"}), mustList(t, []string{"autoclusters"}), true},
+		{"unknown plan", mustList(t, configured), types.ListUnknown(types.StringType), true},
+		{"null state", types.ListNull(types.StringType), mustList(t, configured), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := planmodifier.ListRequest{StateValue: tt.state, PlanValue: tt.plan, ConfigValue: tt.plan}
+			resp := &listplanmodifier.RequiresReplaceIfFuncResponse{}
+
+			addOnsMembershipChanged(context.Background(), req, resp)
+
+			if resp.RequiresReplace != tt.want {
+				t.Errorf("RequiresReplace = %v, want %v\n state = %v\n plan  = %v",
+					resp.RequiresReplace, tt.want, tt.state, tt.plan)
+			}
+		})
+	}
+}
+
+func Test_addOnsSchemaUsesConditionalReplace(t *testing.T) {
+	ctx := context.Background()
+
+	resourceSchema := &resource.SchemaResponse{}
+	NewKubernetesClusterResource().Schema(ctx, resource.SchemaRequest{}, resourceSchema)
+
+	addOnsAttr, ok := resourceSchema.Schema.Attributes["add_ons"].(schema.ListAttribute)
+	if !ok {
+		t.Fatalf("add_ons is %T, want schema.ListAttribute", resourceSchema.Schema.Attributes["add_ons"])
+	}
+
+	if addOnsAttr.Default == nil {
+		t.Error("add_ons lost its empty-list default; an unset add_ons would plan as unknown")
+	}
+
+	if len(addOnsAttr.PlanModifiers) != 1 {
+		t.Fatalf("add_ons has %d plan modifiers, want the conditional replace only", len(addOnsAttr.PlanModifiers))
+	}
+
+	if desc := addOnsAttr.PlanModifiers[0].Description(ctx); desc != providerDescAddOnsReplace {
+		t.Errorf("add_ons plan modifier describes itself as %q, want the conditional replace (%q)", desc, providerDescAddOnsReplace)
+	}
+}
+
+func Test_addOnsDataSourceStaysAList(t *testing.T) {
+	ctx := context.Background()
+
+	dataSourceSchema := &datasource.SchemaResponse{}
+	NewKubernetesClusterDataSource().Schema(ctx, datasource.SchemaRequest{}, dataSourceSchema)
+
+	if _, ok := dataSourceSchema.Schema.Attributes["add_ons"].(dsschema.ListAttribute); !ok {
+		t.Fatalf("data source add_ons is %T, want dsschema.ListAttribute", dataSourceSchema.Schema.Attributes["add_ons"])
 	}
 }

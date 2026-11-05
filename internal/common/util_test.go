@@ -322,3 +322,50 @@ func TestSortByKeys(t *testing.T) {
 		})
 	}
 }
+
+func TestSameStringListElements(t *testing.T) {
+	configured := []string{"crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters", "active_health_checks"}
+	rotated := []string{"active_health_checks", "crusoe_csi", "nvidia_gpu_operator", "nvidia_network_operator", "autoclusters"}
+
+	tests := []struct {
+		name string
+		a, b []string
+		want bool
+	}{
+		{name: "identical", a: configured, b: configured, want: true},
+		{name: "the rotation from the ticket", a: configured, b: rotated, want: true},
+		{name: "reversed", a: []string{"a", "b", "c"}, b: []string{"c", "b", "a"}, want: true},
+		{name: "both empty", a: []string{}, b: []string{}, want: true},
+		{name: "nil and empty", a: nil, b: []string{}, want: true},
+		{name: "an element removed", a: configured, b: configured[1:], want: false},
+		{name: "an element added", a: []string{"a", "b"}, b: []string{"a", "b", "c"}, want: false},
+		{name: "an element swapped out", a: []string{"a", "b"}, b: []string{"a", "c"}, want: false},
+		{name: "same values, different multiplicities", a: []string{"a", "a", "b"}, b: []string{"a", "b", "b"}, want: false},
+		{name: "same duplicates reordered", a: []string{"a", "a", "b"}, b: []string{"a", "b", "a"}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SameStringListElements(tt.a, tt.b); got != tt.want {
+				t.Errorf("SameStringListElements(%v, %v) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+			if got := SameStringListElements(tt.b, tt.a); got != tt.want {
+				t.Errorf("SameStringListElements(%v, %v) = %v, want %v (not symmetric)", tt.b, tt.a, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSameStringListElementsDoesNotMutate(t *testing.T) {
+	a := []string{"crusoe_csi", "autoclusters"}
+	b := []string{"autoclusters", "crusoe_csi"}
+
+	SameStringListElements(a, b)
+
+	if !slices.Equal(a, []string{"crusoe_csi", "autoclusters"}) {
+		t.Errorf("first argument was mutated: %v", a)
+	}
+	if !slices.Equal(b, []string{"autoclusters", "crusoe_csi"}) {
+		t.Errorf("second argument was mutated: %v", b)
+	}
+}

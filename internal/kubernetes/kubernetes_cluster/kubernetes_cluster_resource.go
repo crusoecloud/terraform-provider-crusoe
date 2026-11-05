@@ -157,8 +157,14 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 				Optional:            true,
 				ElementType:         types.StringType,
 				MarkdownDescription: apiDescAddOns,
-				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()}, // cannot be updated in place
-				Default:             listdefault.StaticValue(emptyStringList),
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplaceIf(
+						addOnsMembershipChanged,
+						providerDescAddOnsReplace,
+						providerDescAddOnsReplace,
+					),
+				},
+				Default: listdefault.StaticValue(emptyStringList),
 			},
 			"location": schema.StringAttribute{
 				Required:            true,
@@ -256,6 +262,34 @@ func (r *kubernetesClusterResource) Schema(ctx context.Context, _ resource.Schem
 			},
 		},
 	}
+}
+
+//nolint:gocritic // hugeParam: req signature required by listplanmodifier.RequiresReplaceIfFunc
+func addOnsMembershipChanged(_ context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+	unreadable := req.StateValue.IsNull() || req.StateValue.IsUnknown() ||
+		req.PlanValue.IsNull() || req.PlanValue.IsUnknown()
+
+	if unreadable {
+		resp.RequiresReplace = true
+
+		return
+	}
+
+	stateAddOns, err := common.TFListToStringSlice(req.StateValue)
+	if err != nil {
+		resp.RequiresReplace = true
+
+		return
+	}
+
+	planAddOns, err := common.TFListToStringSlice(req.PlanValue)
+	if err != nil {
+		resp.RequiresReplace = true
+
+		return
+	}
+
+	resp.RequiresReplace = !common.SameStringListElements(stateAddOns, planAddOns)
 }
 
 //nolint:gocritic // Implements Terraform defined interface
@@ -404,12 +438,11 @@ func (r *kubernetesClusterResource) Update(
 		return
 	}
 
-	// All three are nil when the user leaves extra args unset (null) in config.
-	// The API rejects an empty PATCH, so skip it and accept the plan's null values.
-	if apiserverArgs == nil && schedulerArgs == nil && controllerManagerArgs == nil {
+	if hasNothingToPatch(&plan, &state, apiserverArgs, schedulerArgs, controllerManagerArgs) {
 		state.ApiserverExtraArgs = plan.ApiserverExtraArgs
 		state.SchedulerExtraArgs = plan.SchedulerExtraArgs
 		state.ControllerManagerExtraArgs = plan.ControllerManagerExtraArgs
+		state.AddOns = plan.AddOns
 		diags = response.State.Set(ctx, &state)
 		response.Diagnostics.Append(diags...)
 
@@ -551,6 +584,27 @@ func resolveExtraArg(stored types.Map, apiValue map[string]string) (types.Map, d
 	}
 
 	return stringMapToTFMap(apiValue)
+}
+
+// hasNothingToPatch reports whether the Update PATCH would carry no change, so
+// the request can be skipped and the plan accepted as-is.
+//
+// Extra args are the only fields the request can set. Plan and state agreeing on
+// all three means there is nothing to send: the case an add_ons reorder reaches
+// now that reordering no longer forces replacement, since ordering is not part of
+// the request. All three args being nil is the separate case of extra args left
+// unset in config, where the API rejects the resulting empty PATCH.
+func hasNothingToPatch(
+	plan, state *kubernetesClusterResourceModel,
+	apiserverArgs, schedulerArgs, controllerManagerArgs map[string]string,
+) bool {
+	extraArgsUnchanged := plan.ApiserverExtraArgs.Equal(state.ApiserverExtraArgs) &&
+		plan.SchedulerExtraArgs.Equal(state.SchedulerExtraArgs) &&
+		plan.ControllerManagerExtraArgs.Equal(state.ControllerManagerExtraArgs)
+
+	extraArgsAllNil := apiserverArgs == nil && schedulerArgs == nil && controllerManagerArgs == nil
+
+	return extraArgsUnchanged || extraArgsAllNil
 }
 
 // hasEmptyExtraArg reports whether any of the provided maps is non-nil but empty.

@@ -46,6 +46,8 @@ const (
 const (
 	providerDescProjectID = "ID of the project that owns the Kubernetes cluster. " + project.ProviderDescProjectIDFallback
 
+	providerDescAddOnsReplace = "Adding or removing an add-on destroys and recreates the cluster. Reordering the list does not."
+
 	// providerDescVersionInput describes the spellings the version attribute takes,
 	// which the spec text does not cover.
 	providerDescVersionInput = "Specify the minor version, for example `1.35`, and the platform selects the current patch; " +
@@ -94,7 +96,7 @@ func clusterToResourceModel(cluster *swagger.KubernetesCluster, ref, model *kube
 	model.RoutingMode = types.StringValue(cluster.RoutingMode)
 	model.ControlPlaneGeneration = common.GenerationOrNull(cluster.ControlPlaneGeneration)
 
-	addOns, d := common.StringSliceToTFList(cluster.AddOns)
+	addOns, d := common.StringSliceToTFList(addOnsInRefOrder(cluster.AddOns, ref.AddOns))
 	diags.Append(d...)
 	model.AddOns = addOns
 
@@ -120,6 +122,23 @@ func clusterToResourceModel(cluster *swagger.KubernetesCluster, ref, model *kube
 	controllerManager, d := resolveExtraArg(ref.ControllerManagerExtraArgs, cluster.ControllerManagerExtraArgs)
 	diags.Append(d...)
 	model.ControllerManagerExtraArgs = controllerManager
+}
+
+func addOnsInRefOrder(apiAddOns []string, ref types.List) []string {
+	if ref.IsNull() || ref.IsUnknown() {
+		return apiAddOns
+	}
+
+	refAddOns, err := common.TFListToStringSlice(ref)
+	if err != nil {
+		return apiAddOns
+	}
+
+	if !common.SameStringListElements(apiAddOns, refAddOns) {
+		return apiAddOns
+	}
+
+	return refAddOns
 }
 
 // sortedNodePools returns the node pool IDs in deterministic (lexical) order. The

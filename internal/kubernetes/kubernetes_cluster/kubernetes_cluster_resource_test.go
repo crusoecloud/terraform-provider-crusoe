@@ -434,3 +434,140 @@ func TestKubernetesClusterResource_RoutingModeChangeRequiresReplace(t *testing.T
 		t.Error("changing routing_mode should force replacement")
 	}
 }
+
+// hasNothingToPatch decides whether Update skips the PATCH entirely. Before
+// add_ons reordering planned as an in-place update, the only way to reach Update
+// was by changing extra args, so "extra args are unset" and "nothing to send"
+// were the same question. A reorder separates them: it reaches Update with extra
+// args untouched, and ordering is not something the PATCH can carry.
+func TestHasNothingToPatch(t *testing.T) {
+	args := func(m map[string]string) map[string]string { return m }
+
+	cases := []struct {
+		name                 string
+		planAPI, stateAPI    types.Map
+		planSched, stateSchd types.Map
+		planCM, stateCM      types.Map
+		apiserverArgs        map[string]string
+		schedulerArgs        map[string]string
+		controllerArgs       map[string]string
+		want                 bool
+	}{
+		{
+			// The case this guard exists for: only add_ons order moved, so the
+			// PATCH would resend the extra args the cluster already has.
+			name:      "extra args unchanged",
+			planAPI:   mustMap(t, map[string]string{"v": "2"}),
+			stateAPI:  mustMap(t, map[string]string{"v": "2"}),
+			planSched: types.MapNull(types.StringType), stateSchd: types.MapNull(types.StringType),
+			planCM: types.MapNull(types.StringType), stateCM: types.MapNull(types.StringType),
+			apiserverArgs: args(map[string]string{"v": "2"}),
+			want:          true,
+		},
+		{
+			name:      "apiserver args changed",
+			planAPI:   mustMap(t, map[string]string{"v": "4"}),
+			stateAPI:  mustMap(t, map[string]string{"v": "2"}),
+			planSched: types.MapNull(types.StringType), stateSchd: types.MapNull(types.StringType),
+			planCM: types.MapNull(types.StringType), stateCM: types.MapNull(types.StringType),
+			apiserverArgs: args(map[string]string{"v": "4"}),
+			want:          false,
+		},
+		{
+			// Each of the three is compared, not just the apiserver one.
+			name:    "scheduler args changed",
+			planAPI: types.MapNull(types.StringType), stateAPI: types.MapNull(types.StringType),
+			planSched: mustMap(t, map[string]string{"bind-address": "0.0.0.0"}),
+			stateSchd: mustMap(t, map[string]string{"bind-address": "127.0.0.1"}),
+			planCM:    types.MapNull(types.StringType), stateCM: types.MapNull(types.StringType),
+			schedulerArgs: args(map[string]string{"bind-address": "0.0.0.0"}),
+			want:          false,
+		},
+		{
+			name:    "controller manager args changed",
+			planAPI: types.MapNull(types.StringType), stateAPI: types.MapNull(types.StringType),
+			planSched: types.MapNull(types.StringType), stateSchd: types.MapNull(types.StringType),
+			planCM:         mustMap(t, map[string]string{"concurrent-deployment-syncs": "10"}),
+			stateCM:        mustMap(t, map[string]string{"concurrent-deployment-syncs": "5"}),
+			controllerArgs: args(map[string]string{"concurrent-deployment-syncs": "10"}),
+			want:           false,
+		},
+		{
+			// Pre-existing case: extra args left unset in config. The API rejects
+			// the empty PATCH that would result.
+			name:    "all args nil",
+			planAPI: types.MapNull(types.StringType), stateAPI: types.MapNull(types.StringType),
+			planSched: types.MapNull(types.StringType), stateSchd: types.MapNull(types.StringType),
+			planCM: types.MapNull(types.StringType), stateCM: types.MapNull(types.StringType),
+			want: true,
+		},
+		{
+			// Plan nulls what state holds. The values differ, so the equality half
+			// is false, but the SDK cannot serialise the clear — the nil half still
+			// has to catch it, or Update sends a PATCH that silently does nothing.
+			name:      "plan clears args state holds",
+			planAPI:   types.MapNull(types.StringType),
+			stateAPI:  mustMap(t, map[string]string{"v": "2"}),
+			planSched: types.MapNull(types.StringType), stateSchd: types.MapNull(types.StringType),
+			planCM: types.MapNull(types.StringType), stateCM: types.MapNull(types.StringType),
+			want: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := &kubernetesClusterResourceModel{
+				ApiserverExtraArgs:         tc.planAPI,
+				SchedulerExtraArgs:         tc.planSched,
+				ControllerManagerExtraArgs: tc.planCM,
+			}
+			state := &kubernetesClusterResourceModel{
+				ApiserverExtraArgs:         tc.stateAPI,
+				SchedulerExtraArgs:         tc.stateSchd,
+				ControllerManagerExtraArgs: tc.stateCM,
+			}
+
+			got := hasNothingToPatch(plan, state, tc.apiserverArgs, tc.schedulerArgs, tc.controllerArgs)
+			if got != tc.want {
+				t.Errorf("hasNothingToPatch() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// add_ons is not compared at all: it is not a field the PATCH can carry, so a
+// reorder must not by itself keep Update from short-circuiting.
+func TestHasNothingToPatch_IgnoresAddOns(t *testing.T) {
+	extraArgs := map[string]string{"v": "2"}
+	tfArgs := mustMap(t, extraArgs)
+
+	addOns := func(vals ...string) types.List {
+		elems := make([]attr.Value, len(vals))
+		for i, v := range vals {
+			elems[i] = types.StringValue(v)
+		}
+		list, diags := types.ListValue(types.StringType, elems)
+		if diags.HasError() {
+			t.Fatalf("building list: %v", diags)
+		}
+
+		return list
+	}
+
+	plan := &kubernetesClusterResourceModel{
+		ApiserverExtraArgs:         tfArgs,
+		SchedulerExtraArgs:         types.MapNull(types.StringType),
+		ControllerManagerExtraArgs: types.MapNull(types.StringType),
+		AddOns:                     addOns("nvidia-gpu-operator", "cert-manager"),
+	}
+	state := &kubernetesClusterResourceModel{
+		ApiserverExtraArgs:         tfArgs,
+		SchedulerExtraArgs:         types.MapNull(types.StringType),
+		ControllerManagerExtraArgs: types.MapNull(types.StringType),
+		AddOns:                     addOns("cert-manager", "nvidia-gpu-operator"),
+	}
+
+	if !hasNothingToPatch(plan, state, extraArgs, nil, nil) {
+		t.Error("hasNothingToPatch() = false for an add_ons-only reorder, want true")
+	}
+}
