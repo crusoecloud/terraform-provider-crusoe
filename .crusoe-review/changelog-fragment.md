@@ -5,8 +5,8 @@ submit an empty finding list: CI (`changelog_check`) fails a merge request that
 needs a fragment and has none, and the `skip-changelog` label is not visible to
 you.
 
-Read `.changelog/README.md` (the rules) and `.claude/commands/changelog.md` (the
-procedure authors follow to write the fragment from the diff). You cannot run
+Read `.changelog/README.md` (the rules) and `.claude/skills/changelog/SKILL.md`
+(the procedure authors follow to write the fragment from the diff). You cannot run
 the commands they mention; use the diff you were given and the repository
 files. Then review the fragment as the result of that procedure applied to this
 diff: is the change customer-visible, is the type right, does the text say what

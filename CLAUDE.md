@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with this Terraform prov
 
 - **Build**: `make build` | **Test + Lint**: `make dev` | **Pre-commit**: `make precommit`
 - **Breaking changes**: Avoid for released resources; use deprecation for field renames (see [Breaking Changes Policy](#breaking-changes-policy))
-- **Changelog**: every customer-visible MR carries `.changelog/<MR>.txt` (`/changelog` drafts it); `CHANGELOG.md` is rendered from them at release time (see [Changelog and Versioning](#changelog-and-versioning))
+- **Changelog**: every customer-visible MR carries `.changelog/<MR>.txt`; the `changelog` skill (`/changelog`) drafts it and asks what the diff cannot answer, run it before opening the MR; `CHANGELOG.md` is rendered from them at release time (see [Changelog and Versioning](#changelog-and-versioning))
 - **Resource packages** in `internal/<resource>/` with `_resource.go`, `_data_source.go`, `*_test.go`, `util.go`
 - **Examples & tests** in `examples/<resource>/` with `main.tf` and `tests/*.tftest.hcl`
 - **ID fields**: Always suffix with `ID` (e.g., `ProjectID`, `InstanceTemplateID`)
@@ -470,7 +470,7 @@ Watch out for these frequently triggered lint errors:
 
 ## Changelog and Versioning
 
-Every merge request with a customer-visible change carries a changelog fragment, `.changelog/<MR>.txt`: rules in [`.changelog/README.md`](.changelog/README.md), `/changelog` drafts it from the branch diff, `make changelog-check FILE=.changelog/<MR>.txt` validates it. CI fails a merge request without one unless it has the `skip-changelog` label or only touches files no customer can notice. Feature merge requests never edit `CHANGELOG.md` or `versions.env`.
+Every merge request with a customer-visible change carries a changelog fragment, `.changelog/<MR>.txt`: rules in [`.changelog/README.md`](.changelog/README.md); the `changelog` skill (`/changelog`) drafts it from the branch diff and asks what the diff cannot answer (site entry or not, which product, which title), so run it before opening the merge request; `make changelog-check FILE=.changelog/<MR>.txt` validates it. A change behind a server-side flag gets no fragment and the `skip-changelog` label until general availability; the skill says so when it sees the limited-availability marker. CI fails a merge request without one unless it has the `skip-changelog` label or only touches files no customer can notice. Feature merge requests never edit `CHANGELOG.md` or `versions.env`.
 
 When preparing a release (RELEASING.md), the `prepare_release` job on a `main` pipeline renders the fragments merged since the last tag into `CHANGELOG.md` and opens the release-prep MR as the release bot (job input `version` for a minor or major release, which also bumps `versions.env`); when it merges, `cut_release_candidate` opens the MR into `release` from `rc/<version>`. By hand, `make changelog` does the rendering. Either way, that section, and the `versions.env` bump, land **on `main` first** (a dedicated release-prep commit), **then** comes the MR into `release`. Do **not** edit these files on the `release` branch or as part of the release MR, and don't squash the release MR — release-only commits make `release` diverge from `main` and cause conflicts on the next `main → release` merge.
 

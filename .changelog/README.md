@@ -138,12 +138,15 @@ docs team.
 
     /changelog            # or: /changelog 123, when the branch has no merge request yet
 
-The command (`.claude/commands/changelog.md`) reads this file, looks at the
-branch's diff and merge request, picks the type and the product tag from the
-live list, writes the text and the title in the site's voice, saves
-`.changelog/<MR>.txt` and runs the check. It asks when it cannot tell whether
-the change is customer-visible or which product it touches. Read what it wrote
-before you push: the author owns the fragment.
+The skill (`.claude/skills/changelog/SKILL.md`) reads this file, looks at the
+branch's diff and merge request, and tells a change behind a server-side flag
+(no fragment, `skip-changelog`) from one every customer sees. Before writing
+anything it asks what the diff cannot answer: whether a bug fix or an
+enhancement deserves a site entry, which product when two fit, which title.
+Then it writes the text and the title in the site's voice, saves
+`.changelog/<MR>.txt` and runs the check. Claude Code also runs it on its own
+when a branch with a customer-visible change is about to become a merge
+request. Read what it wrote before you push: the author owns the fragment.
 
 ## Checking a fragment locally
 
