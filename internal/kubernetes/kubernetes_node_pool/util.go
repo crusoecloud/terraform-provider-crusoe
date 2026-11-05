@@ -124,9 +124,9 @@ const (
 		"`min_node_size` must not exceed `max_node_size`; both may be 0, which holds the node pool at zero nodes."
 	providerDescAutoscalingEnabled = "Must be set whenever the block is present."
 	// providerDescAutoscalingOwnsCount is shared by instance_count and
-	// autoscaling_config. Every update sends instance_count, because the
-	// generated client's count has no omitempty, so without ignore_changes a
-	// plan reverts whatever the autoscaler did.
+	// autoscaling_config. instance_count is required, so the plan always carries
+	// it and every update sends it; without ignore_changes a plan reverts
+	// whatever the autoscaler did.
 	providerDescAutoscalingOwnsCount = "While autoscaling is enabled, the cluster autoscaler manages the node " +
 		"count, so `instance_count` drifts from the configuration. Every update sends `instance_count`: a plan " +
 		"shows the autoscaler's changes as a diff, and applying it resizes the node pool back to the configured " +

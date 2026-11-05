@@ -465,25 +465,23 @@ func TestNodePoolNeedsRolloutIgnoresVersionSpelling(t *testing.T) {
 	}
 }
 
-// TestPatchRequestCarriesSSHKey pins the one field whose absence is destructive
-// rather than merely missing.
+// TestPatchRequestCarriesSSHKey and TestPatchRequestOmitsUnsetSSHKey pin how
+// ssh_public_key is serialized: a set key goes out as is, and an unset one is
+// left out of the body rather than sent as "".
 //
-// The generated client has no omitempty on ssh_public_key, so an unset field
-// still serializes as `"ssh_public_key": ""`. The gateway's own field is a
-// pointer, so the empty string arrives as a present value and reaches the
-// backend as a request to change the key — and the node pool v2 update path has
-// no empty guard, so it rebuilds the pool's instance template with no key at
-// all. Every update, including a bare instance_count change, silently stripped
-// the customer's SSH key from future nodes.
+// The generated client used to have no omitempty on the field, so every update
+// sent "". Node pool v2 rebuilt the instance template without a key until
+// kubernetes-manager began ignoring the empty value, and v1 still treats "" as
+// a change and clones the template, keeping the key.
 //
-// The assertion is on the marshalled bytes because the bug lives in the
-// serialization, not in the struct.
+// The assertions are on the marshalled bytes because that is where the bug was.
 func TestPatchRequestCarriesSSHKey(t *testing.T) {
-	const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test@example.com"
+	sshKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test@example.com"
+	count := int64(3)
 
 	patch := swagger.KubernetesNodePoolPatchRequest{
-		Count:        3,
-		SshPublicKey: sshKey,
+		Count:        &count,
+		SshPublicKey: &sshKey,
 	}
 
 	body, err := json.Marshal(patch)
@@ -498,12 +496,30 @@ func TestPatchRequestCarriesSSHKey(t *testing.T) {
 
 	got, present := sent["ssh_public_key"]
 	if !present {
-		t.Fatal("ssh_public_key is absent from the patch body; the generated client has no omitempty, " +
-			"so this should never happen")
+		t.Fatal("ssh_public_key is absent from the patch body although it was set; " +
+			"check whether a client-go regeneration renamed its JSON tag")
 	}
 	if got != sshKey {
-		t.Errorf("ssh_public_key = %q, want the pool's standing key %q; an empty value rebuilds the "+
-			"instance template without an SSH key on the v2 backend", got, sshKey)
+		t.Errorf("ssh_public_key = %#v, want the key that was set, %q", got, sshKey)
+	}
+}
+
+func TestPatchRequestOmitsUnsetSSHKey(t *testing.T) {
+	count := int64(3)
+
+	body, err := json.Marshal(swagger.KubernetesNodePoolPatchRequest{Count: &count})
+	if err != nil {
+		t.Fatalf("marshalling the patch request: %v", err)
+	}
+
+	var sent map[string]any
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("unmarshalling the patch body: %v", err)
+	}
+
+	if got, present := sent["ssh_public_key"]; present {
+		t.Errorf("ssh_public_key = %#v is in the patch body although it was not set; "+
+			"an unset key must be left out, not sent as null or empty", got)
 	}
 }
 

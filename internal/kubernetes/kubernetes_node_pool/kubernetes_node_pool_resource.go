@@ -787,28 +787,22 @@ func (r *kubernetesNodePoolResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
+	// The pointer fields are left out of the request when the plan value is
+	// null, and the API then keeps the stored setting.
 	patchRequest := swagger.KubernetesNodePoolPatchRequest{
-		Count:                         plan.InstanceCount.ValueInt64(),
+		Count:                         plan.InstanceCount.ValueInt64Pointer(),
 		NodeLabels:                    nodeLabels,
 		NodeTaints:                    nodeTaints,
-		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBool(),
-		NodePoolVersion:               plan.Version.ValueString(),
-		// ssh_public_key has no omitempty in the generated client, so leaving
-		// this unset does not omit it — it sends the empty string, which the
-		// backend reads as a request to change the key. The node pool v2
-		// backend then rebuilds the pool's instance template with NO key, so
-		// replacement nodes come up without the customer's key; v1 happens to
-		// guard the empty string but still churns the template, marking every
-		// existing node as not using the latest config.
-		//
+		EphemeralStorageForContainerd: plan.EphemeralStorageForContainerd.ValueBoolPointer(),
+		NodePoolVersion:               plan.Version.ValueStringPointer(),
 		// ssh_key is Required and RequiresReplace, so the plan always carries
 		// the pool's standing key and the backend's diff is a no-op.
-		SshPublicKey: plan.SSHKey.ValueString(),
-		// Unlike the fields above, these two have omitempty: an unset value is
-		// omitted and the API leaves the stored setting alone. update_settings
-		// carries its presence on the pointer, because allow_scale_down's own
-		// omitempty means a present block holding false marshals as {} — which
-		// the API still reads as an assertion to turn scale-down off.
+		SshPublicKey: plan.SSHKey.ValueStringPointer(),
+		// consent_mode is omitted when empty, so an unset value leaves the
+		// stored setting alone. update_settings carries its presence on the
+		// pointer, because allow_scale_down's own omitempty means a present block
+		// holding false marshals as {} — which the API still reads as an
+		// assertion to turn scale-down off.
 		ConsentMode:       plan.ConsentMode.ValueString(),
 		UpdateSettings:    planUpdateSettings,
 		AutoscalingConfig: scalingConfig,
