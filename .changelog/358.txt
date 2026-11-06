@@ -1,0 +1,5 @@
+```release-note:bug
+`crusoe_vpc_firewall_rule` manages `icmp` rules without the `source_ports = ""` workaround: the port fields are optional, a `tcp` or `udp` rule without them matches all ports, and an existing rule switches to `icmp` in place. A plan now rejects ports on an `icmp` rule, `icmp` combined with `tcp` or `udp`, and ports outside 1-65535, such as `0-65535`.
+<!-- site: infrastructure-cloud/networking -->
+<!-- title: Manage icmp firewall rules with the Terraform provider -->
+```

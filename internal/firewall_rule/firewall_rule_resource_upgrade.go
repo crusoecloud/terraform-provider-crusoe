@@ -16,7 +16,8 @@ import (
 // comma-separated port strings, since the lists that replaced them did not exist yet.
 // Carrying those values over keeps the upgraded state on the same fields the
 // configuration uses, so the first plan after the upgrade does not report a move to
-// the new lists.
+// the new lists. The port strings were Required in v0, so the carried value also keeps
+// the configured spelling (for example "*" where the API reports "1-65535").
 type firewallRuleResourceModelV0 struct {
 	ID               types.String `tfsdk:"id"`
 	Source           types.String `tfsdk:"source"`

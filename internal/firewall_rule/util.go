@@ -2,6 +2,7 @@ package firewall_rule
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/common"
 	"github.com/crusoecloud/terraform-provider-crusoe/internal/project"
+	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
 // apiDesc* — schema descriptions derived from the client-go swagger spec
@@ -50,21 +52,87 @@ const (
 	// The comma-separated port strings are replaced by the source_port_ranges/
 	// destination_port_ranges lists, which take one port or range per element.
 	providerDescSourcePorts = "Source ports of the firewall rule, as a comma-separated list of ports or port ranges. " +
-		"Deprecated in favor of `source_port_ranges`. " + providerDescSourcePortsConstraint
+		"Deprecated in favor of `source_port_ranges`. " + providerDescSourcePortsConstraint + " " + providerDescPorts
 	providerDescDestinationPorts = "Destination ports of the firewall rule, as a comma-separated list of ports or port ranges. " +
-		"Deprecated in favor of `destination_port_ranges`. " + providerDescDestinationPortsConstraint
+		"Deprecated in favor of `destination_port_ranges`. " + providerDescDestinationPortsConstraint + " " + providerDescPorts
 	providerDescPortWildcard = "Use `*` to match all ports."
 
 	// The source/destination fields are each declared Optional because the framework
 	// cannot mark a field both Optional and Required; the ExactlyOneOf validators
 	// enforce the real "exactly one required" constraints, which these notes document
 	// since tfplugindocs lists the fields under "Optional".
-	providerDescSourceConstraint           = "Exactly one of `source` or `sources` must be set."
-	providerDescDestinationConstraint      = "Exactly one of `destination` or `destinations` must be set."
-	providerDescRuleObjectConstraint       = "Exactly one of `cidr` or `resource_id` must be set on each element."
-	providerDescSourcePortsConstraint      = "Exactly one of `source_ports` or `source_port_ranges` must be set."
-	providerDescDestinationPortsConstraint = "Exactly one of `destination_ports` or `destination_port_ranges` must be set."
+	providerDescSourceConstraint      = "Exactly one of `source` or `sources` must be set."
+	providerDescDestinationConstraint = "Exactly one of `destination` or `destinations` must be set."
+	providerDescRuleObjectConstraint  = "Exactly one of `cidr` or `resource_id` must be set on each element."
+
+	// The ports are optional, because an icmp rule has none, so each pair takes a
+	// ConflictsWith validator instead of ExactlyOneOf.
+	providerDescSourcePortsConstraint      = "At most one of `source_ports` or `source_port_ranges` can be set."
+	providerDescDestinationPortsConstraint = "At most one of `destination_ports` or `destination_port_ranges` can be set."
+	providerDescPorts                      = "Must be omitted when `protocols` includes `icmp`."
+
+	// The protocol set and the icmp constraints come from the backend validators, which
+	// the spec does not describe.
+	providerDescProtocols = "Possible values: `tcp`, `udp`, `icmp`, as a comma-separated list. " +
+		"`icmp` cannot be combined with `tcp` or `udp`."
 )
+
+// protocolICMP is the one protocol the API accepts without ports. The backend also
+// refuses to pair it with tcp or udp on a single rule.
+const protocolICMP = "icmp"
+
+// protocolsIncludeICMP reports whether a protocol list names icmp. The backend
+// lowercases protocols, so the check ignores case.
+func protocolsIncludeICMP(protocols []string) bool {
+	for _, p := range protocols {
+		if strings.EqualFold(p, protocolICMP) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// validateProtocolsConfig reports the protocol constraints the backend enforces, so a
+// plan fails before any API call instead of the apply. An unknown value is skipped and
+// left to the API.
+func validateProtocolsConfig(config *firewallRuleResourceModel, diags *diag.Diagnostics) {
+	if config.Protocols.IsNull() || config.Protocols.IsUnknown() {
+		return
+	}
+
+	list := stringToSlice(config.Protocols.ValueString(), ",")
+	if !protocolsIncludeICMP(list) {
+		return
+	}
+
+	for _, p := range list {
+		if !strings.EqualFold(p, protocolICMP) {
+			diags.AddAttributeError(path.Root("protocols"), "Invalid protocols",
+				"`icmp` cannot be combined with `tcp` or `udp` on one rule. Use a separate rule for `icmp`.")
+
+			break
+		}
+	}
+
+	// The empty port string an older configuration may use counts as unset, since it
+	// also means "all ports".
+	portsAttrs := []struct {
+		name string
+		set  bool
+	}{
+		{"source_ports", isSet(config.SourcePorts)},
+		{"source_port_ranges", isSetList(config.SourcePortRanges)},
+		{"destination_ports", isSet(config.DestinationPorts)},
+		{"destination_port_ranges", isSetList(config.DestinationPortRanges)},
+	}
+	for _, attr := range portsAttrs {
+		if attr.set {
+			diags.AddAttributeError(path.Root(attr.name), "Ports not allowed for icmp",
+				fmt.Sprintf("`icmp` rules match no ports. Remove %#q when `protocols` includes `icmp`.", attr.name))
+		}
+	}
+}
 
 // firewallRuleObjectType is the Terraform type of a single sources/destinations
 // element, mirroring the API's FirewallRuleObject.
@@ -104,7 +172,8 @@ func ruleObjectNestedAttribute() schema.NestedAttributeObject {
 var whitespaceRegex = regexp.MustCompile(`\s*`)
 
 // portRangeRegex matches a single port_ranges element: a port, a port range, or
-// the "*" wildcard. Bounds are left to the API.
+// the "*" wildcard. It keeps each element to one entry, and PortListValidator checks
+// the bounds.
 var portRangeRegex = regexp.MustCompile(`^(\*|\d{1,5}(-\d{1,5})?)$`)
 
 // portRangesAttribute is the shared shape of the source_port_ranges and
@@ -117,8 +186,11 @@ func portRangesAttribute(description string) schema.ListAttribute {
 		Validators: []validator.List{
 			listvalidator.SizeAtLeast(1),
 			listvalidator.NoNullValues(),
-			listvalidator.ValueStringsAre(stringvalidator.RegexMatches(portRangeRegex,
-				"must be a port (e.g. `22`), a port range (e.g. `3000-8080`), or `*`")),
+			listvalidator.ValueStringsAre(
+				stringvalidator.RegexMatches(portRangeRegex,
+					"must be a port (e.g. `22`), a port range (e.g. `3000-8080`), or `*`"),
+				validators.PortListValidator{},
+			),
 		},
 	}
 }
@@ -350,11 +422,20 @@ func applyRuleObjectsToState(ctx context.Context, objects []swagger.FirewallRule
 
 // portsFromModel converts a configured port_ranges list into the API's port list,
 // falling back to the deprecated comma-separated string when the list is unset. The
-// schema's ExactlyOneOf validators guarantee that exactly one of the two is
+// schema's ConflictsWith validators guarantee that at most one of the two is
 // configured. The "*" wildcard is expanded to the full range the API uses.
-func portsFromModel(ctx context.Context, list types.List, deprecated types.String,
+//
+// The result is never nil, because a PATCH sends a nil port list as null, which leaves
+// the stored ports unchanged. An icmp rule gets an empty list, which clears the stored
+// ports so a rule can switch to icmp in place. For other protocols, no ports means every
+// port, which is sent as the full range because an empty list would clear them.
+func portsFromModel(ctx context.Context, list types.List, deprecated types.String, icmp bool,
 	diags *diag.Diagnostics,
 ) []string {
+	if icmp {
+		return []string{}
+	}
+
 	var ports []string
 	if isSetList(list) {
 		diags.Append(list.ElementsAs(ctx, &ports, false)...)
@@ -368,7 +449,12 @@ func portsFromModel(ctx context.Context, list types.List, deprecated types.Strin
 		if p == "*" {
 			p = wildcardPortRange
 		}
-		out = append(out, p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, wildcardPortRange)
 	}
 
 	return out
@@ -399,6 +485,10 @@ func portRangesToState(ctx context.Context, apiPorts []string, configured types.
 // the list never both end up populated. Unlike source/destination, an empty
 // deprecated string is a valid configuration (all ports), so only a null string
 // counts as unset.
+//
+// When neither field is configured, both stay null while the API reports every port
+// or, for an icmp rule, no ports. That is what the omission means, so it does not
+// read as a change. Any other API value fills the list, so drift still surfaces.
 func applyPortsToState(ctx context.Context, apiPorts []string, list *types.List, deprecated *types.String) {
 	if isKnown(*deprecated) {
 		*deprecated = types.StringValue(preserveListFormat(deprecated.ValueString(), apiPorts, true))
@@ -408,6 +498,9 @@ func applyPortsToState(ctx context.Context, apiPorts []string, list *types.List,
 	}
 
 	*deprecated = types.StringNull()
+	if list.IsNull() && slices.Equal(canonicalizeList(apiPorts, true), []string{wildcardPortRange}) {
+		return
+	}
 	*list = portRangesToState(ctx, apiPorts, *list)
 }
 

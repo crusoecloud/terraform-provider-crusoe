@@ -44,11 +44,11 @@ run "validate_disk_project_id" {
   }
 }
 
-run "validate_firewall_rule_project_id" {
+run "validate_tcp_firewall_rule_project_id" {
   command = plan
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.project_id == var.project_id
-    error_message = "Expected project id to be '${var.project_id}', but got '${crusoe_vpc_firewall_rule.open_fw_rule.project_id}'."
+    condition     = crusoe_vpc_firewall_rule.my_tcp_fw_rule.project_id == var.project_id
+    error_message = "Expected project id to be '${var.project_id}', but got '${crusoe_vpc_firewall_rule.my_tcp_fw_rule.project_id}'."
   }
 }
 

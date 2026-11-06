@@ -91,9 +91,10 @@ func TestFirewallRuleUpgradeStateV0KeepsDeprecatedFields(t *testing.T) {
 		if !state.Source.IsNull() || !state.Destination.IsNull() {
 			t.Error("source/destination should stay null when the prior state did not use them")
 		}
-		// Without a configured format to preserve, the lists take the API's raw values.
-		if want := portList(t, wildcardPortRange); !state.SourcePortRanges.Equal(want) {
-			t.Errorf("source_port_ranges = %v, want %v", state.SourcePortRanges, want)
+		// Without a configured format to preserve, the lists take the API's raw values,
+		// except every port, which is what omitting the ports means.
+		if !state.SourcePortRanges.IsNull() {
+			t.Errorf("source_port_ranges = %v, want null for every port", state.SourcePortRanges)
 		}
 		if want := portList(t, "443"); !state.DestinationPortRanges.Equal(want) {
 			t.Errorf("destination_port_ranges = %v, want %v", state.DestinationPortRanges, want)

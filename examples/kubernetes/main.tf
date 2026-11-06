@@ -84,8 +84,8 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   nat_gateway_enabled = false
 }
 
-resource "crusoe_vpc_firewall_rule" "my_egress_rule" {
-  name                    = "${var.name_prefix}egress-rule"
+resource "crusoe_vpc_firewall_rule" "my_egress_fw_rule" {
+  name                    = "${var.name_prefix}egress-firewall-rule"
   action                  = "allow"
   direction               = "egress"
   protocols               = "tcp,udp"
@@ -133,11 +133,11 @@ resource "crusoe_kubernetes_cluster" "my_cluster" {
 
   # Optional: Extra arguments for control plane components.
   # Changes take effect after a cluster rotation.
-  apiserver_extra_args         = var.apiserver_extra_args
-  scheduler_extra_args         = var.scheduler_extra_args
+  apiserver_extra_args          = var.apiserver_extra_args
+  scheduler_extra_args          = var.scheduler_extra_args
   controller_manager_extra_args = var.controller_manager_extra_args
 
-  depends_on = [crusoe_vpc_firewall_rule.my_egress_rule]
+  depends_on = [crusoe_vpc_firewall_rule.my_egress_fw_rule]
 }
 
 resource "crusoe_kubernetes_node_pool" "my_node_pool" {

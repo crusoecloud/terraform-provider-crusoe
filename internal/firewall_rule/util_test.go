@@ -2,7 +2,9 @@ package firewall_rule
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -193,6 +195,7 @@ func Test_portsFromModel(t *testing.T) {
 		name       string
 		list       []string
 		deprecated types.String
+		icmp       bool
 		want       []string
 	}{
 		{
@@ -222,9 +225,24 @@ func Test_portsFromModel(t *testing.T) {
 			want:       []string{wildcardPortRange},
 		},
 		{
-			name:       "empty deprecated field sends no ports",
+			name:       "empty deprecated field sends the full range",
 			deprecated: types.StringValue(""),
-			want:       []string{},
+			want:       []string{wildcardPortRange},
+		},
+		{
+			name: "omitted ports send the full range",
+			want: []string{wildcardPortRange},
+		},
+		{
+			name: "icmp sends an empty list",
+			icmp: true,
+			want: []string{},
+		},
+		{
+			name: "icmp ignores configured ports",
+			list: []string{"22"},
+			icmp: true,
+			want: []string{},
 		},
 	}
 	for _, tt := range tests {
@@ -239,12 +257,44 @@ func Test_portsFromModel(t *testing.T) {
 			}
 
 			var diags diag.Diagnostics
-			got := portsFromModel(context.Background(), list, deprecated, &diags)
+			got := portsFromModel(context.Background(), list, deprecated, tt.icmp, &diags)
 			if diags.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diags)
 			}
+			// A nil result would be sent as null, which leaves the stored ports unchanged.
+			if got == nil {
+				t.Fatal("portsFromModel() = nil, want a non-nil list")
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("portsFromModel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_portsFromModel_patchBody checks the PATCH body the API receives. A switch to icmp
+// in place depends on the client sending an empty port list as [] rather than omitting it.
+func Test_portsFromModel_patchBody(t *testing.T) {
+	tests := []struct {
+		name string
+		icmp bool
+		want string
+	}{
+		{"icmp clears the ports", true, `"source_ports":[]`},
+		{"omitted ports send the full range", false, `"source_ports":["1-65535"]`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var diags diag.Diagnostics
+			body, err := json.Marshal(swagger.VpcFirewallRulesPatchRequest{
+				SourcePorts: portsFromModel(context.Background(), types.ListNull(types.StringType),
+					types.StringNull(), tt.icmp, &diags),
+			})
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			if !strings.Contains(string(body), tt.want) {
+				t.Errorf("body = %s, want it to contain %s", body, tt.want)
 			}
 		})
 	}
@@ -300,6 +350,19 @@ func Test_applyPortsToState(t *testing.T) {
 			apiPorts: []string{"22", "3000-8080"},
 			wantList: []string{"22", "3000-8080"},
 		},
+		{
+			name:     "omitted ports stay null against the full range",
+			apiPorts: []string{wildcardPortRange},
+		},
+		{
+			name:     "omitted ports stay null against an icmp rule's empty list",
+			apiPorts: []string{},
+		},
+		{
+			name:     "omitted ports surface drift",
+			apiPorts: []string{"443"},
+			wantList: []string{"443"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -308,6 +371,9 @@ func Test_applyPortsToState(t *testing.T) {
 				list = portList(t, tt.list...)
 			}
 			deprecated := tt.deprecated
+			if deprecated.IsNull() {
+				deprecated = types.StringNull()
+			}
 
 			applyPortsToState(context.Background(), tt.apiPorts, &list, &deprecated)
 
@@ -554,6 +620,83 @@ func Test_firewallRuleToTerraformResourceModel_sources(t *testing.T) {
 	}
 	if !state.Source.IsNull() || !state.Destination.IsNull() {
 		t.Error("deprecated source/destination should stay null when the lists are configured")
+	}
+}
+
+func Test_validateProtocolsConfig(t *testing.T) {
+	tests := []struct {
+		name       string
+		protocols  types.String
+		sourcePort types.String
+		destPort   types.String
+		destRanges []string
+		wantErrors int
+	}{
+		{"tcp with ports", types.StringValue("tcp"), types.StringValue("*"), types.StringValue("443"), nil, 0},
+		{"tcp with port ranges", types.StringValue("tcp"), types.StringNull(), types.StringNull(), []string{"443"}, 0},
+		{"tcp without ports", types.StringValue("tcp"), types.StringNull(), types.StringNull(), nil, 0},
+		{"icmp without ports", types.StringValue("icmp"), types.StringNull(), types.StringNull(), nil, 0},
+		{"icmp with legacy empty strings", types.StringValue("icmp"), types.StringValue(""), types.StringValue(""), nil, 0},
+		{"icmp with source ports", types.StringValue("icmp"), types.StringValue("*"), types.StringNull(), nil, 1},
+		{"icmp with both ports", types.StringValue("icmp"), types.StringValue("*"), types.StringValue("443"), nil, 2},
+		{"icmp with port ranges", types.StringValue("icmp"), types.StringNull(), types.StringNull(), []string{"443"}, 1},
+		{"icmp uppercase with ports", types.StringValue("ICMP"), types.StringValue("443"), types.StringNull(), nil, 1},
+		{"icmp mixed with tcp", types.StringValue("tcp,icmp"), types.StringNull(), types.StringNull(), nil, 1},
+		{"icmp mixed with tcp and udp", types.StringValue("tcp, udp, icmp"), types.StringNull(), types.StringNull(), nil, 1},
+		{"icmp mixed and with ports", types.StringValue("tcp,icmp"), types.StringValue("443"), types.StringNull(), nil, 2},
+		{"unknown protocols skipped", types.StringUnknown(), types.StringValue("443"), types.StringValue("443"), nil, 0},
+		{"null protocols skipped", types.StringNull(), types.StringValue("443"), types.StringValue("443"), nil, 0},
+		{"icmp with unknown ports", types.StringValue("icmp"), types.StringUnknown(), types.StringValue("443"), nil, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &firewallRuleResourceModel{
+				Protocols:             tt.protocols,
+				SourcePorts:           tt.sourcePort,
+				SourcePortRanges:      types.ListNull(types.StringType),
+				DestinationPorts:      tt.destPort,
+				DestinationPortRanges: types.ListNull(types.StringType),
+			}
+			if tt.destRanges != nil {
+				config.DestinationPortRanges = portList(t, tt.destRanges...)
+			}
+			var diags diag.Diagnostics
+
+			validateProtocolsConfig(config, &diags)
+
+			if got := diags.ErrorsCount(); got != tt.wantErrors {
+				t.Errorf("ErrorsCount() = %d, want %d (diagnostics: %v)", got, tt.wantErrors, diags)
+			}
+		})
+	}
+}
+
+// Test_firewallRuleToTerraformResourceModel_icmpRule covers an icmp rule, which the
+// API returns with empty port lists: the ports attributes stay null so a configuration
+// that omits them reads clean.
+func Test_firewallRuleToTerraformResourceModel_icmpRule(t *testing.T) {
+	state := &firewallRuleResourceModel{
+		Protocols: types.StringValue("icmp"),
+		Sources:   ruleObjectList(t, cidrObject("10.0.0.0/16")),
+	}
+	rule := &swagger.VpcFirewallRule{
+		Id:               "fw-1",
+		Protocols:        []string{"icmp"},
+		Sources:          []swagger.FirewallRuleObject{{Cidr: "10.0.0.0/16"}},
+		SourcePorts:      []string{},
+		DestinationPorts: []string{},
+	}
+
+	firewallRuleToTerraformResourceModel(context.Background(), rule, state)
+
+	if !state.SourcePorts.IsNull() || !state.SourcePortRanges.IsNull() {
+		t.Errorf("source ports = %v / %v, want null for an icmp rule", state.SourcePorts, state.SourcePortRanges)
+	}
+	if !state.DestinationPorts.IsNull() || !state.DestinationPortRanges.IsNull() {
+		t.Errorf("destination ports = %v / %v, want null for an icmp rule", state.DestinationPorts, state.DestinationPortRanges)
+	}
+	if got := state.Protocols.ValueString(); got != "icmp" {
+		t.Errorf("protocols = %q, want %q", got, "icmp")
 	}
 }
 

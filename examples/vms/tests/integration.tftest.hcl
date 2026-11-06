@@ -22,18 +22,18 @@ run "check_vm_and_disk_exists" {
   }
 
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.id != null
-    error_message = "The firewall rule '${var.name_prefix}firewall-rule' was not created successfully, as its ID is null."
+    condition     = crusoe_vpc_firewall_rule.my_tcp_fw_rule.id != null
+    error_message = "The firewall rule '${var.name_prefix}tcp-firewall-rule' was not created successfully, as its ID is null."
   }
 
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.destinations[0].resource_id == crusoe_compute_instance.my_vm.id
+    condition     = crusoe_vpc_firewall_rule.my_tcp_fw_rule.destinations[0].resource_id == crusoe_compute_instance.my_vm.id
     error_message = "Expected firewall rule destination to match the VM's resource ID."
   }
 
   assert {
-    condition     = crusoe_vpc_firewall_rule.open_fw_rule.network == crusoe_compute_instance.my_vm.network_interfaces[0].network
-    error_message = "Expected firewall rule network to match the VM's network, but got '${crusoe_vpc_firewall_rule.open_fw_rule.network}'."
+    condition     = crusoe_vpc_firewall_rule.my_tcp_fw_rule.network == crusoe_compute_instance.my_vm.network_interfaces[0].network
+    error_message = "Expected firewall rule network to match the VM's network, but got '${crusoe_vpc_firewall_rule.my_tcp_fw_rule.network}'."
   }
 
   assert {

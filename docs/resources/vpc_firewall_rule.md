@@ -18,9 +18,9 @@ resource "crusoe_vpc_network" "example" {
   cidr = "10.0.0.0/8"
 }
 
-resource "crusoe_vpc_firewall_rule" "example" {
+resource "crusoe_vpc_firewall_rule" "example_tcp" {
   network   = crusoe_vpc_network.example.id
-  name      = "my-firewall-rule"
+  name      = "my-tcp-firewall-rule"
   action    = "allow"
   direction = "ingress"
   protocols = "tcp"
@@ -30,6 +30,18 @@ resource "crusoe_vpc_firewall_rule" "example" {
   source_port_ranges      = ["1-65535"]
   destinations            = [{ resource_id = crusoe_vpc_network.example.id }]
   destination_port_ranges = ["443"]
+}
+
+# An icmp rule has no ports. Omit the source and destination port fields.
+resource "crusoe_vpc_firewall_rule" "example_icmp" {
+  network   = crusoe_vpc_network.example.id
+  name      = "my-icmp-firewall-rule"
+  action    = "allow"
+  direction = "ingress"
+  protocols = "icmp"
+
+  sources      = [{ cidr = "0.0.0.0/0" }]
+  destinations = [{ resource_id = crusoe_vpc_network.example.id }]
 }
 ```
 
@@ -42,18 +54,18 @@ resource "crusoe_vpc_firewall_rule" "example" {
 - `direction` (String) Direction of traffic the rule applies to. Possible values: `ingress` (inbound), `egress` (outbound).
 - `name` (String) Name of the firewall rule.
 - `network` (String) ID of the VPC network the rule belongs to.
-- `protocols` (String) Network protocols the rule matches (for example, `tcp`, `udp`).
+- `protocols` (String) Network protocols the rule matches (for example, `tcp`, `udp`). Possible values: `tcp`, `udp`, `icmp`, as a comma-separated list. `icmp` cannot be combined with `tcp` or `udp`.
 
 ### Optional
 
 - `destination` (String, Deprecated) Destination of the firewall rule, as a CIDR or IP address. Deprecated in favor of `destinations`. Exactly one of `destination` or `destinations` must be set.
-- `destination_port_ranges` (List of String) Destination ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`). Use `*` to match all ports. Exactly one of `destination_ports` or `destination_port_ranges` must be set.
-- `destination_ports` (String, Deprecated) Destination ports of the firewall rule, as a comma-separated list of ports or port ranges. Deprecated in favor of `destination_port_ranges`. Exactly one of `destination_ports` or `destination_port_ranges` must be set.
+- `destination_port_ranges` (List of String) Destination ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`). Use `*` to match all ports. At most one of `destination_ports` or `destination_port_ranges` can be set. Must be omitted when `protocols` includes `icmp`.
+- `destination_ports` (String, Deprecated) Destination ports of the firewall rule, as a comma-separated list of ports or port ranges. Deprecated in favor of `destination_port_ranges`. At most one of `destination_ports` or `destination_port_ranges` can be set. Must be omitted when `protocols` includes `icmp`.
 - `destinations` (Attributes List) Destinations the rule matches, given as CIDR blocks or resource IDs. Exactly one of `cidr` or `resource_id` must be set on each element. Exactly one of `destination` or `destinations` must be set. (see [below for nested schema](#nestedatt--destinations))
 - `project_id` (String) ID of the project the firewall rule belongs to. If not specified, the project ID will be inferred from the Crusoe configuration.
 - `source` (String, Deprecated) Source of the firewall rule, as a CIDR or IP address. Deprecated in favor of `sources`. Exactly one of `source` or `sources` must be set.
-- `source_port_ranges` (List of String) Source ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`). Use `*` to match all ports. Exactly one of `source_ports` or `source_port_ranges` must be set.
-- `source_ports` (String, Deprecated) Source ports of the firewall rule, as a comma-separated list of ports or port ranges. Deprecated in favor of `source_port_ranges`. Exactly one of `source_ports` or `source_port_ranges` must be set.
+- `source_port_ranges` (List of String) Source ports the rule matches. Each entry is a single port or a port range (for example, `3000-8080`). Use `*` to match all ports. At most one of `source_ports` or `source_port_ranges` can be set. Must be omitted when `protocols` includes `icmp`.
+- `source_ports` (String, Deprecated) Source ports of the firewall rule, as a comma-separated list of ports or port ranges. Deprecated in favor of `source_port_ranges`. At most one of `source_ports` or `source_port_ranges` can be set. Must be omitted when `protocols` includes `icmp`.
 - `sources` (Attributes List) Sources the rule matches, given as CIDR blocks or resource IDs. Exactly one of `cidr` or `resource_id` must be set on each element. Exactly one of `source` or `sources` must be set. (see [below for nested schema](#nestedatt--sources))
 
 ### Read-Only
@@ -84,5 +96,5 @@ Import is supported using the following syntax:
 ```shell
 # Resources are imported by their ID. To target a specific project, append the
 # project ID using the format "<id>,<project_id>".
-terraform import crusoe_vpc_firewall_rule.example <firewall_rule_id>
+terraform import crusoe_vpc_firewall_rule.example_tcp <firewall_rule_id>
 ```

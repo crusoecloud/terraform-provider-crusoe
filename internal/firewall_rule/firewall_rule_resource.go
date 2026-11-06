@@ -19,6 +19,8 @@ import (
 	validators "github.com/crusoecloud/terraform-provider-crusoe/internal/validators"
 )
 
+var _ resource.ResourceWithValidateConfig = &firewallRuleResource{}
+
 type firewallRuleResource struct {
 	client *common.CrusoeClient
 }
@@ -31,20 +33,16 @@ type firewallRuleResourceModel struct {
 	Action    types.String `tfsdk:"action"`
 	Direction types.String `tfsdk:"direction"`
 	Protocols types.String `tfsdk:"protocols"`
-	// Sources is the replacement for the deprecated Source field. Exactly one of
-	// the two must be set.
+	// Source is deprecated in favor of Sources.
 	Source  types.String `tfsdk:"source"`
 	Sources types.List   `tfsdk:"sources"`
-	// SourcePortRanges is the replacement for the deprecated SourcePorts field.
-	// Exactly one of the two must be set.
+	// SourcePorts is deprecated in favor of SourcePortRanges.
 	SourcePorts      types.String `tfsdk:"source_ports"`
 	SourcePortRanges types.List   `tfsdk:"source_port_ranges"`
-	// Destinations is the replacement for the deprecated Destination field. Exactly
-	// one of the two must be set.
+	// Destination is deprecated in favor of Destinations.
 	Destination  types.String `tfsdk:"destination"`
 	Destinations types.List   `tfsdk:"destinations"`
-	// DestinationPortRanges is the replacement for the deprecated DestinationPorts
-	// field. Exactly one of the two must be set.
+	// DestinationPorts is deprecated in favor of DestinationPortRanges.
 	DestinationPorts      types.String `tfsdk:"destination_ports"`
 	DestinationPortRanges types.List   `tfsdk:"destination_port_ranges"`
 }
@@ -119,16 +117,14 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				Validators:    []validator.String{validators.RegexValidator{RegexPattern: "^(ingress|egress)"}},
 			},
 			"protocols": schema.StringAttribute{
-				Required:    true,
-				Description: apiDescProtocols,
-				// TODO: add validator
+				Required:            true,
+				MarkdownDescription: apiDescProtocols + " " + providerDescProtocols,
 			},
 			"source": schema.StringAttribute{
 				Optional:            true,
 				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.3.0", "sources"),
 				MarkdownDescription: providerDescSource,
 				Validators: []validator.String{
-					// Exactly one of the deprecated field or its replacement must be set.
 					stringvalidator.ExactlyOneOf(
 						path.MatchRoot("source"),
 						path.MatchRoot("sources"),
@@ -147,21 +143,17 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.7.0", "source_port_ranges"),
 				MarkdownDescription: providerDescSourcePorts,
 				Validators: []validator.String{
-					// Exactly one of the deprecated field or its replacement must be set.
-					stringvalidator.ExactlyOneOf(
-						path.MatchRoot("source_ports"),
-						path.MatchRoot("source_port_ranges"),
-					),
+					validators.PortListValidator{},
+					stringvalidator.ConflictsWith(path.MatchRoot("source_port_ranges")),
 				},
 			},
 			"source_port_ranges": portRangesAttribute(apiDescSourcePorts + " " + providerDescPortWildcard + " " +
-				providerDescSourcePortsConstraint),
+				providerDescSourcePortsConstraint + " " + providerDescPorts),
 			"destination": schema.StringAttribute{
 				Optional:            true,
 				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.3.0", "destinations"),
 				MarkdownDescription: providerDescDestination,
 				Validators: []validator.String{
-					// Exactly one of the deprecated field or its replacement must be set.
 					stringvalidator.ExactlyOneOf(
 						path.MatchRoot("destination"),
 						path.MatchRoot("destinations"),
@@ -180,17 +172,29 @@ func (r *firewallRuleResource) Schema(ctx context.Context, req resource.SchemaRe
 				DeprecationMessage:  common.FormatDeprecationWithReplacement("v1.7.0", "destination_port_ranges"),
 				MarkdownDescription: providerDescDestinationPorts,
 				Validators: []validator.String{
-					// Exactly one of the deprecated field or its replacement must be set.
-					stringvalidator.ExactlyOneOf(
-						path.MatchRoot("destination_ports"),
-						path.MatchRoot("destination_port_ranges"),
-					),
+					validators.PortListValidator{},
+					stringvalidator.ConflictsWith(path.MatchRoot("destination_port_ranges")),
 				},
 			},
 			"destination_port_ranges": portRangesAttribute(apiDescDestinationPorts + " " + providerDescPortWildcard + " " +
-				providerDescDestinationPortsConstraint),
+				providerDescDestinationPortsConstraint + " " + providerDescPorts),
 		},
 	}
+}
+
+// ValidateConfig runs at plan time and surfaces config-only violations before any API call.
+// Schema validators cover each attribute on its own; this covers the rules that tie
+// protocols to the port lists.
+//
+//nolint:gocritic // Implements Terraform defined interface
+func (r *firewallRuleResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config firewallRuleResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validateProtocolsConfig(&config, &resp.Diagnostics)
 }
 
 func (r *firewallRuleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -214,10 +218,13 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 
 	projectID := common.GetProjectIDOrFallback(r.client, plan.ProjectID.ValueString())
 
+	protocols := stringToSlice(plan.Protocols.ValueString(), ",")
+	icmp := protocolsIncludeICMP(protocols)
+
 	sources := ruleObjectsFromModel(ctx, plan.Sources, plan.Source, &resp.Diagnostics)
-	sourcePorts := portsFromModel(ctx, plan.SourcePortRanges, plan.SourcePorts, &resp.Diagnostics)
+	sourcePorts := portsFromModel(ctx, plan.SourcePortRanges, plan.SourcePorts, icmp, &resp.Diagnostics)
 	destinations := ruleObjectsFromModel(ctx, plan.Destinations, plan.Destination, &resp.Diagnostics)
-	destinationPorts := portsFromModel(ctx, plan.DestinationPortRanges, plan.DestinationPorts, &resp.Diagnostics)
+	destinationPorts := portsFromModel(ctx, plan.DestinationPortRanges, plan.DestinationPorts, icmp, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -226,7 +233,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		VpcNetworkId:     plan.Network.ValueString(),
 		Name:             plan.Name.ValueString(),
 		Action:           plan.Action.ValueString(),
-		Protocols:        stringToSlice(plan.Protocols.ValueString(), ","),
+		Protocols:        protocols,
 		Direction:        plan.Direction.ValueString(),
 		Sources:          sources,
 		SourcePorts:      sourcePorts,
@@ -302,21 +309,19 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
 		patchReq.Name = plan.Name.ValueString()
 	}
-	if !plan.Protocols.IsNull() && !plan.Protocols.IsUnknown() {
-		patchReq.Protocols = stringToSlice(plan.Protocols.ValueString(), ",")
-	}
+	// protocols is Required, so the plan always carries it. The ports are always sent,
+	// because omitted ports mean every port, and an icmp rule sends an empty list to clear
+	// the ports stored on the rule.
+	patchReq.Protocols = stringToSlice(plan.Protocols.ValueString(), ",")
+	icmp := protocolsIncludeICMP(patchReq.Protocols)
 	if isSet(plan.Destination) || isSetList(plan.Destinations) {
 		patchReq.Destinations = ruleObjectsFromModel(ctx, plan.Destinations, plan.Destination, &resp.Diagnostics)
 	}
-	if isKnown(plan.DestinationPorts) || isSetList(plan.DestinationPortRanges) {
-		patchReq.DestinationPorts = portsFromModel(ctx, plan.DestinationPortRanges, plan.DestinationPorts, &resp.Diagnostics)
-	}
+	patchReq.DestinationPorts = portsFromModel(ctx, plan.DestinationPortRanges, plan.DestinationPorts, icmp, &resp.Diagnostics)
 	if isSet(plan.Source) || isSetList(plan.Sources) {
 		patchReq.Sources = ruleObjectsFromModel(ctx, plan.Sources, plan.Source, &resp.Diagnostics)
 	}
-	if isKnown(plan.SourcePorts) || isSetList(plan.SourcePortRanges) {
-		patchReq.SourcePorts = portsFromModel(ctx, plan.SourcePortRanges, plan.SourcePorts, &resp.Diagnostics)
-	}
+	patchReq.SourcePorts = portsFromModel(ctx, plan.SourcePortRanges, plan.SourcePorts, icmp, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}

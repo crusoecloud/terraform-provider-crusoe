@@ -59,7 +59,7 @@ func TestFirewallRuleResource_DeprecatedFields(t *testing.T) {
 			t.Errorf("deprecated %s should be Optional", name)
 		}
 		if len(attr.Validators) == 0 {
-			t.Errorf("%s should carry the ExactlyOneOf validator", name)
+			t.Errorf("%s should carry a validator against its replacement", name)
 		}
 	}
 }
@@ -135,6 +135,69 @@ func TestFirewallRuleResource_PortRangeLists(t *testing.T) {
 	}
 }
 
+// TestFirewallRuleResource_PortStringsOptional guards the fix for icmp rules, which have
+// no ports: neither port string may be Computed, since null must mean omitted, and
+// neither may require one of the port fields to be set.
+func TestFirewallRuleResource_PortStringsOptional(t *testing.T) {
+	s := firewallRuleSchema(t)
+
+	for _, name := range []string{"source_ports", "destination_ports"} {
+		attr, ok := s.Attributes[name].(schema.StringAttribute)
+		if !ok {
+			t.Fatalf("%s attribute not found", name)
+		}
+		if attr.Computed {
+			t.Errorf("%s should not be Computed", name)
+		}
+		if hasExactlyOneOfValidator(attr.Validators) {
+			t.Errorf("%s should not require one of the port fields", name)
+		}
+	}
+}
+
+// TestFirewallRuleResource_PortRangeListValues runs the list validators on element
+// values, so an out-of-range port fails the plan rather than the apply.
+func TestFirewallRuleResource_PortRangeListValues(t *testing.T) {
+	ctx := context.Background()
+	s := firewallRuleSchema(t)
+	attr, ok := s.Attributes["source_port_ranges"].(schema.ListAttribute)
+	if !ok {
+		t.Fatal("source_port_ranges attribute not found or not a ListAttribute")
+	}
+
+	tests := []struct {
+		name      string
+		ports     []string
+		wantError bool
+	}{
+		{"single port", []string{"22"}, false},
+		{"range and wildcard", []string{"3000-8080", "*"}, false},
+		{"full range", []string{wildcardPortRange}, false},
+		{"port zero in a range", []string{"0-65535"}, true},
+		{"port above the maximum", []string{"65536"}, true},
+		{"reversed range", []string{"443-80"}, true},
+		{"two ports in one element", []string{"22,443"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			list, diags := types.ListValueFrom(ctx, types.StringType, tt.ports)
+			if diags.HasError() {
+				t.Fatalf("failed to build list: %v", diags)
+			}
+			req := validator.ListRequest{Path: path.Root("source_port_ranges"), ConfigValue: list}
+			resp := &validator.ListResponse{}
+
+			for _, v := range attr.Validators {
+				v.ValidateList(ctx, req, resp)
+			}
+
+			if got := resp.Diagnostics.HasError(); got != tt.wantError {
+				t.Errorf("HasError() = %t, want %t (diagnostics: %v)", got, tt.wantError, resp.Diagnostics)
+			}
+		})
+	}
+}
+
 func TestPortRangeRegex(t *testing.T) {
 	valid := []string{"*", "22", "443", "65535", "3000-8080", "1-65535"}
 	invalid := []string{"", " ", "**", "22,443", "22-", "-22", "3000 - 8080", "abc", "123456", "1-2-3", "22/tcp"}
@@ -148,6 +211,88 @@ func TestPortRangeRegex(t *testing.T) {
 		if portRangeRegex.MatchString(v) {
 			t.Errorf("portRangeRegex should not match %q", v)
 		}
+	}
+}
+
+// firewallRuleAttrs builds a complete, valid raw object for the firewall rule schema,
+// which a test then edits before wrapping it in a Config, Plan, or State.
+func firewallRuleAttrs(ctx context.Context, t *testing.T, s schema.Schema) map[string]tftypes.Value {
+	t.Helper()
+
+	objType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatal("schema type is not an object")
+	}
+
+	sourcesType, ok := objType.AttributeTypes["sources"].(tftypes.List)
+	if !ok {
+		t.Fatal("sources attribute is not a list")
+	}
+	ruleObject := func(cidr string) tftypes.Value {
+		return tftypes.NewValue(sourcesType.ElementType, map[string]tftypes.Value{
+			"cidr":        tftypes.NewValue(tftypes.String, cidr),
+			"resource_id": tftypes.NewValue(tftypes.String, nil),
+		})
+	}
+	portRanges := tftypes.List{ElementType: tftypes.String}
+
+	return map[string]tftypes.Value{
+		"id":                      tftypes.NewValue(tftypes.String, "fw-1"),
+		"project_id":              tftypes.NewValue(tftypes.String, "proj-1"),
+		"name":                    tftypes.NewValue(tftypes.String, "rule"),
+		"network":                 tftypes.NewValue(tftypes.String, "net-1"),
+		"action":                  tftypes.NewValue(tftypes.String, "allow"),
+		"direction":               tftypes.NewValue(tftypes.String, "ingress"),
+		"protocols":               tftypes.NewValue(tftypes.String, "tcp"),
+		"source":                  tftypes.NewValue(tftypes.String, nil),
+		"sources":                 tftypes.NewValue(sourcesType, []tftypes.Value{ruleObject("0.0.0.0/0")}),
+		"source_ports":            tftypes.NewValue(tftypes.String, nil),
+		"source_port_ranges":      tftypes.NewValue(portRanges, nil),
+		"destination":             tftypes.NewValue(tftypes.String, nil),
+		"destinations":            tftypes.NewValue(objType.AttributeTypes["destinations"], []tftypes.Value{ruleObject("10.0.0.0/16")}),
+		"destination_ports":       tftypes.NewValue(tftypes.String, nil),
+		"destination_port_ranges": tftypes.NewValue(portRanges, nil),
+	}
+}
+
+// TestFirewallRuleValidateConfig drives ValidateConfig through a real Config so the
+// model decoding and the attribute paths in the diagnostics are exercised, not just the
+// rule logic covered by Test_validateProtocolsConfig.
+func TestFirewallRuleValidateConfig(t *testing.T) {
+	ctx := context.Background()
+	s := firewallRuleSchema(t)
+	portRanges := tftypes.List{ElementType: tftypes.String}
+
+	tests := []struct {
+		name       string
+		protocols  string
+		portRanges interface{}
+		wantError  bool
+	}{
+		{"icmp without ports", "icmp", nil, false},
+		{"icmp with port ranges", "icmp", []tftypes.Value{tftypes.NewValue(tftypes.String, "443")}, true},
+		{"icmp with unknown port ranges", "icmp", tftypes.UnknownValue, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attrs := firewallRuleAttrs(ctx, t, s)
+			attrs["protocols"] = tftypes.NewValue(tftypes.String, tt.protocols)
+			attrs["source_port_ranges"] = tftypes.NewValue(portRanges, tt.portRanges)
+
+			req := resource.ValidateConfigRequest{
+				Config: tfsdk.Config{
+					Raw:    tftypes.NewValue(s.Type().TerraformType(ctx), attrs),
+					Schema: s,
+				},
+			}
+			resp := &resource.ValidateConfigResponse{}
+
+			(&firewallRuleResource{}).ValidateConfig(ctx, req, resp)
+
+			if got := resp.Diagnostics.HasError(); got != tt.wantError {
+				t.Errorf("HasError() = %t, want %t (diagnostics: %v)", got, tt.wantError, resp.Diagnostics)
+			}
+		})
 	}
 }
 
