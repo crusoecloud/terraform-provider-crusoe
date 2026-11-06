@@ -49,23 +49,25 @@ column 0. The examples below are indented on purpose so that this README is not
 parsed as an entry.
 
     ```release-note:feature
-    `crusoe_load_balancer` manages external load balancers.
+    You can now manage external load balancers with `crusoe_load_balancer`.
     ```
 
-Write for a customer, in one or two sentences: what the provider does now and
-when it applies, in the present tense, with resources, attributes and values in
-backticks. Not what the team did, and not how it was implemented. The same text
-goes to `CHANGELOG.md`, to the GitHub release notes and, with a product tag, to
-the body of the Crusoe Updates entry, so it has to read well on the site.
+Write for a customer, in one or two sentences, outcome first: lead with what
+the reader can now do, then the resource or attribute that does it, not the
+other way around. Address the reader as "you", never "the customer" or "the
+user"; present tense; resources, attributes and values in backticks. Not what
+the team did, and not how it was implemented. The same text goes to
+`CHANGELOG.md`, to the GitHub release notes and, with a product tag, to the
+body of the Crusoe Updates entry, so it has to read well on the site.
 
 A merge request with several changes uses several blocks in the same file:
 
     ```release-note:enhancement
-    `crusoe_vpc_firewall_rule` takes `source_port_ranges` and `destination_port_ranges`, lists of single ports, port ranges or `*`.
+    You can now set `source_port_ranges` and `destination_port_ranges` on `crusoe_vpc_firewall_rule`, as lists of single ports, port ranges or `*`.
     ```
 
     ```release-note:bug
-    `crusoe_kubernetes_node_pool` no longer forces replacement on the first plan after an import.
+    Your first plan after importing a `crusoe_kubernetes_node_pool` no longer forces a replacement.
     ```
 
 ## Types
@@ -90,7 +92,7 @@ also name the product they touch, with an HTML comment inside the block. The
 comment is invisible in the rendered changelog and in the GitHub release notes.
 
     ```release-note:feature
-    `crusoe_load_balancer` manages external load balancers.
+    You can now manage external load balancers with `crusoe_load_balancer`.
     <!-- site: infrastructure-cloud/networking -->
     <!-- title: Manage external load balancers with the Terraform provider -->
     ```
@@ -109,7 +111,7 @@ tag as not validated and passes; the docs side validates again.
 out explicitly when the change is not worth a site entry:
 
     ```release-note:feature
-    The provider is also published for Linux on IBM Z (`linux_s390x`).
+    You can now run the provider on Linux on IBM Z (`linux_s390x`).
     <!-- site: none -->
     ```
 

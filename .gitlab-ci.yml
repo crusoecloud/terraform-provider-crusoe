@@ -55,17 +55,16 @@ prepare_release:
   stage: build
   needs: []
   manual_confirmation: >-
-    This opens the release-prep merge request for the next patch of
-    versions.env, as the release bot. For a minor or major release, cancel and
-    open the job page instead to set "version". Nothing is published until that
-    merge request and the one into release are reviewed and merged.
+    YOU ARE ABOUT TO PREPARE A PATCH RELEASE. IS THAT WHAT YOU WANT? For a
+    minor or major release, cancel and set "version" to vX.Y.0 on the job page.
+    Nothing is published yet: this only opens the release-prep merge request.
   variables:
     GIT_DEPTH: 0   # go-changelog walks the history from the last tag
   inputs:
     version:
       default: ""
-      description: "Empty: the next patch of versions.env. For a minor or major release, vX.Y.0: the job bumps versions.env in the same commit."
-      regex: '^(v[0-9]+\.[0-9]+\.[0-9]+)?$'
+      description: "Empty: the next patch of versions.env. For a minor or major release, vX.Y.0 or X.Y.0: the job bumps versions.env in the same commit."
+      regex: '^(v?[0-9]+\.[0-9]+\.[0-9]+)?$'
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: manual

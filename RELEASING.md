@@ -2,15 +2,18 @@
 
 ## How to
 
-1. Open the [latest pipeline on `main`](https://gitlab.com/crusoeenergy/island/external/terraform-provider-crusoe/-/pipelines/latest?ref=main),
+1. Look at the [changes since the last release](https://gitlab.com/crusoeenergy/island/external/terraform-provider-crusoe/-/compare/release...main):
+   the commits that would ship and, under `.changelog/`, the fragments that
+   become the release notes.
+2. Open the [latest pipeline on `main`](https://gitlab.com/crusoeenergy/island/external/terraform-provider-crusoe/-/pipelines/latest?ref=main),
    select the name of the `prepare_release` job and press "Run job". Leave
    `version` empty for a patch release; type `vX.Y.0` for a minor or major one.
-2. The job opens the merge request `Release vX.Y.Z` into `main`, assigned to
-   you. Read the changelog section and merge it.
-3. That merge opens a second merge request, `Release vX.Y.Z` into `release`.
+3. The job opens the merge request `Prepare release vX.Y.Z` into `main`,
+   assigned to you. Read the changelog section and merge it.
+4. That merge opens a second merge request, `Release vX.Y.Z` into `release`.
    Get one approval from Product Managers and one from CCX. Leave "Squash
    commits" unticked.
-4. Merge it. The GitHub workflow tags the release and publishes it, the
+5. Merge it. The GitHub workflow tags the release and publishes it, the
    Terraform Registry picks it up, and the GitLab pipeline opens the Crusoe
    Updates merge request in the docs repo.
 
@@ -37,10 +40,10 @@ skips the form; it asks for confirmation and then runs the job with the
 default.) Leave `version` empty for a patch release: the job takes the next
 patch of `MAJOR_VERSION.MINOR_VERSION` in `versions.env`, counted from the tags
 on GitHub, the same rule `tag_semver.sh` applies in the workflow. For a minor
-or major release, enter `vX.Y.0`: the job bumps `versions.env` in the same
-commit, so the merge request carries both files. A patch number cannot be
-skipped: the workflow always creates the one after the latest tag, and the job
-refuses anything else.
+or major release, enter `vX.Y.0` (the `v` is optional): the job bumps
+`versions.env` in the same commit, so the merge request carries both files. A
+patch number cannot be skipped: the workflow always creates the one after the
+latest tag, and the job refuses anything else.
 
 The job renders the fragments added since the last tag into a new
 `## vX.Y.Z (date)` section at the top of `CHANGELOG.md`, commits it on
@@ -66,6 +69,13 @@ anyway. The release-prep merge request needs no fragment and no label:
 If more work lands on `main` before the release is cut and it should ship too,
 run `prepare_release` again on the new `main`: the section is rendered again
 and the merge request updated, as long as the version is not tagged yet.
+
+Once the job has run on a pipeline, or was cancelled, its page shows "Retry"
+instead of "Run job". "Retry" runs it again with the same `version`; the
+arrow next to it, "Retry job with modified values", brings the form back,
+for a run with a different `version` (a minor instead of a patch, say)
+without a new pipeline. A new commit on `main` starts a new pipeline anyway,
+with a fresh "Run job".
 
 ### 2. Get the release merge request approved
 
@@ -128,7 +138,7 @@ git fetch origin
 git checkout -b release-prep/v1.8.1 origin/main
 make changelog                     # minor or major: bump versions.env first,
 git add CHANGELOG.md versions.env  # then VERSION=v1.9.0 make changelog
-git commit -m "Release v1.8.1"
+git commit -m "Prepare release v1.8.1"
 git push -u origin release-prep/v1.8.1
 ```
 

@@ -30,9 +30,13 @@ The user invoked this skill with: $ARGUMENTS
 
    Wait for the answers: they set the type, the tag and the title below.
 
-5. **Write the text for a customer, not for the team.** One or two sentences: what the provider does now and when it applies. Resources, attributes and values in backticks, present tense ("`crusoe_load_balancer` takes `vpc_id`"), no ticket numbers, no implementation details, no "in this MR". A breaking change also says what the user has to do; a fix that customers worked around says the workaround can go. The text goes verbatim to `CHANGELOG.md`, to the GitHub release notes and, with a tag, to the body of the Crusoe Updates entry (the docs side appends a link to the release). If a page on docs.crusoe.ai covers the feature, end with `See [Page title](https://docs.crusoe.ai/<path>).` using the page's real title, and check with `curl -sI` that the URL answers 200. One link at most; none is fine.
+5. **Write the text for a customer, not for the team.** One or two sentences, outcome-first: lead with what the customer can now do, then the resource or attribute, not the other way around. Address the reader as "you"; never "the customer" or "the user". Resources, attributes and values in backticks, present tense, no ticket numbers, no implementation details, no "in this MR".
+   - DO: "You can now place a `crusoe_load_balancer` in a specific VPC by setting `vpc_id`."
+   - DON'T: "`crusoe_load_balancer` now takes a `vpc_id` attribute."
 
-   Cut the mechanism. Too long: "Replacement now depends on which add-ons are set, not on their order: an order-only difference plans as an in-place update that settles after a single apply, with no API call." Enough: "Only adding or removing an add-on replaces the cluster now; an order-only difference plans as one in-place change that settles after a single apply."
+   A breaking change also says what a user must do; a fix customers worked around says the workaround can be removed. The text goes verbatim to `CHANGELOG.md`, to the GitHub release notes and, with a tag, to the body of the Crusoe Updates entry (the docs side appends a link to the release). If a page on docs.crusoe.ai covers the feature, end with `See [Page title](https://docs.crusoe.ai/<path>).` using the page's real title, and check with `curl -sI` that the URL answers 200. One link at most; none is fine.
+
+   Cut the mechanism. Too long: "Replacement now depends on which add-ons are set, not on their order: an order-only difference plans as an in-place update that settles after a single apply, with no API call." Enough: "Your cluster is replaced only when you add or remove an add-on; reordering plans as one in-place change that settles after a single apply."
 
 6. **Write the title** (required with a product tag). One line, at most 70 characters, no trailing period, in the style of the titles on Crusoe Updates: the outcome, not the mechanism ("Manage external load balancers with the Terraform provider"), naming the provider or Terraform when the product alone would not make it obvious. Do not start with "Added" or "Fixed"; the badge on the site says that.
 

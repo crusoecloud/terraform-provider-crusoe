@@ -8,7 +8,7 @@
 # release-prep-mr.md the merge request text.
 #
 # Usage: scripts/release-prepare.sh
-#   VERSION=vX.Y.Z   the version to release (default: next patch of
+#   VERSION=vX.Y.Z   the version to release, v optional (default: next patch of
 #                    MAJOR_VERSION.MINOR_VERSION in versions.env, the rule the
 #                    release workflow applies with scripts/tag_semver.sh). A
 #                    new MAJOR.MINOR must end in .0 and bumps versions.env in
@@ -35,8 +35,9 @@ fetch_release_tags || echo "release-prepare: warning, could not fetch the releas
 # the release workflow tags the same number when the candidate merges.
 bump=false
 if [[ -n "${VERSION:-}" ]]; then
+  VERSION="v${VERSION#v}"  # the v is optional on input
   if [[ ! "$VERSION" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    echo "release-prepare: VERSION \"${VERSION}\" is not vX.Y.Z" >&2
+    echo "release-prepare: VERSION \"${VERSION#v}\" is not X.Y.Z" >&2
     exit 1
   fi
   major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}" patch="${BASH_REMATCH[3]}"
@@ -61,7 +62,7 @@ if [[ -n "${VERSION:-}" ]]; then
 fi
 version="${VERSION:-$(next_version)}"
 branch="release-prep/${version}"
-title="Release ${version}"
+title="Prepare release ${version}"
 
 # The branch comes first: go-changelog reads the repository through an
 # in-memory clone that only follows branches and tags, so a detached HEAD,

@@ -120,7 +120,7 @@ Every merge request needs a changelog fragment, or the label "skip-changelog"
 when nothing is customer-visible. Example ${file}:
 
 \`\`\`release-note:enhancement
-\`crusoe_vpc_firewall_rule\` takes \`source_port_ranges\` and \`destination_port_ranges\`, lists of single ports, port ranges or \`*\`.
+You can now set \`source_port_ranges\` and \`destination_port_ranges\` on \`crusoe_vpc_firewall_rule\`, as lists of single ports, port ranges or \`*\`.
 <!-- site: infrastructure-cloud/networking -->
 <!-- title: Set port ranges on firewall rules in Terraform -->
 \`\`\`
