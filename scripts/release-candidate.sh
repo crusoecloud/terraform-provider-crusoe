@@ -58,3 +58,6 @@ fi
 bot_push "$sha" "$branch"
 open_or_update_mr "$branch" release "$title" release-candidate-mr.md \
   "$(jq -n --argjson assignees "$(assignee_ids)" '{ remove_source_branch: true, squash: false, assignee_ids: $assignees }')"
+# A release that changed number while in flight: its old candidate goes
+# now that the new section is on main.
+close_superseded_mrs rc/ release "$branch" "$version"

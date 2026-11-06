@@ -93,20 +93,28 @@ tmp=$(mktemp)
 stripped=$(mktemp)
 trap 'rm -f "$tmp" "$stripped"' EXIT
 src="$CHANGELOG"
-if grep -q "^## ${VERSION} " "$CHANGELOG"; then
-  if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
-    echo "changelog: ${VERSION} is already tagged; its section cannot be rewritten" >&2
-    exit 1
-  fi
-  # Not released yet: drop the existing section so it is rendered again with
-  # the fragments merged since. CHANGELOG.md itself is written once, below.
-  awk -v heading="## ${VERSION} " '
-    index($0, heading) == 1 { skip = 1; next }
-    skip && /^## / { skip = 0 }
+if grep -q "^## ${VERSION} " "$CHANGELOG" && tag_exists "$VERSION"; then
+  echo "changelog: ${VERSION} is already tagged; its section cannot be rewritten" >&2
+  exit 1
+fi
+# An unreleased section is rendered again with the fragments merged since:
+# the one for VERSION, and the top one when it names another untagged
+# version (a release in flight that changes number: its fragments are in the
+# new section). CHANGELOG.md itself is written once, below.
+replace=""
+grep -q "^## ${VERSION} " "$CHANGELOG" && replace="$VERSION"
+top=$(top_section_version)
+if [[ -n "$top" && "$top" != "$VERSION" ]] && ! tag_exists "$top"; then
+  replace="${replace:+$replace }$top"
+fi
+if [[ -n "$replace" ]]; then
+  awk -v versions="$replace" '
+    BEGIN { n = split(versions, v, " "); for (i = 1; i <= n; i++) drop["## " v[i] " "] = 1 }
+    /^## / { skip = 0; for (h in drop) if (index($0, h) == 1) skip = 1 }
     !skip { print }
   ' "$CHANGELOG" > "$stripped"
   src="$stripped"
-  echo "changelog: replacing the unreleased ${VERSION} section"
+  echo "changelog: replacing the unreleased section(s): ${replace}"
 fi
 
 # The marker is matched as a literal line, not as a regex.

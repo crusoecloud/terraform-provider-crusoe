@@ -7,7 +7,9 @@
    become the release notes.
 2. Open the [latest pipeline on `main`](https://gitlab.com/crusoeenergy/island/external/terraform-provider-crusoe/-/pipelines/latest?ref=main),
    select the name of the `prepare_release` job and press "Run job". Leave
-   `version` empty for a patch release; type `vX.Y.0` for a minor or major one.
+   `version` empty for a patch release; type `minor`, `major` or `vX.Y.0` for
+   a minor or major one. Left empty, the job stops if the fragments call for
+   more than a patch, and says which value to set.
 3. The job opens the merge request `Prepare release vX.Y.Z` into `main`,
    assigned to you. Read the changelog section and merge it.
 4. That merge opens a second merge request, `Release vX.Y.Z` into `release`.
@@ -40,10 +42,25 @@ skips the form; it asks for confirmation and then runs the job with the
 default.) Leave `version` empty for a patch release: the job takes the next
 patch of `MAJOR_VERSION.MINOR_VERSION` in `versions.env`, counted from the tags
 on GitHub, the same rule `tag_semver.sh` applies in the workflow. For a minor
-or major release, enter `vX.Y.0` (the `v` is optional): the job bumps
-`versions.env` in the same commit, so the merge request carries both files. A
-patch number cannot be skipped: the workflow always creates the one after the
-latest tag, and the job refuses anything else.
+or major release, enter `minor`, `major` or the exact `vX.Y.0` (the `v` is
+optional): the job bumps `versions.env` in the same commit, so the merge
+request carries both files. A patch number cannot be skipped: the workflow
+always creates the one after the latest tag, and the job refuses anything
+else.
+
+The fragments say which release they call for: a `breaking-change` entry a
+major, a `feature`, `enhancement` or `deprecation` entry a minor, anything
+else a patch (see "Types" in `.changelog/README.md`). The job compares that
+with the version it prepares. With `version` empty, it stops when the
+fragments call for more than a patch and says which value to set. With
+`version` set, it prepares what was asked and, when the fragments call for
+more, says so in its log and at the top of the merge request. It never bumps
+on its own: to change your mind, retry the job with `version` set to
+`minor` or `major`; it opens the merge request for that version and closes
+the one it had opened. A release in flight changes number the same way: when
+the top section of `CHANGELOG.md` was prepared but never tagged, the new
+version replaces it, and its candidate into `release` is closed when the new
+one is cut; do not merge the old candidate meanwhile.
 
 The job renders the fragments added since the last tag into a new
 `## vX.Y.Z (date)` section at the top of `CHANGELOG.md`, commits it on

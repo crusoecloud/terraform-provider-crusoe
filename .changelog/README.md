@@ -82,6 +82,13 @@ A merge request with several changes uses several blocks in the same file:
 | `deprecation` | DEPRECATIONS | Still works, will be removed later |
 | `note` | NOTES | Anything else users should know |
 
+The type also says which release the entry calls for: `breaking-change` a
+major, `feature`, `enhancement` and `deprecation` a minor, the others a
+patch. `prepare_release` stops when `version` was left empty and the
+fragments call for more than a patch, and otherwise says so in its log and in
+the release-prep merge request; the releaser decides (RELEASING.md, "1. Run
+`prepare_release`").
+
 The sections written by hand up to 1.8.0 used NEW FEATURES and UPGRADE NOTES
 for what is `feature` and `breaking-change` here.
 

@@ -17,6 +17,7 @@ GITHUB_REPO="crusoecloud/terraform-provider-crusoe"
 # their output behind as files, which the jobs keep as artifacts.
 BOT_TOKEN="${SVC_CRUSOE_CCX_RELEASE_BOT_TOKEN:-}"
 BOT_SIGNING_KEY="${SVC_CRUSOE_CCX_RELEASE_BOT_SIGNING_KEY:-}"
+MR_URL=""  # the merge request open_or_update_mr last opened or updated
 
 # Copies the release tags from GitHub into this clone, so that release_tags
 # and go-changelog can see them. The GitLab remote has none.
@@ -56,6 +57,81 @@ next_version() {
   else
     echo "v${major}.${minor}.0"
   fi
+}
+
+# fragments_since LAST [THIS]: the fragments added between the release tag
+# LAST (empty or "-": none yet) and THIS (default HEAD), the set go-changelog
+# renders into the next section.
+fragments_since() {
+  if [[ -z "${1:-}" || "$1" == "-" ]]; then
+    git ls-tree -r --name-only "${2:-HEAD}" -- .changelog | grep -E '\.txt$' || true
+  else
+    git diff --name-only --diff-filter=A "$1" "${2:-HEAD}" -- .changelog | grep -E '\.txt$' || true
+  fi
+}
+
+# fragment_types_since LAST [THIS]: the release-note type of every block in
+# those fragments, one per line, read at THIS.
+fragment_types_since() {
+  local f
+  while IFS= read -r f; do
+    git show "${2:-HEAD}:${f}" | sed -n 's/^```release-note:\([a-z-]*\).*/\1/p'
+  done < <(fragments_since "$1" "${2:-HEAD}")
+}
+
+# fragment_type_counts LAST [THIS]: "2 feature, 1 bug", most frequent first.
+fragment_type_counts() {
+  fragment_types_since "$1" "${2:-HEAD}" | sort | uniq -c | sort -rn \
+    | awk '{ printf "%s%s %s", sep, $1, $2; sep = ", " }'
+}
+
+# bump_for_types TYPE...: the release the fragment types call for, as major,
+# minor or patch: a breaking change, new or deprecated functionality, the rest.
+bump_for_types() {
+  local t bump=patch
+  for t in "$@"; do
+    case "$t" in
+      breaking-change) bump=major ;;
+      feature|enhancement|deprecation) [[ "$bump" == major ]] || bump=minor ;;
+    esac
+  done
+  echo "$bump"
+}
+
+# suggested_bump LAST [THIS]: what the fragments since LAST call for. Below
+# 1.0.0 anything may change, so a breaking change calls for a minor there.
+suggested_bump() {
+  local bump
+  # shellcheck disable=SC2046 # one word per type on purpose
+  bump=$(bump_for_types $(fragment_types_since "$1" "${2:-HEAD}"))
+  [[ "$bump" == major && "${1#v}" == 0.* ]] && bump=minor
+  echo "$bump"
+}
+
+# bump_kind VERSION LAST: how VERSION differs from LAST: major, minor or patch.
+bump_kind() {
+  local v=${1#v} last=${2#v}
+  if [[ "${v%%.*}" != "${last%%.*}" ]]; then echo major
+  elif [[ "${v%.*}" != "${last%.*}" ]]; then echo minor
+  else echo patch; fi
+}
+
+# bump_rank KIND: patch 0, minor 1, major 2, to compare two kinds.
+bump_rank() {
+  case "$1" in major) echo 2 ;; minor) echo 1 ;; *) echo 0 ;; esac
+}
+
+# bump_version KIND LAST: the version after the release tag LAST for KIND =
+# major, minor or patch, counted from LAST alone.
+bump_version() {
+  local major minor patch
+  [[ -n "${2:-}" ]] || { echo "release: no release tag to count from" >&2; return 1; }
+  IFS=. read -r major minor patch <<< "${2#v}"
+  case "$1" in
+    major) echo "v$((major + 1)).0.0" ;;
+    minor) echo "v${major}.$((minor + 1)).0" ;;
+    *) echo "v${major}.${minor}.$((patch + 1))" ;;
+  esac
 }
 
 # The version named by the top section of CHANGELOG.md; empty when there is
@@ -173,11 +249,36 @@ open_or_update_mr() {
   if [[ -n "$iid" ]]; then
     payload=$(jq -n --arg title "$title" --rawfile desc "$description_file" --argjson extra "$extra" \
       '{ title: $title, description: $desc } + $extra')
-    gitlab_api PUT "/merge_requests/${iid}" "$payload" | jq -r '"merge request updated: " + .web_url'
+    MR_URL=$(gitlab_api PUT "/merge_requests/${iid}" "$payload" | jq -r .web_url)
+    echo "merge request updated: ${MR_URL}"
   else
     payload=$(jq -n --arg source "$source" --arg target "$target" --arg title "$title" \
       --rawfile desc "$description_file" --argjson extra "$extra" \
       '{ source_branch: $source, target_branch: $target, title: $title, description: $desc } + $extra')
-    gitlab_api POST "/merge_requests" "$payload" | jq -r '"merge request opened: " + .web_url'
+    MR_URL=$(gitlab_api POST "/merge_requests" "$payload" | jq -r .web_url)
+    echo "merge request opened: ${MR_URL}"
   fi
+}
+
+# close_superseded_mrs PREFIX TARGET KEEP VERSION: a retry of prepare_release
+# with another version opens new merge requests (the branches carry the
+# version), so the other open ones from a PREFIX branch into TARGET, KEEP
+# aside, are closed with a note that points at the one for VERSION (MR_URL),
+# and their branches deleted; merge requests from forks are left alone, their
+# branch names are not ours. Best effort: a failure is reported, not fatal.
+close_superseded_mrs() {
+  local prefix=$1 target=$2 keep=$3 version=$4 encoded iid source note
+  encoded=$(jq -rn --arg s "$target" '$s | @uri')
+  while IFS=$'\t' read -r iid source; do
+    [[ -n "$iid" ]] || continue
+    note="Closed by the release bot: the release is now ${version}${MR_URL:+, see ${MR_URL}}; this merge request and its branch are superseded."
+    gitlab_api POST "/merge_requests/${iid}/notes" "$(jq -n --arg body "$note" '{ body: $body }')" >/dev/null \
+      || echo "release: could not comment on !${iid}" >&2
+    gitlab_api PUT "/merge_requests/${iid}" '{ "state_event": "close" }' >/dev/null \
+      || { echo "release: could not close !${iid} (${source}); close it by hand" >&2; continue; }
+    gitlab_api DELETE "/repository/branches/$(jq -rn --arg s "$source" '$s | @uri')" >/dev/null \
+      || echo "release: could not delete ${source}; delete it by hand" >&2
+    echo "merge request !${iid} (${source}) closed: superseded by ${version}"
+  done < <(gitlab_api GET "/merge_requests?state=opened&target_branch=${encoded}&per_page=100" \
+    | jq -r --arg prefix "$prefix" --arg keep "$keep" '.[] | select(.source_project_id == .project_id) | select(.source_branch | startswith($prefix)) | select(.source_branch != $keep) | [.iid, .source_branch] | @tsv')
 }
