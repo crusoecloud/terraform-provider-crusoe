@@ -92,7 +92,9 @@ cut_release_candidate:
     - job: test_and_lint
       optional: true
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    # Pushes only: rules:changes is true on every web, scheduled or API
+    # pipeline, which would move the candidate to whatever main's tip is then.
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - CHANGELOG.md
     - if: '$CI_MERGE_REQUEST_IID'

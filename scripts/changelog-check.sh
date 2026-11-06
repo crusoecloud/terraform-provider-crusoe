@@ -132,7 +132,10 @@ MSG
 fi
 
 # Structure and types. Prints one "<type><TAB><site tag><TAB><title>" line per entry.
-entries=$(awk -v types="$TYPES" '
+# Fields are joined with the unit separator: unlike a tab it is not IFS
+# whitespace, so an empty site or title survives `read` and `awk -F`.
+US=$'\037'
+entries=$(awk -v types="$TYPES" -v US="$US" '
   BEGIN {
     n = split(types, list, "|")
     for (i = 1; i <= n; i++) valid[list[i]] = 1
@@ -153,7 +156,7 @@ entries=$(awk -v types="$TYPES" '
     if (!body) { print "changelog: empty entry ending at line " NR > "/dev/stderr"; bad = 1 }
     if (tags > 1) { print "changelog: more than one site tag in the entry ending at line " NR > "/dev/stderr"; bad = 1 }
     if (titles > 1) { print "changelog: more than one title in the entry ending at line " NR > "/dev/stderr"; bad = 1 }
-    print typ "\t" site "\t" title
+    print typ US site US title
     inblock = 0
     next
   }
@@ -185,7 +188,7 @@ entries=$(awk -v types="$TYPES" '
 shape='^[a-z0-9-]+/[a-z0-9-]+$'
 bad=0
 lookup=""
-while IFS=$'\t' read -r typ site title; do
+while IFS="$US" read -r typ site title; do
   [[ -z "$typ" ]] && continue
   if [[ -n "$title" && ${#title} -gt $TITLE_MAX ]]; then
     echo "changelog: title is ${#title} characters, the site shows at most ${TITLE_MAX}: \"${title}\"" >&2
@@ -242,6 +245,6 @@ if [[ -n "$lookup" ]]; then
   fi
 fi
 
-summary=$(awk -F'\t' '$2 != "" { print $2 }' <<<"$entries" | paste -sd, -)
-titles=$(awk -F'\t' '$3 != "" { print "\"" $3 "\"" }' <<<"$entries" | paste -sd, -)
+summary=$(awk -F "$US" '$2 != "" { print $2 }' <<<"$entries" | paste -sd, -)
+titles=$(awk -F "$US" '$3 != "" { print "\"" $3 "\"" }' <<<"$entries" | paste -sd, -)
 echo "changelog: ok, ${file}${summary:+ (product tag: ${summary}${titles:+; title: ${titles}})}"
