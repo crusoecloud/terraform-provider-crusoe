@@ -10,6 +10,45 @@ https://github.com/crusoecloud/terraform-provider-crusoe/releases
 
 <!-- new releases go below this line -->
 
+## v1.9.0 (2026-11-06)
+
+FEATURES:
+
+* `crusoe_load_balancer` manages external load balancers: `vpc_id`, `protocol` (`tcp` or `udp`), `listen_ports_and_backends` (each `listen_port` with its `backends` of `ip` and `port`), optional `health_check_options` and the read-only `vip`. (!306)
+<!-- site: infrastructure-cloud/networking -->
+<!-- title: Manage external load balancers with the Terraform provider -->
+* `data.crusoe_load_balancer` lists external load balancers, with the same attributes as the resource plus the `status` of each backend, and takes `location`, `vpc_network_id` and `name` to filter the result. (!307)
+<!-- site: none -->
+
+ENHANCEMENTS:
+
+* `crusoe_kubernetes_node_pool` takes an `autoscaling_config` block (`enabled`, `min_node_size`, `max_node_size`) that lets the cluster autoscaler size the node pool within those bounds, on clusters with a supported autoscaler version; the data source reports it. Add `instance_count` to `lifecycle { ignore_changes }` when enabling it, since the autoscaler owns the node count. A node pool whose autoscaling was enabled outside Terraform, with no block in the configuration, is disabled on apply. (!281)
+<!-- site: infrastructure-cloud/managed-kubernetes -->
+<!-- title: Autoscale Kubernetes node pools with the Terraform provider -->
+* `crusoe_registry_repository` rotates the credentials of a pull-through cache in place: `upstream_registry_credentials.username` and `.password` are write-only (never stored in the plan or state; needs Terraform 1.11 or later), and changing the new `credentials_version` sends them again. Changing `upstream_registry.provider`, `upstream_registry.url` or `project_id` now replaces the repository instead of failing. Existing state is upgraded and the stored username and password are dropped from it. (!328)
+<!-- site: developer-tools/terraform -->
+<!-- title: Rotate pull-through cache credentials in place with Terraform -->
+
+BUG FIXES:
+
+* Creating a `pull-through-cache` repository for a private AWS ECR upstream no longer fails with "inconsistent result after apply". The credentials are required when the repository is created; a repository created without them has to be recreated to add them. (!328)
+* Service account credentials are read from `client_id`, `client_secret`, `token_url` and `audience` in `~/.crusoe/config`, and from the `CRUSOE_CLIENT_ID`, `CRUSOE_CLIENT_SECRET`, `CRUSOE_TOKEN_URL` and `CRUSOE_AUDIENCE` environment variables. The former `service_account_*` keys and `CRUSOE_SERVICE_ACCOUNT_*` variables are no longer read: rename them to keep authenticating as a service account. (!343)
+* Setting `api_endpoint` in the `provider "crusoe" {}` block now actually targets that endpoint. Previously it was silently ignored, and the provider fell back to `CRUSOE_API_ENDPOINT`, the selected profile's `api_endpoint`, or production regardless of what the provider block said. (!357)
+<!-- site: developer-tools/terraform -->
+<!-- title: Provider block now controls which API endpoint Terraform uses -->
+* The provider no longer combines credentials from different sources: it uses the first complete pair it finds, environment variables first, then the configuration profile, so a stray variable cannot be paired with a key from the profile. Overriding only one of `token_url` and `audience` is now an error. (!343)
+* `crusoe_compute_instance_by_template` now sets `attachment_type` and `mode` for each disk in `disks` after create, and a refresh now updates `disks` from the API. (!354)
+* `crusoe_kubernetes_cluster` no longer destroys and recreates the cluster, or fails an apply with "Provider produced inconsistent result after apply", when the API returns `add_ons` in a different order than the configuration: replacement now depends on which add-ons are set, not on their order. A reorder plans as an in-place update instead, so configurations that pinned the `add_ons` order or listed it in `lifecycle { ignore_changes }` to work around this can drop that. (!342)
+<!-- site: infrastructure-cloud/managed-kubernetes -->
+<!-- title: Reordered Kubernetes add-ons no longer replace the cluster -->
+* `crusoe_vpc_firewall_rule` manages `icmp` rules without the `source_ports = ""` workaround: the port fields are optional, a `tcp` or `udp` rule without them matches all ports, and an existing rule switches to `icmp` in place. A plan now rejects ports on an `icmp` rule, `icmp` combined with `tcp` or `udp`, and ports outside 1-65535, such as `0-65535`. (!358)
+<!-- site: infrastructure-cloud/networking -->
+<!-- title: Manage icmp firewall rules with the Terraform provider -->
+
+NOTES:
+
+* State written by earlier versions of `crusoe_load_balancer`, which managed internal load balancers, cannot be migrated: remove those resources with `terraform state rm` and create them again. (!306)
+
 ## 1.8.0
 
 ENHANCEMENTS:
