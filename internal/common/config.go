@@ -57,6 +57,10 @@ type ConfigOptions struct {
 	// Precedence: opts.Project > CRUSOE_DEFAULT_PROJECT env > profile's default_project
 	Project string
 
+	// ApiEndpoint overrides the Crusoe API endpoint.
+	// Precedence: opts.ApiEndpoint > CRUSOE_API_ENDPOINT env > profile's api_endpoint > default
+	ApiEndpoint string
+
 	// ConfigPath overrides the default ~/.crusoe/config path. Empty uses default.
 	ConfigPath string
 }
@@ -110,6 +114,12 @@ func GetConfig() (*Config, error) {
 //  1. opts.Project (from provider block)
 //  2. CRUSOE_DEFAULT_PROJECT environment variable
 //  3. default_project from selected profile
+//
+// Precedence for API endpoint selection (highest to lowest):
+//  1. opts.ApiEndpoint (from provider block)
+//  2. CRUSOE_API_ENDPOINT environment variable
+//  3. api_endpoint from selected profile
+//  4. defaultApiEndpoint
 func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 	config := Config{
 		ApiEndpoint: defaultApiEndpoint,
@@ -203,6 +213,9 @@ func GetConfigWithOptions(opts ConfigOptions) (*Config, error) {
 
 	if apiEndpoint := os.Getenv("CRUSOE_API_ENDPOINT"); apiEndpoint != "" {
 		config.ApiEndpoint = apiEndpoint
+	}
+	if opts.ApiEndpoint != "" {
+		config.ApiEndpoint = opts.ApiEndpoint
 	}
 
 	// The winning tier supplies both the credential pair and its own ancillary fields

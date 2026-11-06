@@ -68,7 +68,7 @@ func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"api_endpoint": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.cloud.crusoe.ai/v1`. Can also be set via `CRUSOE_API_ENDPOINT` environment variable.",
+				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.cloud.crusoe.ai/v1`. Takes precedence over `CRUSOE_API_ENDPOINT` environment variable.",
 			},
 			"profile": schema.StringAttribute{
 				Optional:            true,
@@ -154,6 +154,10 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		resp.Diagnostics.AddWarning("Empty project value",
 			"Empty string provided for 'project' in provider block, falling back to CRUSOE_DEFAULT_PROJECT env or profile default.")
 	}
+	if !config.ApiEndpoint.IsNull() && config.ApiEndpoint.ValueString() == "" {
+		resp.Diagnostics.AddWarning("Empty api_endpoint value",
+			"Empty string provided for 'api_endpoint' in provider block, falling back to CRUSOE_API_ENDPOINT env or profile default.")
+	}
 
 	if updateMessage := common.GetUpdateMessageIfValid(context.Background()); updateMessage != "" {
 		resp.Diagnostics.AddWarning("Update Available",
@@ -162,8 +166,9 @@ func (p *crusoeProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	// Build config options from provider block
 	opts := common.ConfigOptions{
-		Profile: config.Profile.ValueString(),
-		Project: config.Project.ValueString(),
+		Profile:     config.Profile.ValueString(),
+		Project:     config.Project.ValueString(),
+		ApiEndpoint: config.ApiEndpoint.ValueString(),
 	}
 
 	// clientConfig is always non-nil, even when err is set (see GetConfigWithOptions).

@@ -678,6 +678,87 @@ func TestGetConfigWithOptions_ProjectPrecedence(t *testing.T) {
 	})
 }
 
+func TestGetConfigWithOptions_ApiEndpointPrecedence(t *testing.T) {
+	t.Run("opts.ApiEndpoint takes precedence over env var and profile", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		t.Setenv("CRUSOE_API_ENDPOINT", "https://env-endpoint.example.com/v1")
+		configPath := writeTempConfig(t, `
+[default]
+api_endpoint = "https://profile-endpoint.example.com/v1"
+`)
+
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath, ApiEndpoint: "https://opts-endpoint.example.com/v1"})
+		if err != nil {
+			t.Fatalf("GetConfigWithOptions failed: %v", err)
+		}
+		if config.ApiEndpoint != "https://opts-endpoint.example.com/v1" {
+			t.Errorf("Provider block api_endpoint should win, got %q", config.ApiEndpoint)
+		}
+	})
+
+	t.Run("env var used when opts.ApiEndpoint is empty", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		t.Setenv("CRUSOE_API_ENDPOINT", "https://env-endpoint.example.com/v1")
+		configPath := writeTempConfig(t, `
+[default]
+api_endpoint = "https://profile-endpoint.example.com/v1"
+`)
+
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+		if err != nil {
+			t.Fatalf("GetConfigWithOptions failed: %v", err)
+		}
+		if config.ApiEndpoint != "https://env-endpoint.example.com/v1" {
+			t.Errorf("Env var should win over profile, got %q", config.ApiEndpoint)
+		}
+	})
+
+	t.Run("profile used when opts and env are both empty", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		configPath := writeTempConfig(t, `
+[default]
+api_endpoint = "https://profile-endpoint.example.com/v1"
+`)
+
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+		if err != nil {
+			t.Fatalf("GetConfigWithOptions failed: %v", err)
+		}
+		if config.ApiEndpoint != "https://profile-endpoint.example.com/v1" {
+			t.Errorf("Profile value should be used, got %q", config.ApiEndpoint)
+		}
+	})
+
+	t.Run("default used when nothing is set", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		configPath := writeTempConfig(t, "")
+
+		config, err := GetConfigWithOptions(ConfigOptions{ConfigPath: configPath})
+		if err != nil {
+			t.Fatalf("GetConfigWithOptions failed: %v", err)
+		}
+		if config.ApiEndpoint != defaultApiEndpoint {
+			t.Errorf("Default endpoint should be used, got %q", config.ApiEndpoint)
+		}
+	})
+
+	t.Run("opts.ApiEndpoint is migrated like any other source", func(t *testing.T) {
+		clearCrusoeEnvVars(t)
+		configPath := writeTempConfig(t, "")
+
+		config, err := GetConfigWithOptions(ConfigOptions{
+			ConfigPath:  configPath,
+			ApiEndpoint: "https://api.crusoecloud.com/v1alpha5",
+		})
+		if err != nil {
+			t.Fatalf("GetConfigWithOptions failed: %v", err)
+		}
+		if config.ApiEndpoint != defaultApiEndpoint {
+			t.Errorf("Legacy opts.ApiEndpoint should be migrated to %q, got %q", defaultApiEndpoint, config.ApiEndpoint)
+		}
+	})
+}
+
 func TestGetConfig_BackwardCompatibility(t *testing.T) {
 	origProfile := os.Getenv("CRUSOE_PROFILE")
 	origProject := os.Getenv("CRUSOE_DEFAULT_PROJECT")

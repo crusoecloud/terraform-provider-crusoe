@@ -1,0 +1,5 @@
+```release-note:bug
+Setting `api_endpoint` in the `provider "crusoe" {}` block now actually targets that endpoint. Previously it was silently ignored, and the provider fell back to `CRUSOE_API_ENDPOINT`, the selected profile's `api_endpoint`, or production regardless of what the provider block said.
+<!-- site: developer-tools/terraform -->
+<!-- title: Provider block now controls which API endpoint Terraform uses -->
+```
