@@ -19,8 +19,10 @@ For anything a customer can notice: a new resource, data source or attribute, a
 changed default, a changed plan or apply behaviour, a fixed bug, a security fix,
 a deprecation, a breaking change. Not for refactors, build or release tooling,
 or dependency bumps with no visible effect; add the `skip-changelog` label for
-those. Tests, docs, examples and CI config need nothing: CI skips the check when
-a merge request touches only those.
+those, with a line `No changelog: <why>` in the merge request description (the
+label skips the check, the line says why, for the reviewer). Tests, docs,
+examples and CI config need nothing: CI skips the check when a merge request
+touches only those.
 
 ### Changes behind a server-side flag
 

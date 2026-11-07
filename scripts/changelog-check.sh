@@ -3,8 +3,9 @@
 #
 # Usage: scripts/changelog-check.sh [file]
 #   In a merge request pipeline the file defaults to .changelog/<MR IID>.txt.
-#   Exits 0 without checking when the MR has the label "skip-changelog" or
-#   "dependencies", or comes from a renovate/* branch.
+#   Exits 0 without checking when the MR has the label "dependencies" or comes
+#   from a renovate/* branch, or has the label "skip-changelog" and says why in
+#   its description (a line "No changelog: <why>").
 #
 # Besides the block structure and the type, the script checks the product tag
 # for Crusoe Updates, "<!-- site: <category>/<subcategory> -->" (see
@@ -22,7 +23,6 @@ set -euo pipefail
 TYPES="feature|enhancement|bug|security|deprecation|breaking-change|note"
 SITE_TYPES="feature|security|breaking-change"
 TITLE_MAX=70
-SKIP_LABELS="skip-changelog|dependencies"
 # A merge request that only touches these needs neither a fragment nor a
 # label: no customer can notice them. Keep the list short; anything else
 # needs an explicit decision.
@@ -46,6 +46,60 @@ site_values() {
   jq -r '.platforms | to_entries[] | .key as $c | .value.subcategories | keys_unsorted[] | "\($c)/\(.)"' <<<"$json"
 }
 
+# The merge request description, into MR_DESCRIPTION. CI truncates the
+# variable at 2700 characters; the full text then comes from the API (job
+# token), and MR_DESCRIPTION_PARTIAL says when that did not happen.
+MR_DESCRIPTION=""
+MR_DESCRIPTION_PARTIAL=false
+read_mr_description() {
+  local full
+  MR_DESCRIPTION=$(printf '%s\n' "${CI_MERGE_REQUEST_DESCRIPTION:-}" | tr -d '\r')
+  [[ "${CI_MERGE_REQUEST_DESCRIPTION_IS_TRUNCATED:-false}" == true ]] || return 0
+  MR_DESCRIPTION_PARTIAL=true
+  [[ -n "${CI_JOB_TOKEN:-}" && -n "${CI_API_V4_URL:-}" ]] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  if full=$(curl -fsS --max-time 20 -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+      "${CI_API_V4_URL}/projects/${CI_MERGE_REQUEST_PROJECT_ID:-${CI_PROJECT_ID:-}}/merge_requests/${CI_MERGE_REQUEST_IID:-}" \
+      | jq -r '.description // ""'); then
+    MR_DESCRIPTION=$(printf '%s\n' "$full" | tr -d '\r')
+    MR_DESCRIPTION_PARTIAL=false
+  fi
+}
+
+# The skip-changelog label says the check is skipped; the description says
+# why, for the reviewer: a line "No changelog: <why>" anywhere, or a
+# "## No changelog" heading with text under it. Like the portal's
+# check_mr_description.sh, the check fails without the reason.
+REASON_LINE='^[[:space:]]*([>*+-][[:space:]]*)*(\*\*|__)?No changelog(\*\*|__)?:[[:space:]*_]*[^[:space:]*_]'
+require_skip_reason() {
+  local reason
+  read_mr_description
+  if reason=$(grep -Ei -m 1 "$REASON_LINE" <<<"$MR_DESCRIPTION"); then
+    echo "changelog: skipped, as the description says: $(sed -E 's/^[[:space:]>*+-]+//; s/\*\*//g' <<<"$reason")"
+    return 0
+  fi
+  if awk 'tolower($0) ~ /^##+[[:space:]]*no changelog[[:space:]]*:?[[:space:]]*$/ { s = 1; next } s && /^#/ { exit } s && /[^[:space:]]/ { found = 1 } END { exit !found }' <<<"$MR_DESCRIPTION"; then
+    echo "changelog: skipped, as the \"No changelog\" section of the description says"
+    return 0
+  fi
+  cat >&2 <<MSG
+changelog: the merge request is labelled skip-changelog, but its description does not say why.
+
+Add a line that starts with "No changelog:" and says why no customer can notice
+the change, anywhere in the description. For example:
+
+  No changelog: CI and release scripts only
+  No changelog: refactor, same behaviour
+  No changelog: limited availability, announced at general availability
+
+Then retry this job: GitLab does not start a pipeline when a description is edited.
+MSG
+  if $MR_DESCRIPTION_PARTIAL; then
+    echo "changelog: the description is longer than 2700 characters and could not be fetched in full, so only its start was checked; put the line near the top" >&2
+  fi
+  return 1
+}
+
 file="${1:-}"
 explicit_file="$file"
 list_tags=false
@@ -66,8 +120,10 @@ if [[ -z "$file" ]]; then
   file=".changelog/${CI_MERGE_REQUEST_IID}.txt"
 fi
 
-if [[ ",${CI_MERGE_REQUEST_LABELS:-}," =~ ,(${SKIP_LABELS}), ]]; then
-  echo "changelog: skipped, merge request is labelled ${BASH_REMATCH[1]}"
+# Exempt outright: dependency bumps and Renovate. The skip-changelog label
+# is honoured after the safe-path check below, and needs the reason.
+if [[ ",${CI_MERGE_REQUEST_LABELS:-}," == *,dependencies,* ]]; then
+  echo "changelog: skipped, merge request is labelled dependencies"
   exit 0
 fi
 case "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" in
@@ -76,6 +132,8 @@ case "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" in
     exit 0
     ;;
 esac
+skip_label=false
+[[ ",${CI_MERGE_REQUEST_LABELS:-}," == *,skip-changelog,* ]] && skip_label=true
 
 # Files the merge request changes, from its merge base. Fails when git cannot
 # tell (no base SHA, base not fetchable), and the fragment is then required.
@@ -112,12 +170,18 @@ if [[ -z "$explicit_file" && -n "${CI_MERGE_REQUEST_IID:-}" ]]; then
   fi
 fi
 
+if $skip_label; then
+  require_skip_reason || exit 1
+  exit 0
+fi
+
 if [[ ! -f "$file" ]]; then
   cat >&2 <<MSG
 changelog: ${file} is missing
 
 Every merge request needs a changelog fragment, or the label "skip-changelog"
-when nothing is customer-visible. Example ${file}:
+with a line "No changelog: <why>" in its description when nothing is
+customer-visible. Example ${file}:
 
 \`\`\`release-note:enhancement
 You can now set \`source_port_ranges\` and \`destination_port_ranges\` on \`crusoe_vpc_firewall_rule\`, as lists of single ports, port ranges or \`*\`.
