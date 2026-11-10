@@ -135,13 +135,20 @@ esac
 skip_label=false
 [[ ",${CI_MERGE_REQUEST_LABELS:-}," == *,skip-changelog,* ]] && skip_label=true
 
-# Files the merge request changes, from its merge base. Fails when git cannot
-# tell (no base SHA, base not fetchable), and the fragment is then required.
+# Files the merge request changes: its merge base against its own head. In a
+# merged results or merge train pipeline CI_COMMIT_SHA is a merge with the
+# target branch, which also holds what landed there after the merge base, so
+# the source branch head is used when GitLab sets it. Fails when git cannot
+# tell (no base SHA, a commit not fetchable), and the fragment is then required.
 changed_files() {
   local base="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}"
+  local head="${CI_MERGE_REQUEST_SOURCE_BRANCH_SHA:-${CI_COMMIT_SHA:-HEAD}}"
+  local sha
   [[ -n "$base" ]] || return 1
-  git cat-file -e "${base}^{commit}" 2>/dev/null || git fetch -q --depth=1 origin "$base" 2>/dev/null || return 1
-  git diff --name-only "$base" "${CI_COMMIT_SHA:-HEAD}"
+  for sha in "$base" "$head"; do
+    git cat-file -e "${sha}^{commit}" 2>/dev/null || git fetch -q --depth=1 origin "$sha" 2>/dev/null || return 1
+  done
+  git diff --name-only "$base" "$head"
 }
 
 is_safe() {
