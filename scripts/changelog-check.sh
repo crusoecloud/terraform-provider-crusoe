@@ -70,16 +70,26 @@ read_mr_description() {
 # why, for the reviewer: a line "No changelog: <why>" anywhere, or a
 # "## No changelog" heading with text under it. Like the portal's
 # check_mr_description.sh, the check fails without the reason.
+# has_skip_reason tells whether the description says why (and keeps what to
+# print in SKIP_REASON); require_skip_reason adds the error when it does not.
+SKIP_REASON=""
 REASON_LINE='^[[:space:]]*([>*+-][[:space:]]*)*(\*\*|__)?No changelog(\*\*|__)?:[[:space:]*_]*[^[:space:]*_]'
-require_skip_reason() {
+has_skip_reason() {
   local reason
   read_mr_description
   if reason=$(grep -Ei -m 1 "$REASON_LINE" <<<"$MR_DESCRIPTION"); then
-    echo "changelog: skipped, as the description says: $(sed -E 's/^[[:space:]>*+-]+//; s/\*\*//g' <<<"$reason")"
+    SKIP_REASON="as the description says: $(sed -E 's/^[[:space:]>*+-]+//; s/\*\*//g' <<<"$reason")"
     return 0
   fi
   if awk 'tolower($0) ~ /^##+[[:space:]]*no changelog[[:space:]]*:?[[:space:]]*$/ { s = 1; next } s && /^#/ { exit } s && /[^[:space:]]/ { found = 1 } END { exit !found }' <<<"$MR_DESCRIPTION"; then
-    echo "changelog: skipped, as the \"No changelog\" section of the description says"
+    SKIP_REASON="as the \"No changelog\" section of the description says"
+    return 0
+  fi
+  return 1
+}
+require_skip_reason() {
+  if has_skip_reason; then
+    echo "changelog: skipped, ${SKIP_REASON}"
     return 0
   fi
   cat >&2 <<MSG
@@ -180,6 +190,19 @@ fi
 if $skip_label; then
   require_skip_reason || exit 1
   exit 0
+fi
+
+# The line without the label is the likely slip: name it instead of asking
+# for a fragment.
+if [[ ! -f "$file" ]] && has_skip_reason; then
+  cat >&2 <<MSG
+changelog: the description says "No changelog", but the merge request has no skip-changelog label.
+
+The line counts only with the label. Add the label "skip-changelog" to the
+merge request and retry this job: GitLab does not start a pipeline when a
+label changes.
+MSG
+  exit 1
 fi
 
 if [[ ! -f "$file" ]]; then
