@@ -10,7 +10,7 @@ https://github.com/crusoecloud/terraform-provider-crusoe/releases
 
 <!-- new releases go below this line -->
 
-## v1.9.0 (2026-11-06)
+## v1.9.0 (2026-11-10)
 
 FEATURES:
 
@@ -36,6 +36,11 @@ BUG FIXES:
 <!-- site: developer-tools/terraform -->
 <!-- title: Provider block now controls which API endpoint Terraform uses -->
 * The provider no longer combines credentials from different sources. It uses the first complete pair it finds, environment variables first, then the configuration profile. A stray `CRUSOE_ACCESS_KEY_ID` or `CRUSOE_SECRET_KEY` variable can no longer pair with the other key from `~/.crusoe/config`. (!343)
+* You can now change the public IP type of a `crusoe_compute_instance` attached to an InfiniBand partition; the update no longer fails with a `400` error. (!368)
+* You can now move a `crusoe_compute_instance` to another InfiniBand partition in place by changing `transport_partition_id` or `ib_partition_id` in `host_channel_adapters`, instead of the apply failing with "Provider produced inconsistent result after apply". The VM is stopped for the change and started again if it was running, and a plan now rejects setting `ib_partition_id` and `transport_partition_id` to different partitions. See [Managing InfiniBand networking](https://docs.crusoe.ai/networking/infiniband/managing-infiniband-networks/). (!368)
+<!-- site: infrastructure-cloud/compute -->
+<!-- title: Move a VM to another InfiniBand partition with Terraform -->
+* Your VM is now started again if it was running when the backend rejects an in-place resize of a `crusoe_compute_instance`, instead of being left stopped. (!368)
 * `crusoe_compute_instance_by_template` now sets `attachment_type` and `mode` for each disk in `disks` after create, and a refresh now updates `disks` from the API. (!354)
 * `crusoe_kubernetes_cluster` no longer destroys and recreates the cluster, or fails an apply with "Provider produced inconsistent result after apply", when the API returns `add_ons` in a different order than the configuration: replacement now depends on which add-ons are set, not on their order. A reorder plans as an in-place update instead, so configurations that pinned the `add_ons` order or listed it in `lifecycle { ignore_changes }` to work around this can drop that. (!342)
 <!-- site: infrastructure-cloud/managed-kubernetes -->
