@@ -102,8 +102,8 @@ Required:
 
 Optional:
 
-- `ib_partition_id` (String, Deprecated) Infiniband Partition ID. This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
-- `transport_partition_id` (String) ID of the transport partition the host channel adapter is attached to.
+- `ib_partition_id` (String, Deprecated) Infiniband Partition ID. Changing the partition updates the VM in place: the VM is stopped to apply the change, then started again if it was running. This field is deprecated as of provider version v1.3.0 and will be removed in the next major version. Please remove this field from your configuration. Use transport_partition_id instead.
+- `transport_partition_id` (String) ID of the transport partition the host channel adapter is attached to. Changing the partition updates the VM in place: the VM is stopped to apply the change, then started again if it was running.
 
 
 <a id="nestedatt--network_interfaces"></a>

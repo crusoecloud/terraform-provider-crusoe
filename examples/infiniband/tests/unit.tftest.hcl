@@ -54,6 +54,16 @@ run "validate_partition" {
     condition     = crusoe_ib_partition.my_partition.ib_network_id == output.selected_ib_network_id
     error_message = "Expected IB network ID to be '${output.selected_ib_network_id}', but got '${crusoe_ib_partition.my_partition.ib_network_id}'."
   }
+
+  assert {
+    condition     = crusoe_ib_partition.my_other_partition.name == "${var.name_prefix}other-partition"
+    error_message = "Expected the other IB partition name to be '${var.name_prefix}other-partition', but got '${crusoe_ib_partition.my_other_partition.name}'."
+  }
+
+  assert {
+    condition     = crusoe_ib_partition.my_other_partition.ib_network_id == output.selected_ib_network_id
+    error_message = "Expected the other IB partition's network ID to be '${output.selected_ib_network_id}', but got '${crusoe_ib_partition.my_other_partition.ib_network_id}'."
+  }
 }
 
 run "validate_disks" {

@@ -1,0 +1,13 @@
+```release-note:bug
+You can now move a `crusoe_compute_instance` to another InfiniBand partition in place by changing `transport_partition_id` or `ib_partition_id` in `host_channel_adapters`, instead of the apply failing with "Provider produced inconsistent result after apply". The VM is stopped for the change and started again if it was running, and a plan now rejects setting `ib_partition_id` and `transport_partition_id` to different partitions. See [Managing InfiniBand networking](https://docs.crusoe.ai/networking/infiniband/managing-infiniband-networks/).
+<!-- site: infrastructure-cloud/compute -->
+<!-- title: Move a VM to another InfiniBand partition with Terraform -->
+```
+
+```release-note:bug
+You can now change the public IP type of a `crusoe_compute_instance` attached to an InfiniBand partition; the update no longer fails with a `400` error.
+```
+
+```release-note:bug
+Your VM is now started again if it was running when the backend rejects an in-place resize of a `crusoe_compute_instance`, instead of being left stopped.
+```

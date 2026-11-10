@@ -58,6 +58,87 @@ func AliasPairConflicts(deprecated, replacement types.String) bool {
 	return deprecated.ValueString() != replacement.ValueString()
 }
 
+// AliasPairUseStateForUnknown returns UseStateForUnknown for one Computed half of an alias
+// pair whose value can change in place. Apply it to both halves, passing the same two names.
+//
+// The configuration usually sets only one name, and the other is filled in from the API.
+// Plain UseStateForUnknown plans that other half as its prior value, so changing the value
+// the pair names plans the two halves as different values, and the apply cannot satisfy
+// both. This modifier plans the configured value on the unconfigured half when the value
+// the pair names changes, and keeps the prior value otherwise, so a rename from the
+// deprecated name to its replacement stays a no-op.
+//
+// The names are attribute names, not paths, as in AliasPairRequiresReplaceIf.
+func AliasPairUseStateForUnknown(deprecatedName, replacementName string) planmodifier.String {
+	return aliasPairUseStateForUnknownModifier{
+		deprecatedName:  deprecatedName,
+		replacementName: replacementName,
+	}
+}
+
+type aliasPairUseStateForUnknownModifier struct {
+	deprecatedName  string
+	replacementName string
+}
+
+func (m aliasPairUseStateForUnknownModifier) Description(_ context.Context) string {
+	return "Once the resource exists, the value of this attribute in state is preserved, " +
+		"unless the configuration changes the value it shares with " + m.deprecatedName + " / " +
+		m.replacementName + "."
+}
+
+func (m aliasPairUseStateForUnknownModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+//nolint:gocritic // hugeParam: req signature required by planmodifier.String interface
+func (m aliasPairUseStateForUnknownModifier) PlanModifyString(ctx context.Context,
+	req planmodifier.StringRequest, resp *planmodifier.StringResponse,
+) {
+	// On create there is no prior value to preserve, as in UseStateForUnknown.
+	if req.StateValue.IsNull() {
+		return
+	}
+
+	// A known planned value comes from the configuration; leave it alone.
+	if !req.PlanValue.IsUnknown() {
+		return
+	}
+
+	// An unknown configuration value has to stay unknown, or interpolation breaks.
+	if req.ConfigValue.IsUnknown() {
+		return
+	}
+
+	parent := req.Path.ParentPath()
+	deprecatedPath := parent.AtName(m.deprecatedName)
+	replacementPath := parent.AtName(m.replacementName)
+
+	var stateDeprecated, stateReplacement, configDeprecated, configReplacement types.String
+
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, deprecatedPath, &stateDeprecated)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, replacementPath, &stateReplacement)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, deprecatedPath, &configDeprecated)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, replacementPath, &configReplacement)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// The configured half is not known yet, so neither is the value this half follows.
+	if configDeprecated.IsUnknown() || configReplacement.IsUnknown() {
+		return
+	}
+
+	effectiveConfig := EffectiveAliasValue(configDeprecated, configReplacement)
+	if effectiveConfig.IsNull() || effectiveConfig.Equal(EffectiveAliasValue(stateDeprecated, stateReplacement)) {
+		resp.PlanValue = req.StateValue
+
+		return
+	}
+
+	resp.PlanValue = effectiveConfig
+}
+
 // AliasPairRequiresReplaceIf builds a RequiresReplaceIfFunc for one half of an alias pair.
 // It forces replacement only when the value the pair names changes, so a user who renames
 // the deprecated attribute to its replacement gets an in-place update instead of a

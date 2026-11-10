@@ -67,3 +67,32 @@ run "validate_create_transport_network_vm" {
     ])}"
   }
 }
+
+# Move the VMs to the other partition in place. Each VM is stopped for the change and
+# started again.
+run "update_partition_in_place" {
+  command = apply
+
+  variables {
+    partition = "secondary"
+  }
+
+  assert {
+    condition = alltrue([
+      for vm in crusoe_compute_instance.my_vms :
+      vm.host_channel_adapters[0].transport_partition_id == crusoe_transport_partition.my_other_partition.id
+    ])
+    error_message = "Failed VM partition update - expected: ${crusoe_transport_partition.my_other_partition.id}, actual: ${join("; ", [
+      for vm in crusoe_compute_instance.my_vms :
+      "${vm.name}: ${vm.host_channel_adapters[0].transport_partition_id}"
+      if vm.host_channel_adapters[0].transport_partition_id != crusoe_transport_partition.my_other_partition.id
+    ])}"
+  }
+
+  # The IDs must be unchanged from the create step, proving the VMs were updated in place
+  # rather than destroyed and recreated.
+  assert {
+    condition     = output.vm_ids == run.validate_create_transport_network_vm.vm_ids
+    error_message = "The VM IDs changed after the partition update, indicating the VMs were replaced instead of updated in place."
+  }
+}

@@ -577,3 +577,205 @@ func TestUseStateForUnknownIncludingNull(t *testing.T) {
 		})
 	}
 }
+
+// tfString converts a framework string to its raw value, keeping null and unknown.
+func tfString(v types.String) tftypes.Value {
+	switch {
+	case v.IsNull():
+		return tftypes.NewValue(tftypes.String, nil)
+	case v.IsUnknown():
+		return tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+	default:
+		return tftypes.NewValue(tftypes.String, v.ValueString())
+	}
+}
+
+// TestAliasPairUseStateForUnknown drives the modifier on the unconfigured half of an alias
+// pair inside a list element, the shape of the compute instance host channel adapters.
+func TestAliasPairUseStateForUnknown(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	const listName = "host_channel_adapters"
+
+	s := schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			listName: schema.ListNestedAttribute{
+				Optional: true,
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						deprecatedName:  schema.StringAttribute{Optional: true, Computed: true},
+						replacementName: schema.StringAttribute{Optional: true, Computed: true},
+					},
+				},
+			},
+		},
+	}
+
+	objType, ok := s.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatalf("schema type is not an object")
+	}
+	listType, ok := objType.AttributeTypes[listName].(tftypes.List)
+	if !ok {
+		t.Fatalf("%s attribute is not a list", listName)
+	}
+
+	pair := func(deprecated, replacement types.String) tftypes.Value {
+		return tftypes.NewValue(objType, map[string]tftypes.Value{
+			listName: tftypes.NewValue(listType, []tftypes.Value{
+				tftypes.NewValue(listType.ElementType, map[string]tftypes.Value{
+					deprecatedName:  tfString(deprecated),
+					replacementName: tfString(replacement),
+				}),
+			}),
+		})
+	}
+
+	null := types.StringNull()
+	unknown := types.StringUnknown()
+	p1 := types.StringValue("p1")
+	p2 := types.StringValue("p2")
+
+	tests := []struct {
+		name string
+		// attr is the half under test; the configuration leaves it unset unless noted.
+		attr                                string
+		stateDeprecated, stateReplacement   types.String
+		configDeprecated, configReplacement types.String
+		stateIsNull                         bool
+		want                                types.String
+	}{
+		{
+			// The bug in CCX-5786: the configuration changes the partition through the
+			// deprecated name, and the replacement kept planning the old one.
+			name:            "change through deprecated name plans it on the replacement",
+			attr:            replacementName,
+			stateDeprecated: p1, stateReplacement: p1,
+			configDeprecated: p2, configReplacement: null,
+			want: p2,
+		},
+		{
+			name:            "change through replacement name plans it on the deprecated name",
+			attr:            deprecatedName,
+			stateDeprecated: p1, stateReplacement: p1,
+			configDeprecated: null, configReplacement: p2,
+			want: p2,
+		},
+		{
+			name:            "unchanged partition keeps the prior value",
+			attr:            replacementName,
+			stateDeprecated: p1, stateReplacement: p1,
+			configDeprecated: p1, configReplacement: null,
+			want: p1,
+		},
+		{
+			// Renaming the deprecated attribute to its replacement is not a change.
+			name:            "rename keeps the prior value",
+			attr:            deprecatedName,
+			stateDeprecated: p1, stateReplacement: p1,
+			configDeprecated: null, configReplacement: p1,
+			want: p1,
+		},
+		{
+			// The API no longer echoing the deprecated name leaves it empty in state.
+			name:            "change against an empty deprecated name in state",
+			attr:            deprecatedName,
+			stateDeprecated: types.StringValue(""), stateReplacement: p1,
+			configDeprecated: null, configReplacement: p2,
+			want: p2,
+		},
+		{
+			name:            "neither name configured keeps the prior value",
+			attr:            replacementName,
+			stateDeprecated: p1, stateReplacement: p1,
+			configDeprecated: null, configReplacement: null,
+			want: p1,
+		},
+		{
+			// An unresolved interpolation on the configured half leaves nothing to follow.
+			name:            "unknown configured half stays unknown",
+			attr:            replacementName,
+			stateDeprecated: p1, stateReplacement: p1,
+			configDeprecated: unknown, configReplacement: null,
+			want: unknown,
+		},
+		{
+			name:            "create leaves the value unknown",
+			attr:            replacementName,
+			stateIsNull:     true,
+			stateDeprecated: null, stateReplacement: null,
+			configDeprecated: p1, configReplacement: null,
+			want: unknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			attrPath := path.Root(listName).AtListIndex(0).AtName(tt.attr)
+
+			stateRaw := pair(tt.stateDeprecated, tt.stateReplacement)
+			if tt.stateIsNull {
+				stateRaw = tftypes.NewValue(objType, nil)
+			}
+			state := tfsdk.State{Raw: stateRaw, Schema: s}
+			config := tfsdk.Config{Raw: pair(tt.configDeprecated, tt.configReplacement), Schema: s}
+
+			var stateValue, configValue types.String
+			if !tt.stateIsNull {
+				if diags := state.GetAttribute(ctx, attrPath, &stateValue); diags.HasError() {
+					t.Fatalf("failed to read state attribute: %v", diags)
+				}
+			}
+			if diags := config.GetAttribute(ctx, attrPath, &configValue); diags.HasError() {
+				t.Fatalf("failed to read config attribute: %v", diags)
+			}
+
+			// The framework plans an unset Computed attribute as unknown.
+			req := planmodifier.StringRequest{
+				Path:        attrPath,
+				State:       state,
+				Config:      config,
+				StateValue:  stateValue,
+				ConfigValue: configValue,
+				PlanValue:   types.StringUnknown(),
+			}
+			resp := &planmodifier.StringResponse{PlanValue: types.StringUnknown()}
+
+			common.AliasPairUseStateForUnknown(deprecatedName, replacementName).PlanModifyString(ctx, req, resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+			}
+			if !resp.PlanValue.Equal(tt.want) {
+				t.Errorf("plan value = %v, want %v", resp.PlanValue, tt.want)
+			}
+		})
+	}
+}
+
+// TestAliasPairUseStateForUnknownConfiguredHalf checks that a configured half keeps its
+// configured value: only the half the configuration leaves unset follows the other.
+func TestAliasPairUseStateForUnknownConfiguredHalf(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	req := planmodifier.StringRequest{
+		Path:        path.Root(deprecatedName),
+		StateValue:  types.StringValue("p1"),
+		ConfigValue: types.StringValue("p2"),
+		PlanValue:   types.StringValue("p2"),
+	}
+	resp := &planmodifier.StringResponse{PlanValue: req.PlanValue}
+
+	common.AliasPairUseStateForUnknown(deprecatedName, replacementName).PlanModifyString(ctx, req, resp)
+
+	if !resp.PlanValue.Equal(types.StringValue("p2")) {
+		t.Errorf("plan value = %v, want p2", resp.PlanValue)
+	}
+}

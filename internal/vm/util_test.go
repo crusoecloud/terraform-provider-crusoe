@@ -5,6 +5,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -285,8 +289,8 @@ func readHCA(t *testing.T, list types.List) vmHostChannelAdapterResourceModel {
 // name always ends up populated.
 //
 // Preserving the deprecated half matters because vmToTerraformResourceModel runs only in
-// Create and Read: Update never rewrites host channel adapter state. A diff on that half
-// would have no way to resolve itself.
+// Create and Read: Update writes host channel adapter state only on a partition change, and
+// then from the plan. A diff on that half would have no way to resolve itself.
 func Test_vmHostChannelAdaptersToTerraformResourceModel(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -367,5 +371,187 @@ func Test_vmHostChannelAdaptersToTerraformResourceModel_empty(t *testing.T) {
 	}
 	if n := len(got.Elements()); n != 0 {
 		t.Errorf("got %d host channel adapters, want 0", n)
+	}
+}
+
+// hcaPairList builds a one-element host channel adapter list from the two halves of the
+// partition alias pair, which may be null or unknown.
+func hcaPairList(t *testing.T, deprecated, replacement types.String) types.List {
+	t.Helper()
+
+	obj, diags := types.ObjectValue(vmHostChannelAdapterSchema.AttrTypes, map[string]attr.Value{
+		attrIBPartitionID:        deprecated,
+		attrTransportPartitionID: replacement,
+	})
+	if diags.HasError() {
+		t.Fatalf("building host channel adapter: %v", diags)
+	}
+
+	list, diags := types.ListValue(vmHostChannelAdapterSchema, []attr.Value{obj})
+	if diags.HasError() {
+		t.Fatalf("building host channel adapter list: %v", diags)
+	}
+
+	return list
+}
+
+// Test_hostChannelAdapterPartitionChanged covers the check that decides whether Update
+// stops the VM to change its partition. A rename between the two names of the alias pair
+// must not stop the VM.
+func Test_hostChannelAdapterPartitionChanged(t *testing.T) {
+	null := types.StringNull()
+	p1 := types.StringValue("p1")
+	p2 := types.StringValue("p2")
+
+	tests := []struct {
+		name  string
+		state types.List
+		plan  types.List
+		want  bool
+	}{
+		{
+			name:  "same partition",
+			state: hcaPairList(t, p1, p1),
+			plan:  hcaPairList(t, p1, p1),
+			want:  false,
+		},
+		{
+			name:  "rename from the deprecated name",
+			state: hcaPairList(t, p1, p1),
+			plan:  hcaPairList(t, null, p1),
+			want:  false,
+		},
+		{
+			name:  "change through the deprecated name",
+			state: hcaPairList(t, p1, p1),
+			plan:  hcaPairList(t, p2, p2),
+			want:  true,
+		},
+		{
+			name:  "change through the replacement name",
+			state: hcaPairList(t, p1, p1),
+			plan:  hcaPairList(t, null, p2),
+			want:  true,
+		},
+		{
+			name:  "API stopped echoing the deprecated name",
+			state: hcaPairList(t, types.StringValue(""), p1),
+			plan:  hcaPairList(t, p1, p1),
+			want:  false,
+		},
+		{
+			// A partition created in the same apply is not known at plan time.
+			name:  "unknown planned partition",
+			state: hcaPairList(t, p1, p1),
+			plan:  hcaPairList(t, null, types.StringUnknown()),
+			want:  true,
+		},
+		{
+			name:  "VM without host channel adapters",
+			state: types.ListNull(vmHostChannelAdapterSchema),
+			plan:  types.ListNull(vmHostChannelAdapterSchema),
+			want:  false,
+		},
+		{
+			// Any other change to a VM without InfiniBand plans the unconfigured list as
+			// unknown, because UseStateForUnknown does not preserve a null state.
+			name:  "VM without host channel adapters, other attributes changing",
+			state: types.ListNull(vmHostChannelAdapterSchema),
+			plan:  types.ListUnknown(vmHostChannelAdapterSchema),
+			want:  false,
+		},
+		{
+			name:  "VM without host channel adapters, unknown partition configured",
+			state: types.ListNull(vmHostChannelAdapterSchema),
+			plan:  hcaPairList(t, null, types.StringUnknown()),
+			want:  false,
+		},
+		{
+			name:  "unknown plan list on a VM with a partition",
+			state: hcaPairList(t, p1, p1),
+			plan:  types.ListUnknown(vmHostChannelAdapterSchema),
+			want:  true,
+		},
+		{
+			name:  "empty plan list",
+			state: hcaPairList(t, p1, p1),
+			plan:  types.ListValueMust(vmHostChannelAdapterSchema, nil),
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hostChannelAdapterPartitionChanged(tt.state, tt.plan); got != tt.want {
+				t.Errorf("hostChannelAdapterPartitionChanged() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_validateHostChannelAdapterAliasPairs(t *testing.T) {
+	null := types.StringNull()
+	p1 := types.StringValue("p1")
+	p2 := types.StringValue("p2")
+
+	tests := []struct {
+		name      string
+		hcas      types.List
+		wantError bool
+	}{
+		{"deprecated name only", hcaPairList(t, p1, null), false},
+		{"replacement name only", hcaPairList(t, null, p1), false},
+		{"both names, same partition", hcaPairList(t, p1, p1), false},
+		{"both names, different partitions", hcaPairList(t, p1, p2), true},
+		{"unknown half", hcaPairList(t, p1, types.StringUnknown()), false},
+		{"null list", types.ListNull(vmHostChannelAdapterSchema), false},
+		{"unknown list", types.ListUnknown(vmHostChannelAdapterSchema), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var diags diag.Diagnostics
+			validateHostChannelAdapterAliasPairs(tt.hcas, &diags)
+
+			if diags.HasError() != tt.wantError {
+				t.Errorf("HasError() = %t, want %t: %v", diags.HasError(), tt.wantError, diags)
+			}
+		})
+	}
+}
+
+// Test_hostChannelAdapterPartitionModifiers pins that both halves of the partition alias
+// pair carry the modifier that follows a partition change, not plain UseStateForUnknown,
+// which plans the unconfigured half as the old partition.
+func Test_hostChannelAdapterPartitionModifiers(t *testing.T) {
+	schemaResp := &resource.SchemaResponse{}
+	NewVMResource().Schema(context.Background(), resource.SchemaRequest{}, schemaResp)
+
+	hcas, ok := schemaResp.Schema.Attributes[attrHostChannelAdapters].(schema.ListNestedAttribute)
+	if !ok {
+		t.Fatalf("%s is not a list nested attribute", attrHostChannelAdapters)
+	}
+
+	want := reflect.TypeOf(partitionAliasPairModifier())
+	for _, name := range []string{attrIBPartitionID, attrTransportPartitionID} {
+		a, ok := hcas.NestedObject.Attributes[name].(schema.StringAttribute)
+		if !ok {
+			t.Fatalf("%s is not a string attribute", name)
+		}
+		if len(a.PlanModifiers) != 1 || reflect.TypeOf(a.PlanModifiers[0]) != want {
+			t.Errorf("%s plan modifiers = %v, want only the alias pair modifier", name, a.PlanModifiers)
+		}
+	}
+}
+
+// Test_vmResourceInterfaces pins the optional interfaces the partition change relies on.
+func Test_vmResourceInterfaces(t *testing.T) {
+	r := NewVMResource()
+
+	if _, ok := r.(resource.ResourceWithValidateConfig); !ok {
+		t.Error("vmResource does not implement ResourceWithValidateConfig")
+	}
+	if _, ok := r.(resource.ResourceWithModifyPlan); !ok {
+		t.Error("vmResource does not implement ResourceWithModifyPlan")
 	}
 }

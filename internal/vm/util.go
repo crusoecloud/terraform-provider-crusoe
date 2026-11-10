@@ -8,6 +8,7 @@ import (
 	"github.com/antihax/optional"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	swagger "github.com/crusoecloud/client-go/swagger/v1"
@@ -79,6 +80,18 @@ const (
 	// the spec text; the field is deprecated and its behavior is provider-specific.
 	providerDescReservationID = "ID of the reservation to which the VM belongs. If not provided or null, the lowest-cost reservation will be used by default. To opt out of using a reservation, set this to an empty string."
 	providerDescIBPartitionID = "Infiniband Partition ID."
+	// The spec does not say a partition change stops the VM; the provider does it, so the
+	// note is provider-side.
+	providerDescPartitionChange = "Changing the partition updates the VM in place: the VM is stopped to apply the " +
+		"change, then started again if it was running."
+)
+
+// The two names of the partition alias pair inside host_channel_adapters. The schema,
+// ValidateConfig, and the plan modifier refer to these, so the pair is described in one place.
+const (
+	attrHostChannelAdapters  = "host_channel_adapters"
+	attrIBPartitionID        = "ib_partition_id"
+	attrTransportPartitionID = "transport_partition_id"
 )
 
 // ib_network_id and ib_partition_id are superseded by transport_network_id and
@@ -316,6 +329,99 @@ func firstHostChannelAdapterRef(ref types.List) vmHostChannelAdapterResourceMode
 	}
 
 	return refHCAs[0]
+}
+
+// hostChannelAdapterAliasPair reads the two halves of the partition alias pair out of one
+// element of a plan, state, or config host_channel_adapters list. An unknown element yields
+// two unknown halves, and a null or unreadable one two null halves.
+func hostChannelAdapterAliasPair(elem attr.Value) (deprecated, replacement types.String) {
+	obj, ok := elem.(types.Object)
+	if !ok || obj.IsNull() {
+		return types.StringNull(), types.StringNull()
+	}
+	if obj.IsUnknown() {
+		return types.StringUnknown(), types.StringUnknown()
+	}
+
+	deprecated, ok = obj.Attributes()[attrIBPartitionID].(types.String)
+	if !ok {
+		deprecated = types.StringNull()
+	}
+	replacement, ok = obj.Attributes()[attrTransportPartitionID].(types.String)
+	if !ok {
+		replacement = types.StringNull()
+	}
+
+	return deprecated, replacement
+}
+
+// firstHostChannelAdapterPartition resolves the partition that the first host channel
+// adapter of a plan or state list names. It is unknown while either half of the alias pair
+// is, and null when the list holds no adapter.
+func firstHostChannelAdapterPartition(hcas types.List) types.String {
+	if hcas.IsUnknown() {
+		return types.StringUnknown()
+	}
+	if hcas.IsNull() || len(hcas.Elements()) == 0 {
+		return types.StringNull()
+	}
+
+	deprecated, replacement := hostChannelAdapterAliasPair(hcas.Elements()[0])
+	if deprecated.IsUnknown() || replacement.IsUnknown() {
+		return types.StringUnknown()
+	}
+
+	return common.EffectiveAliasValue(deprecated, replacement)
+}
+
+// hostChannelAdapterPartitionChanged reports whether the plan moves the VM's host channel
+// adapter to another partition. Renaming ib_partition_id to transport_partition_id is not a
+// change. A planned partition that is not known yet counts as one when the VM has a
+// partition, since it may be.
+func hostChannelAdapterPartitionChanged(state, plan types.List) bool {
+	planPartition := firstHostChannelAdapterPartition(plan)
+	if planPartition.IsNull() {
+		return false
+	}
+
+	statePartition := firstHostChannelAdapterPartition(state)
+	if planPartition.IsUnknown() {
+		// A VM without a partition has a null list in state, which UseStateForUnknown does
+		// not preserve, so the list is unknown on any other change to the VM. That VM has
+		// no partition to move away from.
+		return !statePartition.IsNull()
+	}
+
+	return !planPartition.Equal(statePartition)
+}
+
+// validateHostChannelAdapterAliasPairs rejects a host channel adapter that gives the two
+// names of the partition alias pair different values, which does not say which partition
+// to use.
+//
+// Setting both to the same value stays legal, so a configuration written during the
+// migration keeps working. Only a conflict is an error.
+func validateHostChannelAdapterAliasPairs(hcas types.List, diags *diag.Diagnostics) {
+	if hcas.IsNull() || hcas.IsUnknown() {
+		return
+	}
+
+	for i, elem := range hcas.Elements() {
+		deprecated, replacement := hostChannelAdapterAliasPair(elem)
+		if !common.AliasPairConflicts(deprecated, replacement) {
+			continue
+		}
+
+		diags.AddAttributeError(
+			path.Root(attrHostChannelAdapters).AtListIndex(i).AtName(attrTransportPartitionID),
+			"Conflicting partition configuration",
+			fmt.Sprintf("%s is %q and %s is %q. The two attributes name the same partition, so they "+
+				"cannot be set to different values. Remove %s and keep %s.",
+				attrIBPartitionID, deprecated.ValueString(),
+				attrTransportPartitionID, replacement.ValueString(),
+				attrIBPartitionID, attrTransportPartitionID),
+		)
+	}
 }
 
 // vmHostChannelAdaptersToTerraformDataModel creates a slice of Terraform-compatible host channel adapters

@@ -31,6 +31,19 @@ variable "vm_count" {
   default = 2
 }
 
+# Changing the partition moves the VMs to the other one in place. Each VM is stopped for
+# the change and started again if it was running.
+variable "partition" {
+  description = "Transport partition the VMs are attached to: `primary` or `secondary`."
+  type        = string
+  default     = "primary"
+
+  validation {
+    condition     = contains(["primary", "secondary"], var.partition)
+    error_message = "partition must be \"primary\" or \"secondary\"."
+  }
+}
+
 # List available IB networks
 data "crusoe_transport_networks" "my_transport_networks" {}
 output "transport_networks" {
@@ -69,13 +82,22 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   network  = crusoe_vpc_network.my_vpc_network.id
 }
 
-# Create a transport partition to deploy VMs in
+# Create two transport partitions to deploy VMs in
 resource "crusoe_transport_partition" "my_partition" {
   name                 = "${var.name_prefix}partition"
   transport_network_id = local.available_transport_network_id
 }
 
-# Create multiple VMs, all in the same transport partition
+resource "crusoe_transport_partition" "my_other_partition" {
+  name                 = "${var.name_prefix}other-partition"
+  transport_network_id = local.available_transport_network_id
+}
+
+locals {
+  vm_partition_id = var.partition == "primary" ? crusoe_transport_partition.my_partition.id : crusoe_transport_partition.my_other_partition.id
+}
+
+# Create multiple VMs, all in the transport partition var.partition selects
 resource "crusoe_compute_instance" "my_vms" {
   count    = var.vm_count
   name     = "${var.name_prefix}vm-${count.index}"
@@ -96,10 +118,15 @@ resource "crusoe_compute_instance" "my_vms" {
   }]
   host_channel_adapters = [
     {
-      transport_partition_id = crusoe_transport_partition.my_partition.id
+      transport_partition_id = local.vm_partition_id
     }
   ]
   ssh_key = local.my_ssh_key
+}
+
+# Output the VM IDs for testing
+output "vm_ids" {
+  value = crusoe_compute_instance.my_vms[*].id
 }
 
 # Create multiple storage disks

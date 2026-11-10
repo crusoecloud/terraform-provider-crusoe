@@ -33,6 +33,19 @@ variable "vm_count" {
   default = 1
 }
 
+# Changing the partition moves the VMs to the other one in place. Each VM is stopped for
+# the change and started again if it was running.
+variable "partition" {
+  description = "IB partition the VMs are attached to: `primary` or `secondary`."
+  type        = string
+  default     = "primary"
+
+  validation {
+    condition     = contains(["primary", "secondary"], var.partition)
+    error_message = "partition must be \"primary\" or \"secondary\"."
+  }
+}
+
 # List available IB networks
 data "crusoe_ib_networks" "my_ib_networks" {}
 output "ib_networks" {
@@ -71,13 +84,22 @@ resource "crusoe_vpc_subnet" "my_vpc_subnet" {
   network  = crusoe_vpc_network.my_vpc_network.id
 }
 
-# Create an IB partition to deploy VMs in
+# Create two IB partitions to deploy VMs in
 resource "crusoe_ib_partition" "my_partition" {
   name          = "${var.name_prefix}partition"
   ib_network_id = local.available_ib_network_id
 }
 
-# Create multiple VMs, all in the same Infiniband partition
+resource "crusoe_ib_partition" "my_other_partition" {
+  name          = "${var.name_prefix}other-partition"
+  ib_network_id = local.available_ib_network_id
+}
+
+locals {
+  vm_partition_id = var.partition == "primary" ? crusoe_ib_partition.my_partition.id : crusoe_ib_partition.my_other_partition.id
+}
+
+# Create multiple VMs, all in the Infiniband partition var.partition selects
 resource "crusoe_compute_instance" "my_vms" {
   count    = var.vm_count
   name     = "${var.name_prefix}vm-${count.index}"
@@ -98,10 +120,15 @@ resource "crusoe_compute_instance" "my_vms" {
   }]
   host_channel_adapters = [
     {
-      ib_partition_id = crusoe_ib_partition.my_partition.id
+      ib_partition_id = local.vm_partition_id
     }
   ]
   ssh_key = local.my_ssh_key
+}
+
+# Output the VM IDs for testing
+output "vm_ids" {
+  value = crusoe_compute_instance.my_vms[*].id
 }
 
 # Create multiple storage disks

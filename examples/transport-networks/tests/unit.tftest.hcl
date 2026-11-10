@@ -54,6 +54,16 @@ run "validate_partition" {
     condition     = crusoe_transport_partition.my_partition.transport_network_id == output.selected_transport_network_id
     error_message = "Expected transport network ID to be '${output.selected_transport_network_id}', but got '${crusoe_transport_partition.my_partition.transport_network_id}'."
   }
+
+  assert {
+    condition     = crusoe_transport_partition.my_other_partition.name == "${var.name_prefix}other-partition"
+    error_message = "Expected the other transport partition name to be '${var.name_prefix}other-partition', but got '${crusoe_transport_partition.my_other_partition.name}'."
+  }
+
+  assert {
+    condition     = crusoe_transport_partition.my_other_partition.transport_network_id == output.selected_transport_network_id
+    error_message = "Expected the other transport partition's network ID to be '${output.selected_transport_network_id}', but got '${crusoe_transport_partition.my_other_partition.transport_network_id}'."
+  }
 }
 
 run "validate_disks" {

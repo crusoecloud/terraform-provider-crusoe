@@ -139,6 +139,50 @@ func resizeRequiresReplace(_ context.Context, req planmodifier.StringRequest,
 	)
 }
 
+// partitionAliasPairModifier builds the plan modifier both halves of the partition alias
+// pair share.
+func partitionAliasPairModifier() planmodifier.String {
+	return common.AliasPairUseStateForUnknown(attrIBPartitionID, attrTransportPartitionID)
+}
+
+//nolint:gocritic // Implements Terraform defined interface
+func (r *vmResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var hcas types.List
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(attrHostChannelAdapters), &hcas)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validateHostChannelAdapterAliasPairs(hcas, &resp.Diagnostics)
+}
+
+// ModifyPlan warns that a partition change stops the VM, as resizeRequiresReplace does for
+// a resize. The warning is here rather than on the attributes because either half of the
+// alias pair can carry the change.
+//
+//nolint:gocritic // Implements Terraform defined interface
+func (r *vmResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Only an update can change the partition of an existing VM.
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var stateHCAs, planHCAs types.List
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root(attrHostChannelAdapters), &stateHCAs)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root(attrHostChannelAdapters), &planHCAs)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if hostChannelAdapterPartitionChanged(stateHCAs, planHCAs) {
+		resp.Diagnostics.AddWarning(
+			"VM will be stopped to change its partition",
+			"Changing the partition of the host channel adapter updates the VM in place. The VM will be "+
+				"stopped to apply the change, then started again if it was running before the update.",
+		)
+	}
+}
+
 func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version: 2,
@@ -323,17 +367,20 @@ func (r *vmResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"ib_partition_id": schema.StringAttribute{
-							Computed:            true,
-							Optional:            true,
-							MarkdownDescription: providerDescIBPartitionID + " " + providerDescIBPartitionIDDeprecated,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
-							DeprecationMessage:  providerDescIBPartitionIDDeprecated,
+							Computed: true,
+							Optional: true,
+							MarkdownDescription: providerDescIBPartitionID + " " + providerDescPartitionChange + " " +
+								providerDescIBPartitionIDDeprecated,
+							// maintain across updates, following a partition change made through transport_partition_id
+							PlanModifiers:      []planmodifier.String{partitionAliasPairModifier()},
+							DeprecationMessage: providerDescIBPartitionIDDeprecated,
 						},
 						"transport_partition_id": schema.StringAttribute{
 							Computed:            true,
 							Optional:            true,
-							MarkdownDescription: apiDescTransportPartitionID,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, // maintain across updates
+							MarkdownDescription: apiDescTransportPartitionID + " " + providerDescPartitionChange,
+							// maintain across updates, following a partition change made through ib_partition_id
+							PlanModifiers: []planmodifier.String{partitionAliasPairModifier()},
 						},
 					},
 				},
@@ -534,8 +581,9 @@ func (r *vmResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Update attempts to update a VM. Currently only supports attaching/detaching disks, and requires that the
-// VM be stopped.
+// Update applies in-place changes to a VM: attaching and detaching disks, the public IP
+// type, a resize within the same product family, and the partition of the host channel
+// adapter. A resize and a partition change stop the VM; see updateWhileStopped.
 //
 //nolint:gocritic // Implements Terraform defined interface
 func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -641,22 +689,10 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 			return
 		}
 
-		var hostChannelAdapters []swagger.PartialHostChannelAdapter
-		if !plan.HostChannelAdapters.IsUnknown() && !plan.HostChannelAdapters.IsNull() {
-			tHostChannelAdapters := make([]vmHostChannelAdapterResourceModel, 0, len(plan.HostChannelAdapters.Elements()))
-			diags = plan.HostChannelAdapters.ElementsAs(ctx, &tHostChannelAdapters, true)
-			resp.Diagnostics.Append(diags...)
-
-			for _, hca := range tHostChannelAdapters {
-				hostChannelAdapters = []swagger.PartialHostChannelAdapter{
-					{
-						IbPartitionId:        hca.IBPartitionID,
-						TransportPartitionId: hca.TransportPartitionID,
-					},
-				}
-			}
-		}
-
+		// The request carries no host channel adapters, so the partition is left as it is. The
+		// backend rejects adapters that set both names of the partition alias pair, which
+		// state always does, and a partition change needs the VM stopped, so it is applied
+		// below, in updateWhileStopped.
 		var tNetworkInterfaces []vmNetworkInterfaceResourceModel
 		diags = plan.NetworkInterfaces.ElementsAs(ctx, &tNetworkInterfaces, true)
 		resp.Diagnostics.Append(diags...)
@@ -670,7 +706,6 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 					},
 				}},
 			}},
-			HostChannelAdapters: hostChannelAdapters,
 		}, state.ProjectID.ValueString(), state.ID.ValueString())
 		if httpResp != nil {
 			defer httpResp.Body.Close()
@@ -695,100 +730,17 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 		resp.Diagnostics.Append(diags...)
 	}
 
-	// resize the instance in place if the type changed within the same product family.
-	// (Cross-family changes trigger a replace via the schema plan modifier and never reach here.)
-	if !plan.Type.IsUnknown() && !plan.Type.IsNull() && plan.Type.ValueString() != state.Type.ValueString() {
-		// fetch the current power state; the backend requires the VM to be stopped before a resize.
-		instance, httpResp, err := r.client.APIClient.VMsApi.GetInstance(ctx, state.ProjectID.ValueString(), state.ID.ValueString())
-		if httpResp != nil {
-			defer httpResp.Body.Close()
-		}
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to resize instance",
-				fmt.Sprintf("There was an error fetching the instance's current state: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-
-		// stop the VM first if it isn't already stopped.
-		wasRunning := instance.State != StateStopped && instance.State != StateShutoff
-		if wasRunning {
-			stopResp, stopHTTPResp, stopErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
-				Action: "STOP",
-			}, state.ProjectID.ValueString(), state.ID.ValueString())
-			if stopHTTPResp != nil {
-				defer stopHTTPResp.Body.Close()
-			}
-			if stopErr != nil {
-				resp.Diagnostics.AddError("Failed to resize instance",
-					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
-
-				return
-			}
-
-			_, stopErr = common.AwaitOperation(ctx, stopResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-			if stopErr != nil {
-				resp.Diagnostics.AddError("Failed to resize instance",
-					fmt.Sprintf("There was an error stopping the instance before resizing: %s", common.UnpackAPIError(stopErr)))
-
-				return
-			}
-		}
-
-		resizeResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
-			Action: "UPDATE",
-			Type_:  plan.Type.ValueString(),
-		}, state.ProjectID.ValueString(), state.ID.ValueString())
-		if httpResp != nil {
-			defer httpResp.Body.Close()
-		}
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to resize instance",
-				fmt.Sprintf("There was an error requesting to resize the instance: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-
-		_, err = common.AwaitOperation(ctx, resizeResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to resize instance",
-				fmt.Sprintf("There was an error resizing the instance: %s", common.UnpackAPIError(err)))
-
-			return
-		}
-
-		// Persist the new type before attempting the restart, so a restart failure
-		// does not lose the completed resize from state.
-		state.Type = plan.Type
-		diags = resp.State.Set(ctx, &state)
-		resp.Diagnostics.Append(diags...)
+	// Changes the backend applies only to a stopped VM: a resize within the same product
+	// family (cross-family changes trigger a replace via the schema plan modifier and never
+	// reach here) and a partition change. Both share one stop and start.
+	typeChanged := !plan.Type.IsUnknown() && !plan.Type.IsNull() && plan.Type.ValueString() != state.Type.ValueString()
+	partition := firstHostChannelAdapterPartition(plan.HostChannelAdapters)
+	partitionChanged := !partition.IsUnknown() &&
+		hostChannelAdapterPartitionChanged(state.HostChannelAdapters, plan.HostChannelAdapters)
+	if typeChanged || partitionChanged {
+		r.updateWhileStopped(ctx, &state, &plan, typeChanged, partitionChanged, resp)
 		if resp.Diagnostics.HasError() {
 			return
-		}
-
-		// restore the prior power state: resizing leaves the VM stopped, so start it
-		// again if it was running before the resize.
-		if wasRunning {
-			startResp, startHTTPResp, startErr := r.client.APIClient.VMsApi.UpdateInstance(ctx, swagger.InstancesPatchRequestV1{
-				Action: "START",
-			}, state.ProjectID.ValueString(), state.ID.ValueString())
-			if startHTTPResp != nil {
-				defer startHTTPResp.Body.Close()
-			}
-			if startErr != nil {
-				resp.Diagnostics.AddError("Failed to start instance after resize",
-					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
-
-				return
-			}
-
-			_, startErr = common.AwaitOperation(ctx, startResp.Operation, state.ProjectID.ValueString(), r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
-			if startErr != nil {
-				resp.Diagnostics.AddError("Failed to start instance after resize",
-					fmt.Sprintf("The instance was resized but could not be restarted: %s", common.UnpackAPIError(startErr)))
-
-				return
-			}
 		}
 	}
 
@@ -802,6 +754,120 @@ func (r *vmResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	tflog.Debug(ctx, debugMsg, map[string]interface{}{})
 	state.ReservationID = plan.ReservationID
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// updateWhileStopped applies the changes the backend accepts only on a stopped VM: a resize
+// and a partition change. It stops the VM if needed, applies each change as its own
+// update, and starts the VM again if it was running, also when an update fails, so a
+// failure does not leave the VM down. Each completed change is persisted before the next
+// step, so a later failure does not lose it from state.
+func (r *vmResource) updateWhileStopped(ctx context.Context, state, plan *vmResourceModel,
+	typeChanged, partitionChanged bool, resp *resource.UpdateResponse,
+) {
+	projectID := state.ProjectID.ValueString()
+	vmID := state.ID.ValueString()
+
+	instance, err := getVM(ctx, r.client.APIClient, projectID, vmID)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update instance",
+			fmt.Sprintf("There was an error fetching the instance's current state: %s", err))
+
+		return
+	}
+
+	wasRunning := instance.State != StateStopped && instance.State != StateShutoff
+	if wasRunning {
+		if err := r.patchInstance(ctx, projectID, vmID, &swagger.InstancesPatchRequestV1{Action: "STOP"}); err != nil {
+			resp.Diagnostics.AddError("Failed to update instance",
+				fmt.Sprintf("There was an error stopping the instance before updating it: %s", err))
+
+			return
+		}
+	}
+
+	// start brings the VM back to the power state it had before this update.
+	start := func() error {
+		if !wasRunning {
+			return nil
+		}
+
+		return r.patchInstance(ctx, projectID, vmID, &swagger.InstancesPatchRequestV1{Action: "START"})
+	}
+
+	// failed reports an update that did not apply and starts the VM again rather than
+	// leaving it stopped.
+	failed := func(summary, detail string) {
+		if err := start(); err != nil {
+			detail += fmt.Sprintf(" The instance was stopped for the update and could not be started again: %s", err)
+		} else if wasRunning {
+			detail += " The instance was started again."
+		}
+		resp.Diagnostics.AddError(summary, detail)
+	}
+
+	if typeChanged {
+		if err := r.patchInstance(ctx, projectID, vmID, &swagger.InstancesPatchRequestV1{
+			Action: "UPDATE",
+			Type_:  plan.Type.ValueString(),
+		}); err != nil {
+			failed("Failed to resize instance",
+				fmt.Sprintf("There was an error resizing the instance: %s.", err))
+
+			return
+		}
+
+		state.Type = plan.Type
+		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if partitionChanged {
+		// The backend rejects a request that sets both names, even to the same value, so
+		// only the replacement name is sent.
+		if err := r.patchInstance(ctx, projectID, vmID, &swagger.InstancesPatchRequestV1{
+			Action: "UPDATE",
+			HostChannelAdapters: []swagger.PartialHostChannelAdapter{{
+				TransportPartitionId: firstHostChannelAdapterPartition(plan.HostChannelAdapters).ValueString(),
+			}},
+		}); err != nil {
+			failed("Failed to change instance partition",
+				fmt.Sprintf("There was an error changing the partition of the instance's host channel adapter: %s.", err))
+
+			return
+		}
+
+		state.HostChannelAdapters = plan.HostChannelAdapters
+		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	// restore the prior power state: the updates leave the VM stopped.
+	if err := start(); err != nil {
+		resp.Diagnostics.AddError("Failed to start instance after update",
+			fmt.Sprintf("The instance was updated but could not be restarted: %s", err))
+	}
+}
+
+// patchInstance sends a PATCH to the VM and waits for the operation it starts.
+func (r *vmResource) patchInstance(ctx context.Context, projectID, vmID string, body *swagger.InstancesPatchRequestV1) error {
+	patchResp, httpResp, err := r.client.APIClient.VMsApi.UpdateInstance(ctx, *body, projectID, vmID)
+	if httpResp != nil {
+		defer httpResp.Body.Close()
+	}
+	if err != nil {
+		return common.UnpackAPIError(err)
+	}
+
+	_, err = common.AwaitOperation(ctx, patchResp.Operation, projectID, r.client.APIClient.VMOperationsApi.GetComputeVMsInstancesOperation)
+	if err != nil {
+		return common.UnpackAPIError(err)
+	}
+
+	return nil
 }
 
 //nolint:gocritic // Implements Terraform defined interface
