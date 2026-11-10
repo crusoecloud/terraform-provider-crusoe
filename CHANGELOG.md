@@ -32,11 +32,10 @@ ENHANCEMENTS:
 BUG FIXES:
 
 * Creating a `pull-through-cache` repository for a private AWS ECR upstream no longer fails with "inconsistent result after apply". The credentials are required when the repository is created; a repository created without them has to be recreated to add them. (!328)
-* Service account credentials are read from `client_id`, `client_secret`, `token_url` and `audience` in `~/.crusoe/config`, and from the `CRUSOE_CLIENT_ID`, `CRUSOE_CLIENT_SECRET`, `CRUSOE_TOKEN_URL` and `CRUSOE_AUDIENCE` environment variables. The former `service_account_*` keys and `CRUSOE_SERVICE_ACCOUNT_*` variables are no longer read: rename them to keep authenticating as a service account. (!343)
 * Setting `api_endpoint` in the `provider "crusoe" {}` block now actually targets that endpoint. Previously it was silently ignored, and the provider fell back to `CRUSOE_API_ENDPOINT`, the selected profile's `api_endpoint`, or production regardless of what the provider block said. (!357)
 <!-- site: developer-tools/terraform -->
 <!-- title: Provider block now controls which API endpoint Terraform uses -->
-* The provider no longer combines credentials from different sources: it uses the first complete pair it finds, environment variables first, then the configuration profile, so a stray variable cannot be paired with a key from the profile. Overriding only one of `token_url` and `audience` is now an error. (!343)
+* The provider no longer combines credentials from different sources. It uses the first complete pair it finds, environment variables first, then the configuration profile. A stray `CRUSOE_ACCESS_KEY_ID` or `CRUSOE_SECRET_KEY` variable can no longer pair with the other key from `~/.crusoe/config`. (!343)
 * `crusoe_compute_instance_by_template` now sets `attachment_type` and `mode` for each disk in `disks` after create, and a refresh now updates `disks` from the API. (!354)
 * `crusoe_kubernetes_cluster` no longer destroys and recreates the cluster, or fails an apply with "Provider produced inconsistent result after apply", when the API returns `add_ons` in a different order than the configuration: replacement now depends on which add-ons are set, not on their order. A reorder plans as an in-place update instead, so configurations that pinned the `add_ons` order or listed it in `lifecycle { ignore_changes }` to work around this can drop that. (!342)
 <!-- site: infrastructure-cloud/managed-kubernetes -->
