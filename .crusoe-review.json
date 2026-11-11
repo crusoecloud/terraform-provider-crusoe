@@ -3,12 +3,14 @@
   "categories": {
     "repo-agents": {
       "instructions": {
-        "changelog-fragment": ".crusoe-review/changelog-fragment.md"
+        "changelog-fragment": ".crusoe-review/changelog-fragment.md",
+        "breaking-change": ".crusoe-review/breaking-change.md"
       }
     },
     "terraform": {
       "instructions": {
-        "changelog-fragment": ".crusoe-review/changelog-fragment.md"
+        "changelog-fragment": ".crusoe-review/changelog-fragment.md",
+        "breaking-change": ".crusoe-review/breaking-change.md"
       }
     }
   }

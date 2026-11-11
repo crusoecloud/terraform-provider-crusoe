@@ -91,6 +91,18 @@ fragments call for more than a patch, and otherwise says so in its log and in
 the release-prep merge request; the releaser decides (RELEASING.md, "1. Run
 `prepare_release`").
 
+A `breaking-change` entry ships in a planned major release, and the merge
+request description links the plan with a line `Breaking change plan:
+<link>`, the ticket or page that names the release and how customers are
+told; CI fails the fragment without it. Prefer the deprecation path when the
+old attribute can keep working next to the new one for a release: a
+`DeprecationMessage` that names the replacement and a `deprecation` entry
+now, the removal in the next major. A breaking change behind a server-side
+flag is not one yet ("Changes behind a server-side flag" above): the merge
+request that removes the limited-availability marker carries the entry and
+the plan line. The review bot flags a breaking change that has no entry
+(`.crusoe-review/breaking-change.md`).
+
 The sections written by hand up to 1.8.0 used NEW FEATURES and UPGRADE NOTES
 for what is `feature` and `breaking-change` here.
 

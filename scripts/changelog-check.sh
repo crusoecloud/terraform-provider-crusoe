@@ -5,7 +5,8 @@
 #   In a merge request pipeline the file defaults to .changelog/<MR IID>.txt.
 #   Exits 0 without checking when the MR has the label "dependencies" or comes
 #   from a renovate/* branch, or has the label "skip-changelog" and says why in
-#   its description (a line "No changelog: <why>").
+#   its description (a line "No changelog: <why>"). A breaking-change entry
+#   needs a line "Breaking change plan: <link>" in the description.
 #
 # Besides the block structure and the type, the script checks the product tag
 # for Crusoe Updates, "<!-- site: <category>/<subcategory> -->" (see
@@ -66,30 +67,33 @@ read_mr_description() {
   fi
 }
 
-# The skip-changelog label says the check is skipped; the description says
-# why, for the reviewer: a line "No changelog: <why>" anywhere, or a
-# "## No changelog" heading with text under it. Like the portal's
-# check_mr_description.sh, the check fails without the reason.
-# has_skip_reason tells whether the description says why (and keeps what to
-# print in SKIP_REASON); require_skip_reason adds the error when it does not.
-SKIP_REASON=""
-REASON_LINE='^[[:space:]]*([>*+-][[:space:]]*)*(\*\*|__)?No changelog(\*\*|__)?:[[:space:]*_]*[^[:space:]*_]'
-has_skip_reason() {
-  local reason
+# What the description says, for the reviewer: a labelled line anywhere
+# ("<label>: <text>"; bold, quoted or as a list item tolerated), or a
+# "## <label>" heading with text under it. Like the portal's
+# check_mr_description.sh, the check fails without it. description_says
+# tells whether the description has the label and keeps what to print in
+# SAID; the callers add the error when it does not.
+SAID=""
+description_says() {
+  local label="$1" line pattern
+  pattern='^[[:space:]]*([>*+-][[:space:]]*)*(\*\*|__)?'"${label}"'(\*\*|__)?:[[:space:]*_]*[^[:space:]*_]'
   read_mr_description
-  if reason=$(grep -Ei -m 1 "$REASON_LINE" <<<"$MR_DESCRIPTION"); then
-    SKIP_REASON="as the description says: $(sed -E 's/^[[:space:]>*+-]+//; s/\*\*//g' <<<"$reason")"
+  if line=$(grep -Ei -m 1 "$pattern" <<<"$MR_DESCRIPTION"); then
+    SAID="as the description says: $(sed -E 's/^[[:space:]>*+-]+//; s/\*\*//g' <<<"$line")"
     return 0
   fi
-  if awk 'tolower($0) ~ /^##+[[:space:]]*no changelog[[:space:]]*:?[[:space:]]*$/ { s = 1; next } s && /^#/ { exit } s && /[^[:space:]]/ { found = 1 } END { exit !found }' <<<"$MR_DESCRIPTION"; then
-    SKIP_REASON="as the \"No changelog\" section of the description says"
+  if awk -v label="$(tr '[:upper:]' '[:lower:]' <<<"$label")" 'tolower($0) ~ ("^##+[[:space:]]*" label "[[:space:]]*:?[[:space:]]*$") { s = 1; next } s && /^#/ { exit } s && /[^[:space:]]/ { found = 1 } END { exit !found }' <<<"$MR_DESCRIPTION"; then
+    SAID="as the \"${label}\" section of the description says"
     return 0
   fi
   return 1
 }
+# The skip-changelog label says the check is skipped; the description says
+# why: "No changelog: <why>".
+has_skip_reason() { description_says "No changelog"; }
 require_skip_reason() {
   if has_skip_reason; then
-    echo "changelog: skipped, ${SKIP_REASON}"
+    echo "changelog: skipped, ${SAID}"
     return 0
   fi
   cat >&2 <<MSG
@@ -275,6 +279,35 @@ entries=$(awk -v types="$TYPES" -v US="$US" '
     exit bad
   }
 ' "$file") || exit 1
+
+# A breaking change ships in a planned release: the description links the
+# plan with a line "Breaking change plan: <link>" (or a "## Breaking change
+# plan" section). Checked in a merge request pipeline only; locally there is
+# no description to read.
+if [[ -n "${CI_MERGE_REQUEST_IID:-}" ]] && awk -F "$US" '$1 == "breaking-change" { f = 1 } END { exit !f }' <<<"$entries"; then
+  if description_says "Breaking change plan"; then
+    echo "changelog: breaking change, ${SAID}"
+  else
+    cat >&2 <<MSG
+changelog: the fragment has a breaking-change entry, but the description has no "Breaking change plan:" line.
+
+A breaking change ships in a planned release, the major (below 1.0, the minor)
+that announces it. Add a line that starts with "Breaking change plan:" and
+links the plan: the ticket or page that names the release and how customers
+are told. For example:
+
+  Breaking change plan: https://crusoe.atlassian.net/browse/CCX-1234
+
+Prefer the deprecation path when the old name can keep working for a release
+(.changelog/README.md, "Types"). Then retry this job: GitLab does not start a
+pipeline when a description is edited.
+MSG
+    if $MR_DESCRIPTION_PARTIAL; then
+      echo "changelog: the description is longer than 2700 characters and could not be fetched in full, so only its start was checked; put the line near the top" >&2
+    fi
+    exit 1
+  fi
+fi
 
 # Product tags. Presence means "draft a Crusoe Updates entry"; SITE_TYPES must
 # decide explicitly, the other types opt in by adding a tag. A tagged entry
