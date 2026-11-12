@@ -123,10 +123,14 @@ The value is `<category>/<subcategory>` from the site's
 (`platforms.<category>.subcategories.<subcategory>`), for example
 `infrastructure-cloud/networking`, `security/iam` or `general/api`. A change to
 the provider itself that touches no product, such as its configuration or
-authentication, is tagged `developer-tools/terraform`. There is no copy of that
-list here: the check reads the file from the docs repo and prints the valid
-values when a tag is wrong. If the file cannot be read, the check reports the
-tag as not validated and passes; the docs side validates again.
+authentication, is tagged `developer-tools/terraform`; that tag is never the
+fallback for a product the list does not name. Such a product gets its
+subcategory in the site's `changelogConfig.json` first (a one-line merge request
+in the docs repo; the check reads the list from the docs repo's `main`, so the
+fragment can use it as soon as that merge request is merged). There is no copy
+of that list here: the check reads the file from the docs repo and prints the
+valid values when a tag is wrong. If the file cannot be read, the check reports
+the tag as not validated and passes; the docs side validates again.
 
 `feature`, `security` and `breaking-change` entries must carry a tag, or opt
 out explicitly when the change is not worth a site entry:
