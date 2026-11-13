@@ -104,7 +104,7 @@ const (
 
 	providerDescGeneration = "Null when the API does not report it."
 
-	providerDescConsentModeDefault = "Newly created node pools default to `propose`. " +
+	providerDescConsentModeDefault = "Newly created node pools default to `auto`. " +
 		"A node pool that predates this setting starts at `off`, so that remediation does not begin " +
 		"on a pool whose owner was never asked."
 	providerDescAutoscalingConfig = "Enabling requires both `min_node_size` and `max_node_size` and replaces any " +

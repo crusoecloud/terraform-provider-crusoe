@@ -1,0 +1,3 @@
+```release-note:bug
+The `consent_mode` description on `crusoe_kubernetes_node_pool` now gives the right default: when you leave it out, a new node pool uses `auto`, not `propose`.
+```
