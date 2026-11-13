@@ -216,25 +216,12 @@ func parseNodePoolOpResult[T any](opResult interface{}) (*T, error) {
 	return &result, nil
 }
 
-// nodePoolOpResult and operationDetails mirror swagger.KubernetesNodePoolResponse and
-// swagger.OperationDetails, which the generated client no longer exposes.
-// TODO: CCX-5707 - drop and revert to the swagger types once the SDK exposes them again.
-type operationDetails struct {
-	Error_        string `json:"error,omitempty"`
-	NumVmsCreated int32  `json:"num_vms_created,omitempty"`
-}
-
-type nodePoolOpResult struct {
-	Details  *operationDetails           `json:"details,omitempty"`
-	NodePool *swagger.KubernetesNodePool `json:"node_pool"`
-}
-
-func AwaitNodePoolOrNodePoolResponse(ctx context.Context, asyncOperation *swagger.Operation, projectID string, client *swagger.APIClient) (*swagger.KubernetesNodePool, *nodePoolOpResult, error) {
+func AwaitNodePoolOrNodePoolResponse(ctx context.Context, asyncOperation *swagger.Operation, projectID string, client *swagger.APIClient) (*swagger.KubernetesNodePool, *swagger.KubernetesNodePoolResponse, error) {
 	var err error
 	var secondErr error
 	var finalOp *swagger.Operation
 	var nodePool *swagger.KubernetesNodePool
-	var nodePoolResponse *nodePoolOpResult
+	var nodePoolResponse *swagger.KubernetesNodePoolResponse
 
 	finalOp, err = common.AwaitOperation(ctx, asyncOperation, projectID, client.KubernetesNodePoolOperationsApi.GetKubernetesNodePoolsOperation)
 	if err != nil {
@@ -242,7 +229,7 @@ func AwaitNodePoolOrNodePoolResponse(ctx context.Context, asyncOperation *swagge
 	}
 
 	// Try new node pool response
-	nodePoolResponse, err = parseNodePoolOpResult[nodePoolOpResult](finalOp.Result)
+	nodePoolResponse, err = parseNodePoolOpResult[swagger.KubernetesNodePoolResponse](finalOp.Result)
 	if err != nil || nodePoolResponse.NodePool == nil {
 		// Handle old node pool response
 		nodePool, secondErr = parseNodePoolOpResult[swagger.KubernetesNodePool](finalOp.Result)
@@ -255,7 +242,7 @@ func AwaitNodePoolOrNodePoolResponse(ctx context.Context, asyncOperation *swagge
 	return nodePool, nodePoolResponse, err
 }
 
-func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operation, projectID string, client *swagger.APIClient) (*nodePoolOpResult, error) {
+func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operation, projectID string, client *swagger.APIClient) (*swagger.KubernetesNodePoolResponse, error) {
 	nodePool, nodePoolResponse, err := AwaitNodePoolOrNodePoolResponse(ctx, asyncOperation, projectID, client)
 	if err != nil {
 		return nil, err
@@ -268,9 +255,9 @@ func AwaitNodePoolOperation(ctx context.Context, asyncOperation *swagger.Operati
 
 	// Try old node pool response
 	if nodePool != nil {
-		return &nodePoolOpResult{
+		return &swagger.KubernetesNodePoolResponse{
 			NodePool: nodePool,
-			Details: &operationDetails{
+			Details: &swagger.OperationDetails{
 				Error_:        "",
 				NumVmsCreated: int32(nodePool.Count),
 			},

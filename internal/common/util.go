@@ -106,7 +106,7 @@ func NewAPIClient(host, key, secret string) *swagger.APIClient {
 }
 
 // ctxWithRetryTransport installs NewAPIClient's retry transport (429/5xx backoff, no retry on
-// POST) as the oauth2.HTTPClient value client-go's NewServiceAccountConfig reads, so it backs
+// POST) as the oauth2.HTTPClient value client-go's NewClientSecretConfig reads, so it backs
 // both the token fetch and every outer API request.
 //
 // A ctx that already carries an oauth2.HTTPClient value is left untouched.
@@ -128,7 +128,7 @@ func ctxWithRetryTransport(ctx context.Context) context.Context {
 func NewClientSecretAPIClient(ctx context.Context, host, clientID, clientSecret, tokenURL, audience string) (
 	*swagger.APIClient, error,
 ) {
-	cfg, err := authv1.NewServiceAccountConfig(ctxWithRetryTransport(ctx), clientID, clientSecret, tokenURL, audience)
+	cfg, err := authv1.NewClientSecretConfig(ctxWithRetryTransport(ctx), clientID, clientSecret, tokenURL, audience)
 	if err != nil {
 		return nil, fmt.Errorf("building service-account API client: %w", err)
 	}

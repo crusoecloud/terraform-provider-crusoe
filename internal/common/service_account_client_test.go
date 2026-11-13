@@ -14,7 +14,7 @@ import (
 )
 
 // TestCtxWithRetryTransport_InstallsRetryTransportAsOAuthBase confirms client-go's
-// NewServiceAccountConfig picks up the client ctxWithRetryTransport installs as the Base
+// NewClientSecretConfig picks up the client ctxWithRetryTransport installs as the Base
 // transport beneath its OAuth2 transport.
 func TestCtxWithRetryTransport_InstallsRetryTransportAsOAuthBase(t *testing.T) {
 	ctx := ctxWithRetryTransport(context.Background())
@@ -24,9 +24,9 @@ func TestCtxWithRetryTransport_InstallsRetryTransportAsOAuthBase(t *testing.T) {
 		t.Fatal("ctxWithRetryTransport() did not install an *http.Client under oauth2.HTTPClient")
 	}
 
-	cfg, err := authv1.NewServiceAccountConfig(ctx, "client-id", "client-secret", "https://token.invalid/oauth2/token", "audience")
+	cfg, err := authv1.NewClientSecretConfig(ctx, "client-id", "client-secret", "https://token.invalid/oauth2/token", "audience")
 	if err != nil {
-		t.Fatalf("NewServiceAccountConfig() error = %v, want nil", err)
+		t.Fatalf("NewClientSecretConfig() error = %v, want nil", err)
 	}
 
 	transport, ok := cfg.HTTPClient.Transport.(*oauth2.Transport)
@@ -35,7 +35,7 @@ func TestCtxWithRetryTransport_InstallsRetryTransportAsOAuthBase(t *testing.T) {
 	}
 
 	if transport.Base != injected.Transport {
-		t.Error("NewServiceAccountConfig's OAuth2 transport Base is not the retry transport ctxWithRetryTransport installed")
+		t.Error("NewClientSecretConfig's OAuth2 transport Base is not the retry transport ctxWithRetryTransport installed")
 	}
 }
 
@@ -86,7 +86,7 @@ func TestCtxWithRetryTransport_RetriesTransientFailures(t *testing.T) {
 // the failure without waiting out a real token's lifetime.
 func TestServiceAccountConfig_TokenRefreshFailsIfBuiltWithACancelledCtx(t *testing.T) {
 	fetches := 0
-	// A real TLS server, since NewServiceAccountConfig rejects a non-https tokenURL.
+	// A real TLS server, since NewClientSecretConfig rejects a non-https tokenURL.
 	tokenServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fetches++
 		w.Header().Set("Content-Type", "application/json")
@@ -102,10 +102,10 @@ func TestServiceAccountConfig_TokenRefreshFailsIfBuiltWithACancelledCtx(t *testi
 
 	configurePhaseCtx, cancelConfigurePhaseCtx := context.WithCancel(context.Background())
 	ctx := context.WithValue(configurePhaseCtx, oauth2.HTTPClient, &http.Client{Transport: tokenServer.Client().Transport})
-	cfg, err := authv1.NewServiceAccountConfig(
+	cfg, err := authv1.NewClientSecretConfig(
 		ctxWithRetryTransport(ctx), "client-id", "client-secret", tokenServer.URL, "audience")
 	if err != nil {
-		t.Fatalf("NewServiceAccountConfig() error = %v, want nil", err)
+		t.Fatalf("NewClientSecretConfig() error = %v, want nil", err)
 	}
 
 	doGet := func() error {
@@ -162,10 +162,10 @@ func TestServiceAccountConfig_TokenRefreshSucceedsWithBackgroundCtx(t *testing.T
 	defer resourceServer.Close()
 
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{Transport: tokenServer.Client().Transport})
-	cfg, err := authv1.NewServiceAccountConfig(
+	cfg, err := authv1.NewClientSecretConfig(
 		ctxWithRetryTransport(ctx), "client-id", "client-secret", tokenServer.URL, "audience")
 	if err != nil {
-		t.Fatalf("NewServiceAccountConfig() error = %v, want nil", err)
+		t.Fatalf("NewClientSecretConfig() error = %v, want nil", err)
 	}
 
 	doGet := func() error {
