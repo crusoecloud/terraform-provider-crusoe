@@ -44,7 +44,7 @@ variable "partition" {
   }
 }
 
-# List available IB networks
+# List available transport networks
 data "crusoe_transport_networks" "my_transport_networks" {}
 output "transport_networks" {
   value = data.crusoe_transport_networks.my_transport_networks.transport_networks
