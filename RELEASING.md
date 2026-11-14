@@ -119,9 +119,12 @@ Merging into `release` starts two things. On GitLab, the `release` pipeline:
 GitHub, where the push mirror delivers the merge a minute or so later, the
 `semver tag` workflow: it computes the version from `versions.env` and the
 existing tags, checks that the top section of `CHANGELOG.md` is that version,
-pushes the tag and runs GoReleaser with the section as the release notes. The
-signed binaries go to the GitHub release, which the Terraform Registry picks up
-on its own, and the workflow posts to `#ccx-ci-releases`. The release also
+builds every target with GoReleaser without publishing, pushes the tag and runs
+GoReleaser with the section as the release notes. The signed binaries go to the
+GitHub release, which the Terraform Registry picks up on its own, and the
+workflow posts the release to `#ccx-ci-releases`, or a failure notice that says
+whether the tag was pushed. The GitLab `release` pipeline posts there only when
+it fails. The release also
 carries `release-manifest.json` (one entry per fragment, with its product tag)
 for the docs site; `make release-manifest` prints it locally.
 
@@ -200,6 +203,11 @@ not the version it computed: no tag exists and nothing was published. That is
 a release-prep merge request that was skipped, or a candidate that was
 squashed. Fix it on `main`, prepare the release again and merge into `release`
 again.
+
+It also stops before tagging when the snapshot build fails (a break in
+`.goreleaser.yml`, a target the Go toolchain dropped). Nothing was published
+and the version is still free: fix it on `main` through a normal merge request
+and cut the candidate again, with the same top section.
 
 If the workflow fails after the tag (GoReleaser, signing, GitHub), the tag
 exists but the release is incomplete. When the cause is outside the repository
