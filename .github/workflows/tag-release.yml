@@ -11,6 +11,8 @@ permissions:
 jobs:
   semver-tag:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,9 +31,12 @@ jobs:
           echo "MINOR_VERSION=${MINOR_VERSION}" >> $GITHUB_ENV
 
       - name: Calculate and set new version
+        id: version
         run: |
           chmod +x ./scripts/tag_semver.sh
           ./scripts/tag_semver.sh $MAJOR_VERSION $MINOR_VERSION ""
+          source variables.env
+          echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Check the changelog before tagging
@@ -44,6 +49,20 @@ jobs:
           export RELEASE_VERSION
           scripts/release-notes.sh --check
           scripts/release-manifest.sh --check
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - name: Build the release before tagging
+        # Builds every target with the same GoReleaser version as the release,
+        # without signing or publishing, so a build or config break (v1.7.1:
+        # windows/arm) stops the workflow before the tag exists.
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          args: release --snapshot --clean --skip=sign
+          # Keep in step with the version in the goreleaser job.
+          version: '2.18.3'
 
       - name: Read version and push tag
         run: |
@@ -89,7 +108,8 @@ jobs:
           # is attached by release.extra_files in .goreleaser.yml.
           args: release --clean --release-notes release-notes.md
           # Pinned: bump only after testing with `goreleaser release --snapshot`
-          # at the same version (a CI-only config break failed the v1.7.1 release).
+          # at the same version (a CI-only config break failed the v1.7.1 release),
+          # and together with the one in "Build the release before tagging".
           version: '2.18.3'
         env:
           # GitHub sets the GITHUB_TOKEN secret automatically.
@@ -154,6 +174,73 @@ jobs:
                     type: "mrkdwn",
                     text: "<\($run_url)|View Workflow Run>"
                   }
+                }
+              ]
+            }')
+          curl -sS --fail-with-body --max-time 10 -X POST "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD"
+
+  notify-failure:
+    # Either job failing means no release went out; the success announcement
+    # above never runs, so without this the failure is silent.
+    needs: [semver-tag, goreleaser]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the failed release to Slack
+        env:
+          SLACK_CCX_CI_RELEASES_WEBHOOK_URL: ${{ secrets.SLACK_CCX_CI_RELEASES_WEBHOOK_URL }}
+          VERSION: ${{ needs.semver-tag.outputs.version }}
+          # The tag push is the last step of semver-tag.
+          TAG_PUSHED: ${{ needs.semver-tag.result == 'success' }}
+        run: |
+          if [ -z "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" ]; then
+            echo "SLACK_CCX_CI_RELEASES_WEBHOOK_URL not configured; skipping Slack notification." >&2
+            exit 0
+          fi
+          if [ "$TAG_PUSHED" = "true" ]; then
+            STATUS="The tag ${VERSION} was pushed, but the release is incomplete. See \"If the release fails\" in RELEASING.md."
+          else
+            STATUS="Failed before tagging: no tag was pushed and nothing was published."
+          fi
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          PAYLOAD=$(jq -n \
+            --arg version "${VERSION:-unknown}" \
+            --arg commit "${GITHUB_SHA::8}" \
+            --arg status "$STATUS" \
+            --arg run_url "$RUN_URL" \
+            '{
+              text: "Terraform Provider Crusoe \($version) release failed",
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: "Terraform Provider Crusoe \($version) Release Failed"
+                  }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*Version:*\n\($version)" },
+                    { type: "mrkdwn", text: "*Commit:*\n\($commit)" }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: $status }
+                },
+                {
+                  type: "actions",
+                  elements: [
+                    {
+                      type: "button",
+                      text: { type: "plain_text", text: "View Failed Workflow Run" },
+                      url: $run_url,
+                      style: "danger"
+                    }
+                  ]
                 }
               ]
             }')

@@ -124,74 +124,9 @@ pages:
   rules:
     - when: never
 
-# Slack notifications for release branch pipeline
-notify_release_branch_success:
-  stage: .post
-  image: curlimages/curl:latest
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "release" && $CI_PIPELINE_SOURCE == "push"'
-  script:
-    - |
-      if [ -z "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" ]; then
-        echo "SLACK_CCX_CI_RELEASES_WEBHOOK_URL not configured; skipping Slack notification." >&2
-        exit 0
-      fi
-    - COMMIT_SHORT=$(echo $CI_COMMIT_SHA | cut -c1-8)
-    - |
-      # JSON-escape: display names are free text, and the curl image has no jq.
-      TRIGGERED_BY=$(printf '%s' "$GITLAB_USER_NAME" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    - |
-      curl -sS --fail-with-body --max-time 10 -X POST "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" \
-        -H 'Content-Type: application/json' \
-        -d '{
-          "text": "*Terraform Provider Release Pipeline Succeeded*",
-          "blocks": [
-            {
-              "type": "header",
-              "text": {
-                "type": "plain_text",
-                "text": "Release Branch Pipeline Passed"
-              }
-            },
-            {
-              "type": "section",
-              "fields": [
-                {
-                  "type": "mrkdwn",
-                  "text": "*Branch:*\n'"$CI_COMMIT_BRANCH"'"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Commit:*\n'"$COMMIT_SHORT"'"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Triggered by:*\n'"$TRIGGERED_BY"'"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Duration:*\n'"$CI_PIPELINE_DURATION"'s"
-                }
-              ]
-            },
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "*Next steps:*\n• Review the changes in this commit\n• GitHub Action will automatically tag and release\n• Monitor GitHub release pipeline"
-              }
-            },
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "<'"$CI_PIPELINE_URL"'|View Pipeline>"
-              }
-            }
-          ]
-        }'
-  allow_failure: true
-
+# Slack notice when the release branch pipeline fails. A passing pipeline posts
+# nothing: the GitHub workflow announces the release itself, and reports its own
+# failures (.github/workflows/tag-release.yml).
 notify_release_branch_failure:
   stage: .post
   image: curlimages/curl:latest
@@ -212,13 +147,13 @@ notify_release_branch_failure:
       curl -sS --fail-with-body --max-time 10 -X POST "$SLACK_CCX_CI_RELEASES_WEBHOOK_URL" \
         -H 'Content-Type: application/json' \
         -d '{
-          "text": "*Terraform Provider Release Pipeline Failed*",
+          "text": "Terraform Provider Crusoe release branch pipeline failed",
           "blocks": [
             {
               "type": "header",
               "text": {
                 "type": "plain_text",
-                "text": "Release Branch Pipeline Failed"
+                "text": "Terraform Provider Crusoe Release Branch Pipeline Failed"
               }
             },
             {
@@ -235,10 +170,6 @@ notify_release_branch_failure:
                 {
                   "type": "mrkdwn",
                   "text": "*Triggered by:*\n'"$TRIGGERED_BY"'"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Duration:*\n'"$CI_PIPELINE_DURATION"'s"
                 }
               ]
             },
@@ -246,7 +177,7 @@ notify_release_branch_failure:
               "type": "section",
               "text": {
                 "type": "mrkdwn",
-                "text": "*Possible causes:*\n• Test failures\n• Linting errors\n• Build issues\n• Pipeline timeout\n• Infrastructure problems\n\n*Action required:* This blocks the GitHub Action from tagging and releasing. Fix the failing jobs before proceeding."
+                "text": "The GitHub release workflow does not wait for this pipeline: check whether it published the release, and fix the failing jobs on `main`."
               }
             },
             {
