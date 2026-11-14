@@ -207,7 +207,8 @@ again.
 It also stops before tagging when the snapshot build fails (a break in
 `.goreleaser.yml`, a target the Go toolchain dropped). Nothing was published
 and the version is still free: fix it on `main` through a normal merge request
-and cut the candidate again, with the same top section.
+and cut the candidate by hand from the new `main` (see "By hand"), with the
+same top section.
 
 If the workflow fails after the tag (GoReleaser, signing, GitHub), the tag
 exists but the release is incomplete. When the cause is outside the repository
