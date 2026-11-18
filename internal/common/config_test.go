@@ -919,8 +919,8 @@ secret_key = "secret"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if config.Audience != "https://api.crusoe.ai" {
-		t.Errorf("Audience default: got %q, want %q", config.Audience, "https://api.crusoe.ai")
+	if config.Audience != "https://api.cloud.crusoe.ai" {
+		t.Errorf("Audience default: got %q, want %q", config.Audience, "https://api.cloud.crusoe.ai")
 	}
 }
 

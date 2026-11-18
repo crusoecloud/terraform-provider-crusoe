@@ -20,7 +20,7 @@ const (
 	// token. Hydra treats the registered audience as an allowlist, not something it stamps onto
 	// the token automatically, so this must be sent explicitly or the token's aud claim comes
 	// back empty and the API rejects it. Overridable via audience / CRUSOE_AUDIENCE.
-	defaultAudience = "https://api.crusoe.ai"
+	defaultAudience = "https://api.cloud.crusoe.ai"
 )
 
 // Config holds options that can be set via ~/.crusoe/config and env variables.
