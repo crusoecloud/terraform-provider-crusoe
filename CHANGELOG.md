@@ -10,6 +10,12 @@ https://github.com/crusoecloud/terraform-provider-crusoe/releases
 
 <!-- new releases go below this line -->
 
+## v1.9.1 (2026-11-20)
+
+BUG FIXES:
+
+* The `consent_mode` description on `crusoe_kubernetes_node_pool` now gives the right default: when you leave it out, a new node pool uses `auto`, not `propose`. (!380)
+
 ## v1.9.0 (2026-11-10)
 
 FEATURES:
