@@ -12,79 +12,8 @@ Sample Config File:
 [default]
 access_key_id="MY_ACCESS_KEY"
 secret_key="MY_SECRET_KEY"
+default_project="my-project"
 ```
-
-# Profiles
-You may specify different profiles to use in your `~/.crusoe/config` file
-
-Example:
-```
-profile="profile1"
-
-[profile1]
-access_key_id="7useLCstekgdYQ8Te2vQxi"
-secret_key="coKGIrMJudgAtk3YKMpsB2"
-ssh_public_key_file="~/.ssh/id_rsa.pub"
-api_endpoint="http://test:80/v1"
-
-[profile2]
-access_key_id="CstekgdYQ8Te2vQxi7useL"
-secret_key="IrMJudgAtk3YKMpsB2coKG"
-```
-
-In the above, we have specified two profiles, where profile1 will be used as the default as we specify on the first line. If a value is not specified in the profile, the default value will be used. For example, profile2 did not specify an api_endpoint, so the default API endpoint to production will be used.
-
-You may set which profile you use with the environment variable `CRUSOE_PROFILE` like `export CRUSOE_PROFILE=profile2`
-
-## Service Account Authentication
-
-As an alternative to an access keypair, you can authenticate as a [service account](https://console.crusoecloud.com) using OAuth2 client credentials. This is often preferable for automation (e.g. CI/CD) since service account credentials can be scoped and rotated independently of a human user's keypair.
-
-Sample Config File:
-```toml
-[default]
-client_id="MY_CLIENT_ID"
-client_secret="MY_CLIENT_SECRET"
-```
-
-Like `access_key_id`/`secret_key`, these can also be set per-profile, or via the `CRUSOE_CLIENT_ID` and `CRUSOE_CLIENT_SECRET` environment variables (which take precedence over the config file, following the same precedence rules as the API key credentials above).
-
-The provider automatically fetches and refreshes the OAuth2 access token as needed against Crusoe's token endpoint (`https://auth.crusoe.ai/oauth2/token` by default), no manual token management is required. Every token request also carries an `audience` (`https://api.crusoe.ai` by default), since the API rejects a service-account token whose `aud` claim doesn't match. To point at a different token endpoint or audience (e.g. for a non-production environment), set `token_url`/`audience` in the config file or the `CRUSOE_TOKEN_URL`/`CRUSOE_AUDIENCE` environment variables.
-
-**Configure exactly one authentication method.** You must set either the API key pair (`access_key_id` + `secret_key`) or the service account pair (`client_id` + `client_secret`) not both, and not just one field of a pair:
-
-- If neither pair is fully configured, the provider fails with a "Missing Crusoe Credentials" error.
-- If only one field of a pair is set (e.g. `client_id` without `client_secret`), the provider fails with an "Incomplete ... Credentials" error naming the missing field.
-- If both pairs are fully configured at the same time, the provider fails with a "Conflicting Crusoe Credentials" error rather than silently preferring one, this avoids accidentally authenticating as the wrong identity.
-
-## Provider Configuration
-
-The provider block supports optional `profile` and `project` attributes:
-
-```hcl
-provider "crusoe" {
-  profile = "production"  # Optional: profile from ~/.crusoe/config
-  project = "my-project"  # Optional: project name or UUID
-}
-```
-
-### Project Precedence
-
-The project used for resources is determined by the following precedence (highest to lowest):
-
-1. `project_id` attribute on individual resource/data source (UUID)
-2. `project` argument in provider block (name or UUID)
-3. `CRUSOE_DEFAULT_PROJECT` environment variable (name or UUID)
-4. `default_project` from selected profile in `~/.crusoe/config`
-
-### Profile Precedence
-
-The profile used for credentials is determined by:
-
-1. `profile` argument in provider block
-2. `CRUSOE_PROFILE` environment variable
-3. `profile` key in config file (top-level)
-4. `"default"`
 
 Then, add the following to the start of your terraform file, for example `main.tf`:
 
@@ -116,6 +45,116 @@ resource "crusoe_compute_instance" "nodes" {
 ```
 
 For more usage examples, including storage disks, startup scripts, and firewall rules, see the [examples folder](./examples/).
+
+## Profiles
+You may specify different profiles to use in your `~/.crusoe/config` file
+
+Example:
+```
+profile="profile1"
+
+[profile1]
+access_key_id="7useLCstekgdYQ8Te2vQxi"
+secret_key="coKGIrMJudgAtk3YKMpsB2"
+ssh_public_key_file="~/.ssh/id_rsa.pub"
+api_endpoint="http://test:80/v1"
+default_project="my-project"
+
+[profile2]
+access_key_id="CstekgdYQ8Te2vQxi7useL"
+secret_key="IrMJudgAtk3YKMpsB2coKG"
+default_project="other-project"
+```
+
+In the above, we have specified two profiles, where profile1 will be used as the default as we specify on the first line. If a value is not specified in the profile, the default value will be used. For example, profile2 did not specify an api_endpoint, so the default API endpoint to production will be used.
+
+You may set which profile you use with the environment variable `CRUSOE_PROFILE` like `export CRUSOE_PROFILE=profile2`
+
+## Service Account Authentication
+
+As an alternative to an access keypair, you can authenticate as a [service account](https://console.crusoecloud.com) using OAuth2 client credentials. This is often preferable for automation (e.g. CI/CD) since service account credentials can be scoped and rotated independently of a human user's keypair.
+
+Sample Config File:
+```toml
+[default]
+client_id="MY_CLIENT_ID"
+client_secret="MY_CLIENT_SECRET"
+```
+
+Like `access_key_id`/`secret_key`, these can also be set per-profile, or via the `CRUSOE_CLIENT_ID` and `CRUSOE_CLIENT_SECRET` environment variables (which take precedence over the config file, following the same precedence rules as the API key credentials above).
+
+The provider automatically fetches and refreshes the OAuth2 access token as needed against Crusoe's token endpoint (`https://auth.crusoe.ai/oauth2/token` by default), no manual token management is required. Every token request also carries an `audience` (`https://api.cloud.crusoe.ai` by default), since the API rejects a service-account token whose `aud` claim doesn't match. To point at a different token endpoint or audience (e.g. for a non-production environment), set `token_url`/`audience` in the same profile as `client_id`/`client_secret`, or set `CRUSOE_TOKEN_URL`/`CRUSOE_AUDIENCE` next to `CRUSOE_CLIENT_ID`/`CRUSOE_CLIENT_SECRET`. The provider takes the token endpoint and audience only from the source that supplies the credentials, so `CRUSOE_TOKEN_URL`/`CRUSOE_AUDIENCE` have no effect when the credentials come from a profile. Set the token endpoint and the audience together. If only one of them has a non-default value, the provider fails with an error.
+
+**Configure exactly one authentication method.** You must set either the API key pair (`access_key_id` + `secret_key`) or the service account pair (`client_id` + `client_secret`) not both, and not just one field of a pair:
+
+- If neither pair is fully configured, the provider fails with a "Missing Crusoe Credentials" error.
+- If only one field of a pair is set (e.g. `client_id` without `client_secret`), the provider fails with an "Incomplete ... Credentials" error naming the missing field.
+- If both pairs are fully configured at the same time, the provider fails with a "Conflicting Crusoe Credentials" error rather than silently preferring one, this avoids accidentally authenticating as the wrong identity.
+
+## Provider Configuration
+
+The provider block supports optional `profile`, `project`, and `api_endpoint` attributes:
+
+```hcl
+provider "crusoe" {
+  profile      = "production"                      # Optional: profile from ~/.crusoe/config
+  project      = "my-project"                      # Optional: project name or UUID
+  api_endpoint = "https://api.cloud.crusoe.ai/v1"  # Optional: Crusoe API endpoint
+}
+```
+
+### Project Precedence
+
+The project used for resources is determined by the following precedence (highest to lowest):
+
+1. `project_id` attribute on individual resource/data source (UUID)
+2. `project` argument in provider block (name or UUID)
+3. `CRUSOE_DEFAULT_PROJECT` environment variable (name or UUID)
+4. `default_project` from selected profile in `~/.crusoe/config`
+5. The only project of the user, if the user has exactly one project. The provider shows a "Using Fallback Project" warning. If the user has more than one project, the provider fails and lists them.
+
+### Profile Precedence
+
+The profile used for credentials is determined by:
+
+1. `profile` argument in provider block
+2. `CRUSOE_PROFILE` environment variable
+3. `profile` key in config file (top-level)
+4. `"default"`
+
+### API Endpoint Precedence
+
+The API endpoint is determined by:
+
+1. `api_endpoint` argument in provider block
+2. `CRUSOE_API_ENDPOINT` environment variable
+3. `api_endpoint` from selected profile in `~/.crusoe/config`
+4. `https://api.cloud.crusoe.ai/v1`
+
+### Environment Variables
+
+| Variable | Purpose |
+|---|---|
+| `CRUSOE_PROFILE` | Profile to load from `~/.crusoe/config`. |
+| `CRUSOE_DEFAULT_PROJECT` | Default project, as a name or UUID. |
+| `CRUSOE_API_ENDPOINT` | Crusoe API endpoint. |
+| `CRUSOE_ACCESS_KEY_ID` | Access key ID of an API key. |
+| `CRUSOE_SECRET_KEY` | Secret key of an API key. |
+| `CRUSOE_CLIENT_ID` | Client ID of a service account. |
+| `CRUSOE_CLIENT_SECRET` | Client secret of a service account. |
+| `CRUSOE_TOKEN_URL` | OAuth2 token endpoint for a service account. Defaults to `https://auth.crusoe.ai/oauth2/token`. Used only when the service account credentials come from the environment. |
+| `CRUSOE_AUDIENCE` | OAuth2 audience for a service account. Defaults to `https://api.cloud.crusoe.ai`. Used only when the service account credentials come from the environment. |
+
+A complete credential pair in the environment takes precedence over the credentials in the selected profile. The provider never combines one field from the environment with one field from the profile.
+
+Example, for a CI job with no config file:
+
+```bash
+export CRUSOE_CLIENT_ID="MY_CLIENT_ID"
+export CRUSOE_CLIENT_SECRET="MY_CLIENT_SECRET"
+export CRUSOE_DEFAULT_PROJECT="my-project"
+terraform plan
+```
 
 ## Development
 

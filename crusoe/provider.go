@@ -68,15 +68,15 @@ func (p *crusoeProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"api_endpoint": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The Crusoe API endpoint. Defaults to `https://api.cloud.crusoe.ai/v1`. Takes precedence over `CRUSOE_API_ENDPOINT` environment variable.",
+				MarkdownDescription: "Crusoe API endpoint. Precedence, highest first: this attribute, the `CRUSOE_API_ENDPOINT` environment variable, `api_endpoint` in the selected profile of `~/.crusoe/config`, then the default `https://api.cloud.crusoe.ai/v1`.",
 			},
 			"profile": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The name of the profile to use from `~/.crusoe/config`. When specified, credentials and default_project are loaded from this profile. Takes precedence over `CRUSOE_PROFILE` environment variable.",
+				MarkdownDescription: "Name of the profile in `~/.crusoe/config` that supplies credentials, `api_endpoint`, and `default_project`. Precedence, highest first: this attribute, the `CRUSOE_PROFILE` environment variable, the top-level `profile` key in `~/.crusoe/config`, then `default`. A complete credential pair in the environment (`CRUSOE_ACCESS_KEY_ID` and `CRUSOE_SECRET_KEY`, or `CRUSOE_CLIENT_ID` and `CRUSOE_CLIENT_SECRET`) takes precedence over the credentials in the profile.",
 			},
 			"project": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "The default project for resources. Can be a project name or UUID (resolved to UUID internally). Can be overridden per-resource via `project_id`. Takes precedence over `CRUSOE_DEFAULT_PROJECT` environment variable.",
+				MarkdownDescription: "Default project for resources, as a project name or UUID. The `project_id` attribute of a resource or data source overrides it. Precedence, highest first: this attribute, the `CRUSOE_DEFAULT_PROJECT` environment variable, then `default_project` in the selected profile of `~/.crusoe/config`. If none of these is set and the user has exactly one project, the provider uses that project.",
 			},
 		},
 	}
